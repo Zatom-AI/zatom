@@ -1,4 +1,4 @@
-import pkg_resources
+import importlib.util
 import warnings
 from importlib.util import find_spec
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -105,7 +105,7 @@ def get_metric_value(metric_dict: Dict[str, Any], metric_name: Optional[str]) ->
     Args:
         metric_dict: A dict containing metric values.
         metric_name: If provided, the name of the metric to retrieve.
-    
+
     Returns:
         The value of the metric if found, otherwise None.
     """
@@ -124,6 +124,7 @@ def get_metric_value(metric_dict: Dict[str, Any], metric_name: Optional[str]) ->
     log.info(f"Retrieved metric value! <{metric_name}={metric_value}>")
 
     return metric_value
+
 
 def default(v: Any, d: Any) -> Any:
     """Return default value `d` if `v` does not exist (i.e., is `None`).
@@ -152,7 +153,4 @@ def package_available(package_name: str) -> bool:
     Returns:
         `True` if the package is available. `False` otherwise.
     """
-    try:
-        return pkg_resources.require(package_name) is not None
-    except pkg_resources.DistributionNotFound:
-        return False
+    return importlib.util.find_spec(package_name) is not None
