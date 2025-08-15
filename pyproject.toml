@@ -80,6 +80,7 @@ dependencies = [
     "svgutils==0.3.4",
     "svgwrite==1.4.3",
     "huggingface_hub==0.34.4",
+    "pybind11==2.6.1",
 ]
 
 [project.urls]
