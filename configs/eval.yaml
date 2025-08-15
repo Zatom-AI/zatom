@@ -18,3 +18,9 @@ tags: ["dev"]
 
 # passing checkpoint path is necessary for evaluation
 ckpt_path: ???
+
+# seed for random number generators in pytorch, numpy and python.random
+seed: null
+
+# precision for PyTorch's floating-point matrix multiplication
+float32_matmul_precision: highest # NOTE: must be one of (`medium`, `high`, `highest`)

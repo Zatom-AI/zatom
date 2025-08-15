@@ -46,6 +46,10 @@ test: True
 
 # simply provide checkpoint path to resume training
 ckpt_path: null
+resume_from_last_step_dir: True # if `True`, resume from the last (i.e., max '{epoch}-{step}') checkpoint in the specified directory
 
 # seed for random number generators in pytorch, numpy and python.random
 seed: null
+
+# precision for PyTorch's floating-point matrix multiplication
+float32_matmul_precision: highest # NOTE: must be one of (`medium`, `high`, `highest`)

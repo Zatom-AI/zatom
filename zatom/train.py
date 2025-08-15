@@ -1,9 +1,11 @@
 import os
+import time
 from typing import Any, Dict, List, Tuple
 
 import hydra
 import lightning as L
 import rootutils
+import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.fabric.plugins.environments.cluster_environment import ClusterEnvironment
 from lightning.pytorch.loggers import Logger
@@ -56,7 +58,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     Returns:
         A tuple with metrics and dict with all instantiated objects.
     """
-    # set seed for random number generators in pytorch, numpy and python.random
+    # Set seed for random number generators in pytorch, numpy and python.random
     if cfg.get("seed"):
         L.seed_everything(cfg.seed, workers=True)
 
@@ -134,13 +136,56 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     if cfg.get("train"):
         log.info("Starting training!")
+
         ckpt_path = None
         if cfg.get("ckpt_path") and os.path.exists(cfg.get("ckpt_path")):
             ckpt_path = cfg.get("ckpt_path")
+
+            if cfg.resume_from_last_step_dir and os.path.isdir(ckpt_path):
+                non_ema_ckpt_files = [
+                    f
+                    for f in os.listdir(cfg.get("ckpt_path"))
+                    if f.endswith(".ckpt")
+                    and not f.endswith("-EMA.ckpt")
+                    and "-v" not in f  # ignore versioning
+                ]
+                if non_ema_ckpt_files:
+                    # extract latest (i.e., maximum) checkpoint epoch and step numbers using string splitting
+                    latest_ckpt = max(
+                        non_ema_ckpt_files,
+                        key=lambda x: [int(n) for n in x.replace(".ckpt", "").split("-")],
+                    )
+                    ckpt_path = os.path.join(cfg.get("ckpt_path"), latest_ckpt)
+                    assert os.path.exists(
+                        ckpt_path
+                    ), f"Failed to resume from the last step. Checkpoint path does not exist: {ckpt_path}."
+                else:
+                    log.warning(
+                        f"No checkpoint files found in the given directory: {cfg.get('ckpt_path')}. "
+                        "Resuming from the last step is not possible. Training with new model weights."
+                    )
+                    ckpt_path = None
+
+            elif cfg.resume_from_last_step_dir:
+                log.warning(
+                    f"`resume_from_last_step_dir` is set to `True`, but the given path {ckpt_path} is not a checkpoint directory. "
+                    "Resuming from the last checkpoint is not possible. Training with new model weights."
+                )
+                ckpt_path = None
+
+            elif os.path.isdir(ckpt_path):
+                log.warning(
+                    f"`ckpt_path` is unexpectedly set to a directory {ckpt_path}. "
+                    "Resuming from a directory is only supported when `resume_from_last_step_dir` is `True`. "
+                    "Training with new model weights."
+                )
+                ckpt_path = None
+
         elif cfg.get("ckpt_path"):
             log.warning(
                 "`ckpt_path` was given, but the path does not exist. Training with new model weights."
             )
+
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
 
     train_metrics = trainer.callback_metrics
@@ -156,7 +201,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     test_metrics = trainer.callback_metrics
 
-    # merge train and test metrics
+    # Merge train and test metrics
     metric_dict = {**train_metrics, **test_metrics}
 
     return metric_dict, object_dict
@@ -172,21 +217,31 @@ def main(cfg: DictConfig) -> float | None:
     Returns:
         Optimized metric value if found, otherwise None.
     """
+    start_time = time.time()
+
     os.makedirs(cfg.paths.output_dir, exist_ok=True)
 
-    # apply extra utilities
+    # Apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
     extras(cfg)
 
-    # train the model
+    # Set float32 matmul precision
+    if cfg.float32_matmul_precision is not None:
+        torch.set_float32_matmul_precision(cfg.float32_matmul_precision)
+
+    # Train the model
     metric_dict, _ = train(cfg)
 
-    # safely retrieve metric value for hydra-based hyperparameter optimization
+    # Safely retrieve metric value for hydra-based hyperparameter optimization
     metric_value = get_metric_value(
         metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
     )
 
-    # return optimized metric
+    # Report timing
+    elapsed_time = time.time() - start_time
+    log.info(f"Finished in {elapsed_time:.2f}s")
+
+    # Return optimized metric
     return metric_value
 
 

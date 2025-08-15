@@ -1,8 +1,11 @@
 import os
+import time
 from typing import Any, Dict, List, Tuple
 
 import hydra
+import lightning as L
 import rootutils
+import torch
 from lightning import LightningDataModule, LightningModule, Trainer
 from lightning.fabric.plugins.environments.cluster_environment import ClusterEnvironment
 from lightning.pytorch.loggers import Logger
@@ -52,7 +55,15 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     Returns:
         A tuple containing two dictionaries - the first with evaluation metrics and the second with all instantiated objects.
     """
-    assert cfg.ckpt_path
+    if cfg.ckpt_path is None:
+        log.warning(
+            "No checkpoint path provided. "
+            "Will use untrained weights to perform model inference."
+        )
+
+    # Set seed for random number generators in pytorch, numpy and python.random
+    if cfg.get("seed"):
+        L.seed_everything(cfg.seed, workers=True)
 
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
@@ -123,7 +134,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     log.info("Starting testing!")
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
-    # for predictions use trainer.predict(...)
+    # For predictions use trainer.predict(...)
     # predictions = trainer.predict(model=model, dataloaders=dataloaders, ckpt_path=cfg.ckpt_path)
 
     metric_dict = trainer.callback_metrics
@@ -138,13 +149,24 @@ def main(cfg: DictConfig) -> None:
     Args:
         cfg: DictConfig configuration composed by Hydra.
     """
+    start_time = time.time()
+
     os.makedirs(cfg.paths.output_dir, exist_ok=True)
 
-    # apply extra utilities
+    # Apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
     extras(cfg)
 
+    # Set float32 matmul precision
+    if cfg.float32_matmul_precision is not None:
+        torch.set_float32_matmul_precision(cfg.float32_matmul_precision)
+
+    # Run evaluation
     evaluate(cfg)
+
+    # Report timing
+    elapsed_time = time.time() - start_time
+    log.info(f"Finished in {elapsed_time:.2f}s")
 
 
 if __name__ == "__main__":
