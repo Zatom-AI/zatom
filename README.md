@@ -30,7 +30,7 @@ git clone https://github.com/amorehead/zatom
 cd zatom
 
 # [OPTIONAL] Create Conda environment
-conda create -n zatom python=3.10
+conda create -n zatom python=3.10 gcc=11.4.0 gxx=11.4.0 libstdcxx=14.1.0 libstdcxx-ng=14.1.0 libgcc=14.1.0 libgcc-ng=14.1.0 compilers=1.5.2
 conda activate zatom
 
 # Install requirements
