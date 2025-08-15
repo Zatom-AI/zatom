@@ -67,7 +67,7 @@ dependencies = [
     "lmdb==1.5.1",
     "matminer==0.9.2",
     "mofchecker==0.9.6",
-    "openbabel==3.1.1",
+    "openbabel==3.1.1.1",
     "p_tqdm==1.4.1",
     "pathos==0.3.4",
     "posebusters==0.4.5",
