@@ -44,29 +44,27 @@ pre-commit install
 For sake of reproducibility, one can alternatively build a Docker image for `zatom`.
 
 ```bash
-# Set up temporary directory for Docker image builds
-mkdir ../docker_zatom/ && cp Dockerfile ../docker_zatom/ && cd ../docker_zatom/
-git clone https://github.com/amorehead/zatom # Simply `cd zatom && git pull origin main && cd ../` if already cloned
+# Clone project
+git clone https://github.com/amorehead/zatom
+cd zatom
 
 # E.g., to build image on local machine
-docker build --platform linux/amd64 --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 .
+docker build --platform linux/amd64 --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 - < Dockerfile
 # Skip the following three steps if not using NERSC cluster
 docker login registry.nersc.gov
 docker tag zatom:0.0.1 registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 docker push registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 
 # E.g., alternatively, to build image on NERSC cluster
-podman-hpc build --platform linux/amd64 --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 .
+podman-hpc build --platform linux/amd64 --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 - < Dockerfile
 podman-hpc migrate zatom:0.0.1
+podman-hpc login registry.nersc.gov
 podman-hpc tag zatom:0.0.1 registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 podman-hpc push registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 
 # If using NERSC cluster, prepare image with Shifter
 shifterimg login registry.nersc.gov
 shifterimg -v pull registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
-
-# Return to original repository
-cd ../zatom/
 ```
 
-> Note: The Docker image is ~17 GB in size. Make sure you have enough storage space beforehand to build it.
+> Note: The Docker image is ~30 GB in size. Make sure you have enough storage space beforehand to build it.
