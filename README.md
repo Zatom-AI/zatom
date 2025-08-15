@@ -49,14 +49,14 @@ mkdir ../docker_zatom/ && cp Dockerfile ../docker_zatom/ && cd ../docker_zatom/
 git clone https://github.com/amorehead/zatom # Simply `cd zatom && git pull origin main && cd ../` if already cloned
 
 # E.g., on local machine
-docker build --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 .
+docker build --platform linux/amd64 --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 .
 # Skip the following three steps if not using NERSC cluster
 docker login registry.nersc.gov
 docker tag zatom:0.0.1 registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 docker push registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 
 # E.g., alternatively, on NERSC cluster
-podman-hpc build --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 .
+podman-hpc build --platform linux/amd64 --build-arg GITHUB_TOKEN=your_token_value --no-cache -t zatom:0.0.1 .
 podman-hpc migrate zatom:0.0.1
 podman-hpc tag zatom:0.0.1 registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
 podman-hpc push registry.nersc.gov/dasrepo/amorehead/zatom:0.0.1
