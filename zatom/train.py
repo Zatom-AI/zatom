@@ -1,9 +1,9 @@
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import hydra
 import lightning as L
 import rootutils
-import os
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.fabric.plugins.environments.cluster_environment import ClusterEnvironment
 from lightning.pytorch.loggers import Logger
@@ -81,7 +81,10 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if "_target_" in cfg.strategy:
         log.info(f"Instantiating strategy <{cfg.strategy._target_}>")
         strategy: Strategy = hydra.utils.instantiate(cfg.strategy)
-        if "mixed_precision" in strategy.__dict__ and getattr(strategy, "mixed_precision", None) is not None:
+        if (
+            "mixed_precision" in strategy.__dict__
+            and getattr(strategy, "mixed_precision", None) is not None
+        ):
             strategy.mixed_precision.param_dtype = (
                 resolve_omegaconf_variable(cfg.strategy.mixed_precision.param_dtype)
                 if getattr(cfg.strategy.mixed_precision, "param_dtype", None) is not None

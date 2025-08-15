@@ -15,7 +15,7 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
 
     Args:
         callbacks_cfg: A DictConfig object containing callback configurations.
-    
+
     Returns:
         A list of instantiated callbacks.
     """

@@ -1,7 +1,7 @@
 import math
+from typing import Callable
 
 import torch
-from typing import Callable
 
 from zatom.utils.pylogger import RankedLogger
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
@@ -13,9 +13,9 @@ logger = RankedLogger(__name__, rank_zero_only=False)
 
 @typecheck
 class ConstantScheduleWithWarmup:
-    """A learning rate scheduler that linearly increases the learning rate
-    factor from 0 to 1 over a specified number of warmup steps. After the
-    warmup period, the learning rate factor remains constant at 1.
+    """A learning rate scheduler that linearly increases the learning rate factor from 0 to 1 over
+    a specified number of warmup steps. After the warmup period, the learning rate factor remains
+    constant at 1.
 
     Args:
         warmup_steps: The number of warmup steps to linearly increase
@@ -45,10 +45,9 @@ class ConstantScheduleWithWarmup:
 
 @typecheck
 class CosineScheduleWithWarmup:
-    """A learning rate scheduler that linearly increases the learning rate
-    factor from 0 to 1 over `warmup_steps`, then decays it following a cosine
-    schedule of `num_cycles` to a minimum of `min_lr_factor` over the remaining
-    steps.
+    """A learning rate scheduler that linearly increases the learning rate factor from 0 to 1 over
+    `warmup_steps`, then decays it following a cosine schedule of `num_cycles` to a minimum of
+    `min_lr_factor` over the remaining steps.
 
     Args:
         warmup_steps: The number of warmup steps to linearly increase
@@ -123,7 +122,7 @@ def get_lr_scheduler(
         num_cycles: The number of cosine cycles to complete during the
             decay phase. Default is 0.5, which means one half-cycle.
         min_lr_factor: The minimum learning rate factor after decay.
-    
+
     Returns:
         A learning rate scheduler.
     """
@@ -244,8 +243,7 @@ def weighted_rigid_align(
     mask: Bool["b m"] | Bool[" m"] | None = None,  # type: ignore
     shape: torch.Size | None = None,  # type: ignore
 ) -> Float["b m 3"] | Float["m 3"]:  # type: ignore
-    """Compute weighted rigid alignments following Algorithm 28 of the
-    AlphaFold 3 supplement.
+    """Compute weighted rigid alignments following Algorithm 28 of the AlphaFold 3 supplement.
 
     The check for ambiguous rotation and low rank of cross-correlation
     between aligned point clouds is inspired by
