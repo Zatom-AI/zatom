@@ -3,6 +3,6 @@
 # Maintains an average of model weights.
 # Look at the above link for more detailed information regarding the original implementation.
 weight_averaging:
-  _target_: zatom.models.components.callbacks.weight_averaging.WeightAveraging
+  _target_: zatom.callbacks.weight_averaging.WeightAveraging
   device: null
   use_buffers: false # NOTE: this should be `true` if one is using BatchNorm layers
