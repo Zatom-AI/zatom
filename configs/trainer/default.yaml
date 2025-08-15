@@ -9,11 +9,34 @@ accelerator: cpu
 devices: 1
 
 # mixed precision for extra speed-up
-# precision: 16
+# precision: bf16-mixed
 
-# perform a validation loop every N training epochs
-check_val_every_n_epoch: 1
+# check validation set every N training epochs
+val_check_interval: 1.0
+check_val_every_n_epoch: 50
+
+# # check validation set every N training batches
+# val_check_interval: 1000
+# check_val_every_n_epoch: null
 
 # set True to to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
 deterministic: False
+
+# if `gradient_clip_val` is not `0.0` or `null`, gradients will be norm-clipped by an upper bound of `gradient_clip_val` during training
+# gradient_clip_algorithm: norm
+# gradient_clip_val: 1.0
+
+# accumulate gradients of `accumulate_grad_batches` batches (e.g., by this amount for each rank) before doing a backward pass
+# NOTE: here, we would have to accumulate gradients independently for each rank, per https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients
+accumulate_grad_batches: 1
+
+# if `num_sanity_val_steps` is > 0, then specifically that many validation steps will be run during the first call to `trainer.fit`
+num_sanity_val_steps: 0
+
+# log every N training/validation/test steps
+log_every_n_steps: 50
+
+# if `overfit_batches` is > 0, then only the first `overfit_batches` batches of the dataset splits will be used for training,
+# which may be useful for debugging and overfitting experiments
+overfit_batches: 0
