@@ -45,7 +45,7 @@ To simplify installation, one can alternatively build a Docker image for `zatom`
 
 ```bash
 # Set up temporary directory for Docker image builds
-mkdir ../zatom_docker/ && cp Dockerfile ../zatom_docker/ && cd ../zatom_docker/
+mkdir ../docker_zatom/ && cp Dockerfile ../docker_zatom/ && cd ../docker_zatom/
 git clone https://github.com/amorehead/zatom # Simply `cd zatom && git pull origin main && cd ../` if already cloned
 
 # E.g., on local machine
