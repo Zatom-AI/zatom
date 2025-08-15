@@ -29,7 +29,7 @@ RUN apt-get update \
     && apt-get clean
 
 # Install Conda dependencies
-RUN conda install -y -c conda-forge gcc=11.4.0 gxx=11.4.0 libstdcxx=14.1.0 libstdcxx-ng=14.1.0 libgcc=14.1.0 libgcc-ng=14.1.0
+RUN conda install -y -c conda-forge gcc=11.4.0 gxx=11.4.0 libstdcxx=14.1.0 libstdcxx-ng=14.1.0 libgcc=14.1.0 libgcc-ng=14.1.0 compilers
 
 # Set work directory
 WORKDIR /app/zatom
