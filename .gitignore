@@ -144,7 +144,7 @@ dmypy.json
 *.tar
 *.tar.gz
 
-# Lightning-Hydra-Template
+# Zatom
 configs/local/default.yaml
 /data/
 /logs/
