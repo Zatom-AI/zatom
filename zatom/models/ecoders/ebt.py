@@ -15,42 +15,8 @@ from torch._C import _SDPBackend as SDPBackend
 from zatom.utils.typing_utils import typecheck
 
 #################################################################################
-#               Embedding Layers for Timesteps and Class Labels                 #
+#                             Embedding Layers                                  #
 #################################################################################
-
-
-class TimestepEmbedder(nn.Module):
-    """Embed scalar timesteps into vector representations."""
-
-    def __init__(self, hidden_dim: int, frequency_embedding_dim: int = 256):
-        super().__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(frequency_embedding_dim, hidden_dim, bias=True),
-            nn.SiLU(),
-            nn.Linear(hidden_dim, hidden_dim, bias=True),
-        )
-        self.frequency_embedding_dim = frequency_embedding_dim
-
-    @typecheck
-    @staticmethod
-    def timestep_embedding(t: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
-        """Compute timestep embedding."""
-        half = dim // 2
-        freqs = torch.exp(
-            -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
-        ).to(device=t.device)
-        args = t[:, None].float() * freqs[None]
-        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-        if dim % 2:
-            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
-        return embedding
-
-    @typecheck
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        """Forward pass for timestep embedding."""
-        t_freq = self.timestep_embedding(t, self.frequency_embedding_dim)
-        t_emb = self.mlp(t_freq)
-        return t_emb
 
 
 class LabelEmbedder(nn.Module):
@@ -212,10 +178,12 @@ class EBTBlock(nn.Module):
 class FinalLayer(nn.Module):
     """The final layer of EBT."""
 
-    def __init__(self, hidden_dim: int, out_dim: int):
+    def __init__(self, hidden_dim: int):
         super().__init__()
         self.norm_final = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(hidden_dim, out_dim, bias=True)
+        self.linear = nn.Linear(
+            hidden_dim, 1, bias=False
+        )  # NOTE: Changed this to output single scalar energy. Sum of energies of each embed will be energy function per sample. The `bias` argument must be `False`, since this is an EBM and a relative energy value doesn't affect reconstruction.
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(), nn.Linear(hidden_dim, 2 * hidden_dim, bias=True)
         )
@@ -231,6 +199,9 @@ class FinalLayer(nn.Module):
 
 class EBT(nn.Module):
     """Energy-based model with a Transformer decoder (i.e., an energy decoder or E-coder).
+
+    NOTE: This model is conceptually similar to Diffusion Transformers (DiTs) except that
+    there is no time conditioning and the model outputs a single energy scalar for each example.
 
     Args:
         d_x: Input dimension.
@@ -260,14 +231,13 @@ class EBT(nn.Module):
         self.nhead = nhead
 
         self.x_embedder = nn.Linear(2 * d_x, d_model, bias=True)
-        self.t_embedder = TimestepEmbedder(d_model)
         self.dataset_embedder = LabelEmbedder(num_datasets, d_model, class_dropout_prob)
         self.spacegroup_embedder = LabelEmbedder(num_spacegroups, d_model, class_dropout_prob)
 
         self.blocks = nn.ModuleList(
             [EBTBlock(d_model, nhead, mlp_ratio=mlp_ratio) for _ in range(num_layers)]
         )
-        self.final_layer = FinalLayer(d_model, d_x)
+        self.final_layer = FinalLayer(d_model)
         self.initialize_weights()
 
     @typecheck
@@ -286,10 +256,6 @@ class EBT(nn.Module):
         nn.init.normal_(self.dataset_embedder.embedding_table.weight, std=0.02)
         nn.init.normal_(self.spacegroup_embedder.embedding_table.weight, std=0.02)
 
-        # Initialize timestep embedding MLP
-        nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
-        nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
-
         # Zero-out adaLN modulation layers in EBT blocks
         for block in self.blocks:
             nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
@@ -299,7 +265,7 @@ class EBT(nn.Module):
         nn.init.constant_(self.final_layer.adaLN_modulation[-1].weight, 0)
         nn.init.constant_(self.final_layer.adaLN_modulation[-1].bias, 0)
         nn.init.constant_(self.final_layer.linear.weight, 0)
-        nn.init.constant_(self.final_layer.linear.bias, 0)
+        # nn.init.constant_(self.final_layer.linear.bias, 0)  # NOTE: Turned off bias for final layer of EBT
 
     @typecheck
     def forward(
@@ -334,10 +300,9 @@ class EBT(nn.Module):
         x = self.x_embedder(torch.cat([x, x_sc], dim=-1)) + pos_emb
 
         # Conditioning embeddings
-        t = self.t_embedder(t.squeeze(1))  # (B, d)
         d = self.dataset_embedder(dataset_idx, self.training)  # (B, d)
         s = self.spacegroup_embedder(spacegroup, self.training)  # (B, d)
-        c = t + d + s  # (B, 1, d)
+        c = d + s  # (B, 1, d)
 
         # Transformer blocks
         for block in self.blocks:
