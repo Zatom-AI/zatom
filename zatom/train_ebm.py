@@ -46,8 +46,9 @@ log = RankedLogger(__name__, rank_zero_only=True)
 
 @task_wrapper
 def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
-    training.
+    """Trains an EBM model for generative modeling.
+
+    Can additionally evaluate on a testset, using best weights obtained during training.
 
     This method is wrapped in optional @task_wrapper decorator, that controls the behavior during
     failure. Useful for multiruns, saving info about the crash, etc.
@@ -62,11 +63,14 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("seed"):
         L.seed_everything(cfg.seed, workers=True)
 
-    log.info(f"Instantiating datamodule <{cfg.data._target_}>")
-    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+    log.info(f"Instantiating datamodule <{cfg.data.datamodule._target_}>")
+    datamodule: LightningDataModule = hydra.utils.instantiate(
+        cfg.data.datamodule, _recursive_=False
+    )
+    # datamodule.setup()  # to save metadata the first time code is run
 
-    log.info(f"Instantiating model <{cfg.model._target_}>")
-    model: LightningModule = hydra.utils.instantiate(cfg.model)
+    log.info(f"Instantiating EBM model <{cfg.ebm_module._target_}>")
+    model: LightningModule = hydra.utils.instantiate(cfg.ebm_module)
 
     log.info("Instantiating loggers...")
     logger: List[Logger] = instantiate_loggers(cfg.get("logger"))
@@ -138,57 +142,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     if cfg.get("train"):
         log.info("Starting training!")
-
-        ckpt_path = None
-        if cfg.get("ckpt_path") and os.path.exists(cfg.get("ckpt_path")):
-            ckpt_path = cfg.get("ckpt_path")
-
-            if cfg.resume_from_last_step_dir and os.path.isdir(ckpt_path):
-                non_ema_ckpt_files = [
-                    f
-                    for f in os.listdir(cfg.get("ckpt_path"))
-                    if f.endswith(".ckpt")
-                    and not f.endswith("-EMA.ckpt")
-                    and "-v" not in f  # ignore versioning
-                ]
-                if non_ema_ckpt_files:
-                    # extract latest (i.e., maximum) checkpoint epoch and step numbers using string splitting
-                    latest_ckpt = max(
-                        non_ema_ckpt_files,
-                        key=lambda x: [int(n) for n in x.replace(".ckpt", "").split("-")],
-                    )
-                    ckpt_path = os.path.join(cfg.get("ckpt_path"), latest_ckpt)
-                    assert os.path.exists(
-                        ckpt_path
-                    ), f"Failed to resume from the last step. Checkpoint path does not exist: {ckpt_path}."
-                else:
-                    log.warning(
-                        f"No checkpoint files found in the given directory: {cfg.get('ckpt_path')}. "
-                        "Resuming from the last step is not possible. Training with new model weights."
-                    )
-                    ckpt_path = None
-
-            elif cfg.resume_from_last_step_dir:
-                log.warning(
-                    f"`resume_from_last_step_dir` is set to `True`, but the given path {ckpt_path} is not a checkpoint directory. "
-                    "Resuming from the last checkpoint is not possible. Training with new model weights."
-                )
-                ckpt_path = None
-
-            elif os.path.isdir(ckpt_path):
-                log.warning(
-                    f"`ckpt_path` is unexpectedly set to a directory {ckpt_path}. "
-                    "Resuming from a directory is only supported when `resume_from_last_step_dir` is `True`. "
-                    "Training with new model weights."
-                )
-                ckpt_path = None
-
-        elif cfg.get("ckpt_path"):
-            log.warning(
-                "`ckpt_path` was given, but the path does not exist. Training with new model weights."
-            )
-
-        trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+        trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
 
     train_metrics = trainer.callback_metrics
 
