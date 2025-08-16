@@ -10,6 +10,7 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+from torch._C import _SDPBackend as SDPBackend
 
 from zatom.utils.typing_utils import typecheck
 
@@ -197,11 +198,13 @@ class EBTBlock(nn.Module):
             c
         ).chunk(6, dim=1)
         _x = modulate(self.norm1(x), shift_msa, scale_msa)
-        x = (
-            x
-            + gate_msa.unsqueeze(1)
-            * self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
-        )
+        with torch.nn.attention.sdpa_kernel(
+            backends=[SDPBackend.MATH]
+        ):  # NOTE: May want to turn this off for inference eventually
+            attn_results = self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[
+                0
+            ]  # NOTE: Need to set this, as regular SDPA from PyTorch doesn't support higher order gradients here
+        x = x + gate_msa.unsqueeze(1) * attn_results
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
 
