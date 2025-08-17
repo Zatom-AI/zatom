@@ -73,8 +73,7 @@ class EBMLitModule(LightningModule):
 
     def __init__(
         self,
-        encoder: torch.nn.Module,
-        decoder: torch.nn.Module,
+        ecoder: torch.nn.Module,
         interpolant: DictConfig,
         augmentations: DictConfig,
         sampling: DictConfig,
@@ -90,11 +89,8 @@ class EBMLitModule(LightningModule):
         # Also ensures init params will be stored in ckpt.
         self.save_hyperparameters(logger=False)
 
-        # Multimodal input encoder
-        self.encoder = encoder
-
-        # Multimodal energy decoder
-        self.decoder = decoder
+        # Multimodal input encoder/energy decoder
+        self.ecoder = ecoder
 
         # Interpolant for diffusion or flow matching training/sampling
         self.interpolant = interpolant
@@ -244,18 +240,9 @@ class EBMLitModule(LightningModule):
         Returns:
             A tuple containing the predicted output tensor and a dictionary of intermediate tensors.
         """
-        # Encode batch to latent space
-        with torch.no_grad():
-            encoded_batch = self.encoder(batch, max_num_nodes=self.max_num_nodes)
-            dense_encoded_batch = {
-                "x_1": encoded_batch["x"],
-                "token_mask": encoded_batch["mask"],
-                "diffuse_mask": encoded_batch["mask"],
-            }
-
-        # Corrupt batch using the interpolant
-        self.interpolant.device = dense_encoded_batch["x_1"].device
-        noisy_dense_encoded_batch = self.interpolant.corrupt_batch(dense_encoded_batch)
+        # TODO: Corrupt and densify batch using the interpolant
+        self.interpolant.device = batch["x_1"].device
+        noisy_dense_batch = self.interpolant.corrupt_batch(batch)
 
         # Prepare conditioning inputs to forward pass
         dataset_idx = batch.dataset_idx + 1  # 0 -> null class
@@ -265,16 +252,16 @@ class EBMLitModule(LightningModule):
         if not self.hparams.conditioning.spacegroup:
             spacegroup = torch.zeros_like(batch.spacegroup)
 
-        # Run decoder
-        pred_x = self.decoder(
-            x=noisy_dense_encoded_batch["x_t"],
-            t=noisy_dense_encoded_batch["t"],
+        # Run energy-based encoder/decoder (i.e., E-coder or `ecoder`)
+        pred_x = self.ecoder(
+            x=noisy_dense_batch["x_t"],
+            t=noisy_dense_batch["t"],
             dataset_idx=dataset_idx,
             spacegroup=spacegroup,
-            mask=dense_encoded_batch["token_mask"],
+            mask=noisy_dense_batch["token_mask"],
         )
 
-        return pred_x, noisy_dense_encoded_batch
+        return pred_x, noisy_dense_batch
 
     @typecheck
     def criterion(
@@ -644,8 +631,8 @@ class EBMLitModule(LightningModule):
         samples = self.interpolant.sample_with_classifier_free_guidance(
             batch_size=batch_size,
             num_tokens=max(sample_lengths),
-            emb_dim=self.decoder.d_x,
-            model=self.decoder,
+            emb_dim=self.ecoder.d_x,
+            model=self.ecoder,
             dataset_idx=dataset_idx,
             spacegroup=spacegroup,
             cfg_scale=cfg_scale,
@@ -679,8 +666,7 @@ class EBMLitModule(LightningModule):
         :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
         """
         if self.hparams.compile and stage == "fit":
-            self.encoder = torch.compile(self.encoder)
-            self.decoder = torch.compile(self.decoder)
+            self.ecoder = torch.compile(self.ecoder)
 
     def configure_optimizers(self) -> Dict[str, Any]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.

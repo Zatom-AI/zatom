@@ -4,7 +4,7 @@ defaults:
   - _self_
   - data: joint # NOTE: must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`)
   - encoder: transformer # NOTE: must be one of (`transformer`)
-  - decoder: ebt # NOTE: must be one of (`ebt`)
+  - ecoder: ebt # NOTE: must be one of (`ebt`)
   - ebm_module: ebm
   - logger: null
   - strategy: default

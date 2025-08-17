@@ -1,7 +1,6 @@
 _target_: zatom.models.ebm_module.EBMLitModule
 
-encoder: ${encoder}
-decoder: ${decoder}
+ecoder: ${ecoder}
 
 interpolant:
   # _target_: zatom.models.interpolants.flow_matching.FlowMatchingInterpolant

@@ -274,12 +274,13 @@ class FinalLayer(nn.Module):
 
 
 class EBT(nn.Module):
-    """Energy-based model with a Transformer encoder/decoder (i.e., an E-coder or `e_coder`).
+    """Energy-based model with a Transformer encoder/decoder (i.e., an E-coder or `ecoder`).
 
     NOTE: This model is conceptually similar to All-atom Diffusion Transformers (ADiTs) except that
     there is no self/time conditioning and the model outputs a single energy scalar for each example.
 
     Args:
+        encoder: The encoder module.
         d_x: Input dimension.
         d_model: Model dimension.
         num_layers: Number of Transformer layers.
@@ -292,6 +293,7 @@ class EBT(nn.Module):
 
     def __init__(
         self,
+        encoder: nn.Module,
         d_x: int = 8,
         d_model: int = 384,
         num_layers: int = 12,
@@ -306,6 +308,7 @@ class EBT(nn.Module):
         self.d_model = d_model
         self.nhead = nhead
 
+        self.encoder = encoder
         self.x_embedder = nn.Linear(d_x, d_model, bias=True)
         self.dataset_embedder = LabelEmbedder(num_datasets, d_model, class_dropout_prob)
         self.spacegroup_embedder = LabelEmbedder(num_spacegroups, d_model, class_dropout_prob)
@@ -369,7 +372,7 @@ class EBT(nn.Module):
         pos_emb = get_pos_embedding(token_index, self.d_model)
 
         # Input embeddings: (B, N, d)
-        x = self.x_embedder(x) + pos_emb
+        x = self.x_embedder(self.encoder(x)) + pos_emb
 
         # Conditioning embeddings
         d = self.dataset_embedder(dataset_idx, self.training)  # (B, d)

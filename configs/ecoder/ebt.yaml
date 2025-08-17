@@ -1,4 +1,6 @@
-_target_: zatom.models.decoders.ebt.EBT
+_target_: zatom.models.ecoders.ebt.EBT
+
+encoder: ${encoder}
 
 d_x: 8
 d_model: 768 # 384, 768, 1024
