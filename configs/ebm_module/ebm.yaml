@@ -8,8 +8,6 @@ interpolant:
   # min_t: 1e-2
   # corrupt: True
   # num_timesteps: 100
-  # self_condition: true
-  # self_condition_prob: 0.5
 
 augmentations:
   frac_coords: true

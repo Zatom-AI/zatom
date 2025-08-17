@@ -265,31 +265,13 @@ class EBMLitModule(LightningModule):
         if not self.hparams.conditioning.spacegroup:
             spacegroup = torch.zeros_like(batch.spacegroup)
 
-        # Use self-conditioning for ~half training batches
-        if (
-            self.interpolant.self_condition
-            and random.random() < self.interpolant.self_condition_prob  # nosec
-        ):
-            with torch.no_grad():
-                x_sc = self.decoder(
-                    x=noisy_dense_encoded_batch["x_t"],
-                    t=noisy_dense_encoded_batch["t"],
-                    dataset_idx=dataset_idx,
-                    spacegroup=spacegroup,
-                    mask=dense_encoded_batch["token_mask"],
-                    x_sc=None,
-                )
-        else:
-            x_sc = None
-
-        # Run E-coder model
+        # Run decoder
         pred_x = self.decoder(
             x=noisy_dense_encoded_batch["x_t"],
             t=noisy_dense_encoded_batch["t"],
             dataset_idx=dataset_idx,
             spacegroup=spacegroup,
             mask=dense_encoded_batch["token_mask"],
-            x_sc=x_sc,
         )
 
         return pred_x, noisy_dense_encoded_batch

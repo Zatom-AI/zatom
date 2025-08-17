@@ -274,10 +274,10 @@ class FinalLayer(nn.Module):
 
 
 class EBT(nn.Module):
-    """Energy-based model with a Transformer decoder (i.e., an energy decoder or E-decoder).
+    """Energy-based model with a Transformer encoder/decoder (i.e., an E-coder or `e_coder`).
 
-    NOTE: This model is conceptually similar to Diffusion Transformers (DiTs) except that
-    there is no time conditioning and the model outputs a single energy scalar for each example.
+    NOTE: This model is conceptually similar to All-atom Diffusion Transformers (ADiTs) except that
+    there is no self/time conditioning and the model outputs a single energy scalar for each example.
 
     Args:
         d_x: Input dimension.
@@ -306,7 +306,7 @@ class EBT(nn.Module):
         self.d_model = d_model
         self.nhead = nhead
 
-        self.x_embedder = nn.Linear(2 * d_x, d_model, bias=True)
+        self.x_embedder = nn.Linear(d_x, d_model, bias=True)
         self.dataset_embedder = LabelEmbedder(num_datasets, d_model, class_dropout_prob)
         self.spacegroup_embedder = LabelEmbedder(num_spacegroups, d_model, class_dropout_prob)
 
@@ -351,7 +351,6 @@ class EBT(nn.Module):
         dataset_idx: torch.Tensor,
         spacegroup: torch.Tensor,
         mask: torch.Tensor,
-        x_sc: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Forward pass of EBT.
 
@@ -361,7 +360,6 @@ class EBT(nn.Module):
             dataset_idx: Dataset index for each sample (B,).
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
-            x_sc: Self-conditioning x (B, N, d_in).
 
         Returns:
             torch.Tensor: Output tensor (B, N, d_out)
@@ -370,10 +368,8 @@ class EBT(nn.Module):
         token_index = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
         pos_emb = get_pos_embedding(token_index, self.d_model)
 
-        # Self-conditioning and input embeddings: (B, N, d)
-        if x_sc is None:
-            x_sc = torch.zeros_like(x)
-        x = self.x_embedder(torch.cat([x, x_sc], dim=-1)) + pos_emb
+        # Input embeddings: (B, N, d)
+        x = self.x_embedder(x) + pos_emb
 
         # Conditioning embeddings
         d = self.dataset_embedder(dataset_idx, self.training)  # (B, d)
@@ -398,7 +394,6 @@ class EBT(nn.Module):
         spacegroup: torch.Tensor,
         mask: torch.Tensor,
         cfg_scale: float,
-        x_sc: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Forward pass of EBT, while also batching the unconditional forward pass for classifier-
         free guidance.
@@ -413,14 +408,13 @@ class EBT(nn.Module):
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
             cfg_scale: Classifier-free guidance scale.
-            x_sc: Self-conditioning x (B, N, d_in).
 
         Returns:
             torch.Tensor: Output tensor (B, N, d_out)
         """
         half_x = x[: len(x) // 2]
         combined_x = torch.cat([half_x, half_x], dim=0)
-        model_out = self.forward(combined_x, t, dataset_idx, spacegroup, mask, x_sc)
+        model_out = self.forward(combined_x, t, dataset_idx, spacegroup, mask)
 
         cond_eps, uncond_eps = torch.split(model_out, len(model_out) // 2, dim=0)
         half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
