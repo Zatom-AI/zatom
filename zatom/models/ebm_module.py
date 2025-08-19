@@ -262,7 +262,7 @@ class EBMLitModule(LightningModule):
             mask=noisy_dense_batch["token_mask"],
             cell_per_node_inv=noisy_dense_batch["cell_per_node_inv"],
             token_is_periodic=noisy_dense_batch["node_is_periodic"],
-            phase=self.trainer.stage,  # 'train', 'val', 'test', 'predict'
+            phase=self.trainer.state.stage.value,  # 'train', 'val', 'test', 'predict'
         )
 
         return loss_dict

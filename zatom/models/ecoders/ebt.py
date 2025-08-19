@@ -477,7 +477,7 @@ class EBT(nn.Module):
         # Initialize `alpha` argument
         alpha = torch.clamp(self.alpha, min=0.0001)
         if not no_randomness and self.randomize_mcmc_step_size_scale != 1:
-            expanded_alpha = alpha.expand(batch_size, 1, 1, 1)
+            expanded_alpha = alpha.expand(batch_size, 1)
 
             scale = self.randomize_mcmc_step_size_scale
             low = alpha / scale
@@ -490,11 +490,7 @@ class EBT(nn.Module):
             []
         )  # NOTE: In the general case where `randomize_mcmc_num_steps is False`, this matches length of `self.randomize_mcmc_num_steps`
         for step in range(self.mcmc_num_steps):
-            if (
-                not no_randomness
-                and self.randomize_mcmc_num_steps
-                and self.randomize_mcmc_num_steps > 0
-            ):
+            if not no_randomness and self.randomize_mcmc_num_steps > 0:
                 if (
                     self.randomize_mcmc_num_steps_final_landscape
                 ):  # Only apply random steps to final landscape
@@ -644,7 +640,7 @@ class EBT(nn.Module):
         mask: torch.Tensor,
         cell_per_node_inv: torch.Tensor,
         token_is_periodic: torch.Tensor,
-        phase: Literal["train", "val", "test", "predict"] = "train",
+        phase: Literal["train", "sanity_check", "validate", "test", "predict"] = "train",
     ) -> Dict[str, torch.Tensor]:
         """MCMC-driven forward pass of EBT with loss calculation.
 
@@ -657,7 +653,7 @@ class EBT(nn.Module):
             mask: True if valid token, False if padding (B, N).
             cell_per_node_inv: Inverse cell tensor for periodic boundary conditions (flat(B * N, periodic_nodes_only), 3, 3).
             token_is_periodic: Boolean mask indicating periodic tokens (flat(B * N)).
-            phase: Current phase of the model (train, val, test, predict).
+            phase: Current phase of the model (train, sanity_check, validate, test, predict).
 
         Returns:
             Dictionary of loss values.
