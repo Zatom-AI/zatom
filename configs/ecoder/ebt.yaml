@@ -19,6 +19,9 @@ clamp_futures_grad_max_change: 9.0
 discrete_gaussian_random_noise_scaling: 1.0
 discrete_absolute_clamp: 0.0
 sharpen_predicted_discrete_distribution: 0.0
+atom_types_reconstruction_loss_weight: 1.0
+pos_reconstruction_loss_weight: 1.0
+frac_coords_reconstruction_loss_weight: 1.0
 truncate_mcmc: true
 clamp_futures_grad: false
 no_mcmc_detach: true

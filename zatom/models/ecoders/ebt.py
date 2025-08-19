@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from torch._C import _SDPBackend as SDPBackend
 
-from zatom.utils.training_utils import initialize_module_weights
+from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
 from zatom.utils.typing_utils import typecheck
 
 #################################################################################
@@ -302,6 +302,9 @@ class EBT(nn.Module):
         discrete_gaussian_random_noise_scaling: Scale factor for discrete Gaussian random noise.
         discrete_absolute_clamp: Maximum absolute value for discrete predictions.
         sharpen_predicted_discrete_distribution: Sharpening factor for predicted discrete distributions.
+        atom_types_reconstruction_loss_weight: Weighting factor for the atom types reconstruction loss.
+        pos_reconstruction_loss_weight: Weighting factor for the atom positions reconstruction loss.
+        frac_coords_reconstruction_loss_weight: Weighting factor for the atom fractional coordinates reconstruction loss.
         truncate_mcmc: Whether to truncate MCMC samples.
         clamp_futures_grad: Whether to clamp future gradients.
         no_mcmc_detach: Whether to detach MCMC samples from the graph.
@@ -337,6 +340,9 @@ class EBT(nn.Module):
         discrete_gaussian_random_noise_scaling: float = 1.0,
         discrete_absolute_clamp: float = 0.0,
         sharpen_predicted_discrete_distribution: float = 0.0,
+        atom_types_reconstruction_loss_weight: float = 1.0,
+        pos_reconstruction_loss_weight: float = 1.0,
+        frac_coords_reconstruction_loss_weight: float = 1.0,
         truncate_mcmc: bool = True,
         clamp_futures_grad: bool = False,
         no_mcmc_detach: bool = True,
@@ -361,6 +367,9 @@ class EBT(nn.Module):
         self.discrete_gaussian_random_noise_scaling = discrete_gaussian_random_noise_scaling
         self.discrete_absolute_clamp = discrete_absolute_clamp
         self.sharpen_predicted_discrete_distribution = sharpen_predicted_discrete_distribution
+        self.atom_types_reconstruction_loss_weight = atom_types_reconstruction_loss_weight
+        self.pos_reconstruction_loss_weight = pos_reconstruction_loss_weight
+        self.frac_coords_reconstruction_loss_weight = frac_coords_reconstruction_loss_weight
         self.truncate_mcmc = truncate_mcmc
         self.clamp_futures_grad = clamp_futures_grad
         self.no_mcmc_detach = no_mcmc_detach
@@ -374,9 +383,6 @@ class EBT(nn.Module):
         self.langevin_dynamics_noise_std = nn.Parameter(
             torch.tensor(float(langevin_dynamics_noise)), requires_grad=False
         )
-
-        self.softmax = nn.Softmax(dim=-1)
-        self.log_softmax = nn.LogSoftmax(dim=-1)
 
         self.vocab_size = max_num_elements + int(add_mask_atom_type)
         self.atom_type_embedder = nn.Embedding(self.vocab_size, d_model)
@@ -406,6 +412,14 @@ class EBT(nn.Module):
             weight_initialization_method,
             weight_initialization_gain=weight_initialization_gain,
         )
+
+        # Instantiate parameter-free modules
+        self.softmax = nn.Softmax(dim=-1)
+        self.log_softmax = nn.LogSoftmax(dim=-1)
+
+        # TODO: Implement padding token for discrete sequences
+        self.nll_loss = nn.NLLLoss(ignore_index=0)
+        self.mse_loss = nn.MSELoss()
 
     @typecheck
     def initialize_weights(self):
@@ -755,6 +769,7 @@ class EBT(nn.Module):
         mask: torch.Tensor,
         cell_per_node_inv: torch.Tensor,
         token_is_periodic: torch.Tensor,
+        target_tensors: Dict[str, torch.Tensor],
         phase: Literal["train", "sanity_check", "validate", "test", "predict"] = "train",
     ) -> Dict[str, torch.Tensor]:
         """MCMC-driven forward pass of EBT with loss calculation.
@@ -768,6 +783,10 @@ class EBT(nn.Module):
             mask: True if valid token, False if padding (B, N).
             cell_per_node_inv: Inverse cell tensor for periodic boundary conditions (B, N, 3, 3).
             token_is_periodic: Boolean mask indicating periodic tokens (B, N).
+            target_tensors: Dictionary containing the following target tensors for loss calculation:
+                atom_types: Target atom types tensor (B, N).
+                pos: Target positions tensor (B, N, 3).
+                frac_coords: Target fractional coordinates tensor (B, N, 3).
             phase: Current phase of the model (train, sanity_check, validate, test, predict).
 
         Returns:
@@ -788,19 +807,116 @@ class EBT(nn.Module):
             token_is_periodic,
             training=training,
             no_randomness=no_randomness,
+            return_raw_discrete_logits=True,
         )
 
-        # TODO: Calculate each loss value
-        total_loss = initial_loss = final_reconstruction_loss = initial_final_pred_energies_gap = (
-            l1_loss
-        ) = 0.0
+        # Calculate each loss for each modality
+        loss_dict = {}
 
-        loss_dict = {
-            "loss": total_loss,
-            "initial_loss": initial_loss,
-            "final_step_loss": final_reconstruction_loss,
-            "initial_final_pred_energies_gap": initial_final_pred_energies_gap,
-            "l1_loss": l1_loss,
+        reconstruction_loss_dict = {modal: 0 for modal in target_tensors}
+        modal_loss_fn_dict = {
+            "atom_types": self.nll_loss,
+            "pos": self.mse_loss,
+            "frac_coords": self.mse_loss,
         }
+
+        reconstruction_loss_weight_dict = {
+            "atom_types": self.atom_types_reconstruction_loss_weight,
+            "pos": self.pos_reconstruction_loss_weight,
+            "frac_coords": self.frac_coords_reconstruction_loss_weight,
+        }
+        total_mcmc_steps = len(pred_energies_list)
+
+        for modal in target_tensors:
+            for mcmc_step, (denoised_modals, pred_energies) in enumerate(
+                zip(denoised_modals_list, pred_energies_list)
+            ):
+                pred_modal = denoised_modals[modal]
+                target_modal = target_tensors[modal]
+                modal_loss_fn = modal_loss_fn_dict[modal]
+                reconstruction_loss_weight = reconstruction_loss_weight_dict[modal]
+
+                # Calculate modality-specific losses
+                if modal in ("pos", "frac_coords"):
+                    alignment_mask = mask & token_is_periodic if modal == "frac_coords" else mask
+                    target_modal = weighted_rigid_align(
+                        pred_modal, target_modal, mask=alignment_mask
+                    )
+                elif modal in ("atom_types",):
+                    pred_modal = self.log_softmax(pred_modal).reshape(-1, self.vocab_size)
+                else:
+                    raise NotImplementedError(f"Modality {modal} is currently not supported.")
+
+                modal_loss_value = modal_loss_fn(pred_modal, target_modal)
+
+                if self.truncate_mcmc:
+                    if mcmc_step == (total_mcmc_steps - 1):
+                        reconstruction_loss_dict[modal] = modal_loss_value
+                        final_reconstruction_loss = reconstruction_loss_dict[modal].detach()
+                        if modal in ("atom_types",):
+                            ppl_loss = torch.exp(modal_loss_value).detach()
+                else:
+                    reconstruction_loss_dict[modal] += modal_loss_value
+                    if mcmc_step == (total_mcmc_steps - 1):
+                        final_reconstruction_loss = modal_loss_value.detach()
+                        reconstruction_loss_dict[modal] = (
+                            reconstruction_loss_dict[modal] / total_mcmc_steps
+                        )  # Normalize so this is indifferent to the number of MCMC steps
+                        if modal in ("atom_types",):
+                            ppl_loss = torch.exp(modal_loss_value).detach()
+
+                # Track relevant loss values
+                if mcmc_step == 0:
+                    initial_loss = modal_loss_value.detach()
+                    initial_pred_energies = pred_energies.squeeze().mean().detach()
+                if mcmc_step == (total_mcmc_steps - 1):
+                    final_pred_energies = pred_energies.squeeze().mean().detach()
+                    modal_loss = modal_loss_value.detach()
+
+            # Collect losses
+            initial_final_pred_energies_gap = initial_pred_energies - final_pred_energies
+            total_loss = reconstruction_loss_weight * reconstruction_loss_dict[modal]
+
+            loss_dict.update(
+                {
+                    f"{modal}_loss": total_loss,
+                    f"{modal}_initial_loss": initial_loss,
+                    f"{modal}_final_step_loss": final_reconstruction_loss,
+                    f"{modal}_initial_final_pred_energies_gap": initial_final_pred_energies_gap,
+                }
+            )
+
+            if modal_loss_fn is self.nll_loss:
+                loss_dict[f"{modal}_ce_loss"] = modal_loss
+                loss_dict[f"{modal}_ppl_loss"] = ppl_loss
+            if modal_loss_fn is self.mse_loss:
+                loss_dict[f"{modal}_mse_loss"] = modal_loss
+
+        # Aggregate losses
+        loss_dict["loss"] = sum(loss_dict[f"{modal}_loss"] for modal in denoised_modals)
+        loss_dict["initial_loss"] = sum(
+            loss_dict[f"{modal}_initial_loss"] for modal in denoised_modals
+        )
+        loss_dict["final_step_loss"] = sum(
+            loss_dict[f"{modal}_final_step_loss"] for modal in denoised_modals
+        )
+        loss_dict["initial_final_pred_energies_gap"] = sum(
+            loss_dict[f"{modal}_initial_final_pred_energies_gap"] for modal in denoised_modals
+        )
+        loss_dict["ce_loss"] = sum(
+            loss_dict[f"{modal}_ce_loss"]
+            for modal in denoised_modals
+            if f"{modal}_ce_loss" in loss_dict
+        )
+        loss_dict["ppl_loss"] = sum(
+            loss_dict[f"{modal}_ppl_loss"]
+            for modal in denoised_modals
+            if f"{modal}_ppl_loss" in loss_dict
+        )
+        loss_dict["mse_loss"] = sum(
+            loss_dict[f"{modal}_mse_loss"]
+            for modal in denoised_modals
+            if f"{modal}_mse_loss" in loss_dict
+        )
 
         return loss_dict

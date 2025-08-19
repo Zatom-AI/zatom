@@ -239,7 +239,7 @@ def zero_center_coords(
 def weighted_rigid_align(
     pred_coords: Float["b m 3"] | Float["m 3"],  # type: ignore
     true_coords: Float["b m 3"] | Float["m 3"],  # type: ignore
-    seq_ids: Int["b m"] | Int[" m"],  # type: ignore
+    seq_ids: Int["b m"] | Int[" m"] | None = None,  # type: ignore
     weights: Float["b m"] | Float[" m"] | None = None,  # type: ignore
     mask: Bool["b m"] | Bool[" m"] | None = None,  # type: ignore
     shape: torch.Size | None = None,  # type: ignore
@@ -254,6 +254,8 @@ def weighted_rigid_align(
         pred_coords: A tensor of predicted 3D coordinates.
         true_coords: A tensor of ground-truth 3D coordinates.
         seq_ids: A tensor of sequence IDs corresponding to the coordinates.
+            If not provided, it is assumed that all coordinates belong
+            to the same sequence at each batch index.
         weights: A tensor of weights for each atom in the predicted and true
             coordinates. If provided, the function will compute a weighted
             rigid alignment. If not provided, it assumes uniform weights
@@ -285,7 +287,7 @@ def weighted_rigid_align(
     if shape is not None:
         pred = pred.reshape(shape)
         true = true.reshape(shape)
-        seq_ids = seq_ids.reshape(shape[:-1])
+        seq_ids = seq_ids.reshape(shape[:-1]) if seq_ids is not None else None
         weights = weights.reshape(shape[:-1]) if weights is not None else None
         mask = mask.reshape(shape[:-1]) if mask is not None else None
 
@@ -294,6 +296,8 @@ def weighted_rigid_align(
 
     # Default weights/mask
 
+    if seq_ids is None:
+        seq_ids = torch.ones((b, m), device=device, dtype=torch.long)
     if weights is None:
         weights = torch.ones((b, m), device=device, dtype=dtype)
     if mask is not None:

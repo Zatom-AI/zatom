@@ -252,6 +252,13 @@ class EBMLitModule(LightningModule):
         if not self.hparams.conditioning.spacegroup:
             spacegroup = torch.zeros_like(batch.spacegroup)
 
+        # TODO: Prepare target tensors for loss calculation
+        target_tensors = {
+            "atom_types": batch.atom_types,
+            "pos": batch.pos,
+            "frac_coords": batch.frac_coords,
+        }
+
         # Run energy-based encoder/decoder (i.e., E-coder or `ecoder`)
         loss_dict = self.ecoder.forward_with_loss_wrapper(
             atom_types=noisy_dense_batch["atom_types"],
@@ -262,7 +269,8 @@ class EBMLitModule(LightningModule):
             mask=noisy_dense_batch["token_mask"],
             cell_per_node_inv=noisy_dense_batch["cell_per_node_inv"],
             token_is_periodic=noisy_dense_batch["node_is_periodic"],
-            phase=self.trainer.state.stage.value,  # 'train', 'val', 'test', 'predict'
+            target_tensors=target_tensors,
+            phase=self.trainer.state.stage.value,  # 'train', 'sanity_check', 'validate', 'test', 'predict'
         )
 
         return loss_dict
