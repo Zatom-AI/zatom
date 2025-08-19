@@ -468,8 +468,8 @@ class EBT(nn.Module):
         # Conditioning embeddings
         d = self.dataset_embedder(dataset_idx, self.training)  # (B, d)
         s = self.spacegroup_embedder(spacegroup, self.training)  # (B, d)
-        lt = self.learnable_embedder(torch.zeros_like(token_index))
-        c = d + s + lt  # (B, 1, d)
+        lt = self.learnable_embedder(torch.zeros_like(token_index[..., 0]))
+        c = d + s + lt  # (B, d)
 
         # Transformer blocks
         for block in self.blocks:

@@ -6,7 +6,7 @@ interpolant:
   _target_: zatom.models.interpolants.flow_matching.FlowMatchingInterpolant
   disc_feats: [atom_types]
   cont_feats: [pos, frac_coords]
-  mask_token_index: ${ecoder.encoder.max_num_elements}
+  mask_token_index: ${ecoder.max_num_elements}
   min_t: 0
   max_t: 0
   corrupt: True

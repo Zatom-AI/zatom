@@ -1,6 +1,6 @@
 _target_: zatom.models.encoders.transformer.TransformerEncoder
 
-d_model: 512
+d_model: ${ebm_module.ecoder.d_model}
 nhead: 8
 dim_feedforward: 2048
 activation: "gelu"
