@@ -534,8 +534,8 @@ class EBT(nn.Module):
             dataset_idx: Dataset index for each sample (B,).
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
-            cell_per_node_inv: Inverse cell tensor for periodic boundary conditions (flat(B * N, periodic_nodes_only), 3, 3).
-            token_is_periodic: Boolean mask indicating periodic tokens (flat(B * N)).
+            cell_per_node_inv: Inverse cell tensor for periodic boundary conditions (B, N, 3, 3).
+            token_is_periodic: Boolean mask indicating periodic tokens (B, N).
             training: If True, enables computation graph tracking in final MCMC step.
             no_randomness: If True, disables randomness in MCMC steps.
             return_raw_discrete_logits: If True, returns raw logits instead of probabilities.
@@ -556,7 +556,7 @@ class EBT(nn.Module):
         # Initialize `alpha` argument
         alpha = torch.clamp(self.alpha, min=0.0001)
         if not no_randomness and self.randomize_mcmc_step_size_scale != 1:
-            expanded_alpha = alpha.expand(batch_size, 1)
+            expanded_alpha = alpha.expand(batch_size, 1, 1)
 
             scale = self.randomize_mcmc_step_size_scale
             low = alpha / scale
@@ -639,12 +639,14 @@ class EBT(nn.Module):
 
                     # Update fractional coordinates according to (de)noised atom positions
                     frac_coords_aug = torch.einsum(
-                        "bi,bij->bj",
-                        pred_pos[mask][token_is_periodic],
+                        "bni,bnij->bnj",
+                        pred_pos,
                         cell_per_node_inv,
                     )
                     frac_coords_aug = frac_coords_aug % 1.0
-                    pred_frac_coords[mask][token_is_periodic] = frac_coords_aug
+                    pred_frac_coords = torch.where(
+                        (mask & token_is_periodic).unsqueeze(-1), frac_coords_aug, pred_frac_coords
+                    )
 
                 # Combine input and current discrete modality embeddings
                 if self.normalize_discrete_initial_condition:
@@ -702,13 +704,14 @@ class EBT(nn.Module):
 
                 # Update fractional coordinates according to (de)noised atom positions
                 frac_coords_aug = torch.einsum(
-                    "bi,bij->bj",
-                    pred_pos[mask][token_is_periodic],
+                    "bni,bnij->bnj",
+                    pred_pos,
                     cell_per_node_inv,
                 )
                 frac_coords_aug = frac_coords_aug % 1.0
-                pred_frac_coords[mask][token_is_periodic] = frac_coords_aug
-
+                pred_frac_coords = torch.where(
+                    (mask & token_is_periodic).unsqueeze(-1), frac_coords_aug, pred_frac_coords
+                )
                 # Prepare discrete distributions
                 if self.discrete_absolute_clamp != 0.0:
                     pred_atom_types = torch.clamp(
@@ -763,8 +766,8 @@ class EBT(nn.Module):
             dataset_idx: Dataset index for each sample (B,).
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
-            cell_per_node_inv: Inverse cell tensor for periodic boundary conditions (flat(B * N, periodic_nodes_only), 3, 3).
-            token_is_periodic: Boolean mask indicating periodic tokens (flat(B * N)).
+            cell_per_node_inv: Inverse cell tensor for periodic boundary conditions (B, N, 3, 3).
+            token_is_periodic: Boolean mask indicating periodic tokens (B, N).
             phase: Current phase of the model (train, sanity_check, validate, test, predict).
 
         Returns:

@@ -177,22 +177,37 @@ class FlowMatchingInterpolant:
                 )
 
                 # Compute new fractional coordinates for samples which are periodic
-                noisy_batch["cell_per_node_inv"] = torch.linalg.inv(
+                cell_per_node_inv = torch.linalg.inv(
                     batch["cell"][batch["batch"]][batch["node_is_periodic"]]
                 )
                 frac_coords_aug = torch.einsum(
                     "bi,bij->bj",
                     noisy_batch["pos"][noisy_batch["token_mask"]][batch["node_is_periodic"]],
-                    noisy_batch["cell_per_node_inv"],
+                    cell_per_node_inv,
                 )
                 frac_coords_aug = frac_coords_aug % 1.0
 
+                # Densify fractional coordinates
                 noisy_batch["frac_coords"], _ = to_dense_batch(
                     noisy_batch["frac_coords"], batch["batch"], max_num_nodes=self.max_num_nodes
                 )
                 noisy_batch["frac_coords"][noisy_batch["token_mask"]][
                     batch["node_is_periodic"]
                 ] = frac_coords_aug
+
+                noisy_batch["cell_per_node_inv"] = torch.zeros(
+                    (*noisy_batch["frac_coords"].shape, 3),
+                    device=noisy_batch["frac_coords"].device,
+                )
+                noisy_batch["cell_per_node_inv"][noisy_batch["token_mask"]][
+                    batch["node_is_periodic"]
+                ] = cell_per_node_inv
+
+                noisy_batch["node_is_periodic"], _ = to_dense_batch(
+                    noisy_batch["node_is_periodic"],
+                    batch["batch"],
+                    max_num_nodes=self.max_num_nodes,
+                )
 
             # Handle all other features
             else:
