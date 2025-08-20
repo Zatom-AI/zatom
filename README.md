@@ -45,7 +45,7 @@ conda create -n zatom -c conda-forge python=3.10 gcc=11.4.0 gxx=11.4.0 libstdcxx
 conda activate zatom
 
 # [OPTIONAL] Alternatively, create Conda environment (for macOS)
-conda create -n zatom -c conda-forge python=3.10 clang=18 clangxx=18 libcxx=18 libcxx-devel=18 lld=20.1.7 pybind11=3.0.0
+conda create -n zatom -c conda-forge python=3.10 clang=18 clangxx=18 libcxx=18 libcxx-devel=18 libgfortran5=15.1.0 lld=20.1.7 pybind11=3.0.0
 conda activate zatom
 
 # [OPTIONAL] Install `pyeqeq` (for macOS)

@@ -9,6 +9,31 @@ from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
 log = RankedLogger(__name__, rank_zero_only=False)
 
+# Constants
+
+
+@typecheck
+def get_best_device() -> torch.device:
+    """Select the best available PyTorch device in a prioritized order.
+
+    Returns:
+        torch.device: The best available device.
+    """
+    # Priority order — adjust if you prefer a different ranking
+    if torch.cuda.is_available() and torch.version.cuda:
+        return torch.device("cuda")
+    if torch.cuda.is_available() and torch.version.hip:
+        return torch.device("hip")
+    if torch.mps.is_available():
+        return torch.device("mps")
+    if torch.xpu.is_available():
+        return torch.device("xpu")
+
+    return torch.device("cpu")  # Fallback
+
+
+BEST_DEVICE = get_best_device()
+
 # Classes
 
 
@@ -235,7 +260,7 @@ def zero_center_coords(
 
 @typecheck
 @torch.no_grad()
-@torch.amp.autocast(device_type="cuda", enabled=False, cache_enabled=False)
+@torch.amp.autocast(device_type=BEST_DEVICE.type, enabled=False, cache_enabled=False)
 def weighted_rigid_align(
     pred_coords: Float["b m 3"] | Float["m 3"],  # type: ignore
     true_coords: Float["b m 3"] | Float["m 3"],  # type: ignore
