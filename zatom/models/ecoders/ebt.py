@@ -921,27 +921,35 @@ class EBT(nn.Module):
                 modal_loss_fn = modal_loss_fn_dict[modal]
                 reconstruction_loss_weight = reconstruction_loss_weight_dict[modal]
 
+                loss_mask = mask.float()
+                loss_token_is_periodic = token_is_periodic.float()
+
                 target_shape = target_modal.shape
 
                 # Calculate modality-specific losses
-                if modal == "pos":
-                    alignment_mask = mask & token_is_periodic if modal == "frac_coords" else mask
-                    target_modal = weighted_rigid_align(
-                        pred_modal, target_modal, mask=alignment_mask
-                    )
-                elif modal == "atom_types":
+                if modal == "atom_types":
                     pred_modal = self.log_softmax(pred_modal).reshape(-1, self.vocab_size)
                     target_modal = target_modal.reshape(-1)
+                elif modal == "pos":
+                    target_modal = weighted_rigid_align(pred_modal, target_modal, mask=mask)
+                    loss_mask = mask.unsqueeze(-1).float()
+                elif modal == "frac_coords":
+                    loss_mask = mask.unsqueeze(-1).float()
+                    loss_token_is_periodic = token_is_periodic.unsqueeze(-1).float()
+                elif modal in ("lengths_scaled", "angles_radians"):
+                    loss_mask = torch.ones(
+                        target_shape, dtype=torch.float, device=target_modal.device
+                    )
+                    loss_token_is_periodic = (
+                        token_is_periodic.any(-1, keepdim=True).unsqueeze(-1).float()
+                    )  # NOTE: A periodic sample is one with any periodic atoms
 
                 modal_loss_value = (
-                    modal_loss_fn(pred_modal, target_modal).reshape(target_shape)
-                    * mask.expand_as(target_shape).float()
+                    modal_loss_fn(pred_modal, target_modal).reshape(target_shape) * loss_mask
                 )
 
                 if modal in ("frac_coords", "lengths_scaled", "angles_radians"):
-                    modal_loss_value = (
-                        modal_loss_value * token_is_periodic.expand_as(target_shape).float()
-                    )
+                    modal_loss_value = modal_loss_value * loss_token_is_periodic
 
                 if self.truncate_mcmc:
                     if mcmc_step == (total_mcmc_steps - 1):
@@ -973,18 +981,18 @@ class EBT(nn.Module):
 
             loss_dict.update(
                 {
-                    f"{modal}_loss": total_loss,
-                    f"{modal}_initial_loss": initial_loss,
-                    f"{modal}_final_step_loss": final_reconstruction_loss,
+                    f"{modal}_loss": total_loss.mean(),
+                    f"{modal}_initial_loss": initial_loss.mean(),
+                    f"{modal}_final_step_loss": final_reconstruction_loss.mean(),
                     f"{modal}_initial_final_pred_energies_gap": initial_final_pred_energies_gap,
                 }
             )
 
             if modal_loss_fn is self.nll_loss:
-                loss_dict[f"{modal}_ce_loss"] = modal_loss
-                loss_dict[f"{modal}_ppl_loss"] = ppl_loss
+                loss_dict[f"{modal}_ce_loss"] = modal_loss.mean()
+                loss_dict[f"{modal}_ppl_loss"] = ppl_loss.mean()
             if modal_loss_fn is self.mse_loss:
-                loss_dict[f"{modal}_mse_loss"] = modal_loss
+                loss_dict[f"{modal}_mse_loss"] = modal_loss.mean()
 
         # Aggregate losses
         loss_dict["loss"] = sum(loss_dict[f"{modal}_loss"] for modal in denoised_modals)
