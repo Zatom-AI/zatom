@@ -21,6 +21,9 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
+                "data.datamodule.num_workers.train=1",
+                "data.datamodule.num_workers.val=1",
+                "data.datamodule.num_workers.test=1",
                 // "encoder.num_layers=2",
                 // "ecoder.num_layers=2",
                 // "trainer=ddp",
