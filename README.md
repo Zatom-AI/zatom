@@ -24,14 +24,39 @@ Official repository of Zatom, a multimodal energy-based all-atom transformer
 
 > Note: We recommend installing `zatom` in a clean Python environment, using `conda` or otherwise.
 
+For example, to install `conda`, one can use the following commands.
+
+```bash
+wget "https://github.com/conda-forge/miniforge/releases/download/25.3.1-0/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh  # accept all terms and install to the default location
+rm Miniforge3-$(uname)-$(uname -m).sh  # (optionally) remove installer after using it
+source ~/.bashrc  # or `source ~/.zshrc` - alternatively, one can restart their shell session to achieve the same result
+```
+
+With `conda` available, one can build a virtual environment for `zatom`.
+
 ```bash
 # Clone project
 git clone https://github.com/amorehead/zatom
 cd zatom
 
-# [OPTIONAL] Create Conda environment
-conda create -n zatom python=3.10 gcc=11.4.0 gxx=11.4.0 libstdcxx=14.1.0 libstdcxx-ng=14.1.0 libgcc=14.1.0 libgcc-ng=14.1.0 compilers=1.5.2
+# [OPTIONAL] Create Conda environment (for Linux)
+conda create -n zatom -c conda-forge python=3.10 gcc=11.4.0 gxx=11.4.0 libstdcxx=14.1.0 libstdcxx-ng=14.1.0 libgcc=14.1.0 libgcc-ng=14.1.0 compilers=1.5.2
 conda activate zatom
+
+# [OPTIONAL] Alternatively, create Conda environment (for macOS)
+conda create -n zatom -c conda-forge python=3.10 clang=18 clangxx=18 libcxx=18 libcxx-devel=18 lld=20.1.7 pybind11=3.0.0
+conda activate zatom
+
+# [OPTIONAL] Install `pyeqeq` (for macOS)
+export CC=clang
+export CXX=clang++
+export CPPFLAGS="-isystem $CONDA_PREFIX/include -isystem $CONDA_PREFIX/include/c++/v1"
+export CXXFLAGS="-std=c++17"
+export LDFLAGS="-fuse-ld=lld -L$CONDA_PREFIX/lib"
+export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
+pip install --no-build-isolation pyeqeq
+unset DYLD_LIBRARY_PATH
 
 # Install requirements
 pip install -e .[cuda]
@@ -40,7 +65,7 @@ pip install -e .[cuda]
 pre-commit install
 ```
 
-> Note: If you are installing on systems without access to CUDA GPUs, remove `[cuda]` from the above commands. Be aware that the CPU version will be significantly slower than the GPU version.
+> Note: If you are installing on systems without access to CUDA GPU (e.g., macOS), remove `[cuda]` from the above commands. Be aware that the CPU version (e.g., without macOS's MPS backend) will be significantly slower than the GPU version.
 
 ### Docker
 
