@@ -14,7 +14,7 @@
             "args": []
         },
         {
-            "name": "train_ebm.py",
+            "name": "[DEFAULT] train_ebm.py",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/zatom/train_ebm.py",
@@ -32,6 +32,29 @@
                 "trainer.check_val_every_n_epoch=null",
                 "trainer.val_check_interval=2",
                 "+trainer.limit_val_batches=2",
+            ]
+        },
+        {
+            "name": "[OVERFIT] train_ebm.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zatom/train_ebm.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "data.datamodule.batch_size.train=4",
+                "data.datamodule.batch_size.val=4",
+                "data.datamodule.batch_size.test=4",
+                "data.datamodule.num_workers.train=1",
+                "data.datamodule.num_workers.val=1",
+                "data.datamodule.num_workers.test=1",
+                "logger=wandb",
+                "name='EBT-B__encoder@768_ecoder@768_joint_overfitting'",
+                // "trainer=ddp",
+                "trainer=mps",
+                "trainer.check_val_every_n_epoch=null",
+                "trainer.val_check_interval=100",
+                "trainer.overfit_batches=1"
             ]
         }
     ]
