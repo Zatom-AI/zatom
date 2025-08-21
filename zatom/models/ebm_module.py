@@ -367,29 +367,30 @@ class EBMLitModule(LightningModule):
             for dataset_index in batch.dataset_idx.unique().tolist():
                 dataset_name = IDX_TO_DATASET[dataset_index]
                 if self.num_nodes_bincount[dataset_name] is not None:
-                    self.num_nodes_bincount[dataset_name] = self.num_nodes_bincount[dataset_name][
-                        batch_num_nodes : batch_num_nodes + 1
-                    ]
+                    self.num_nodes_bincount[dataset_name][
+                        torch.arange(self.num_nodes_bincount[dataset_name].size(0))
+                        != batch_num_nodes
+                    ] = 0
                 if self.spacegroups_bincount[dataset_name] is not None:
-                    self.spacegroups_bincount[dataset_name] = self.spacegroups_bincount[
-                        dataset_name
-                    ][batch_spacegroup : batch_spacegroup + 1]
+                    self.spacegroups_bincount[dataset_name][
+                        torch.arange(self.spacegroups_bincount[dataset_name].size(0))
+                        != batch_spacegroup
+                    ] = 0
 
         # Corrupt and densify batch using the interpolant
         self.interpolant.device = self.device
-        self.interpolant.max_num_nodes = (
-            batch.num_nodes
-            if overfitting
-            else max(
-                len(self.num_nodes_bincount[dataset]) - 1
-                for dataset in datasets_dict
-                if datasets_dict[dataset].proportion > 0.0
-            )
+        self.interpolant.max_num_nodes = max(
+            len(self.num_nodes_bincount[dataset]) - 1
+            for dataset in datasets_dict
+            if datasets_dict[dataset].proportion > 0.0
         )
         noisy_dense_batch = self.interpolant.corrupt_batch(batch)
 
         # Prepare conditioning inputs to forward pass
-        dataset_idx = batch.dataset_idx + 1  # 0 -> null class
+        use_cfg = self.ecoder.class_dropout_prob > 0
+        dataset_idx = batch.dataset_idx + int(
+            use_cfg
+        )  # 0 -> null class (for classifier-free guidance or CFG)
         # if not self.hparams.conditioning.dataset_idx:
         #     dataset_idx = torch.zeros_like(dataset_idx)
         spacegroup = batch.spacegroup
@@ -735,9 +736,10 @@ class EBMLitModule(LightningModule):
         ).to(self.device)
 
         # Create dataset_idx tensor
-        # NOTE 0 -> null class within DiT, while 0 -> MP20 elsewhere, so increment by 1
+        # NOTE 0 -> null class within EBT, while 0 -> MP20 elsewhere, so increment by 1 (for classifier-free guidance or CFG)
+        use_cfg = self.ecoder.class_dropout_prob > 0
         dataset_idx = torch.full(
-            (batch_size,), dataset_idx + 1, dtype=torch.int64, device=self.device
+            (batch_size,), dataset_idx + int(use_cfg), dtype=torch.int64, device=self.device
         )
 
         # Create spacegroup tensor

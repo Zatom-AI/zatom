@@ -366,6 +366,7 @@ class EBT(nn.Module):
         self.randomize_mcmc_num_steps_min = randomize_mcmc_num_steps_min
         self.randomize_mcmc_step_size_scale = randomize_mcmc_step_size_scale
         self.randomize_mcmc_num_steps_final_landscape = randomize_mcmc_num_steps_final_landscape
+        self.class_dropout_prob = class_dropout_prob
         self.langevin_dynamics_noise = langevin_dynamics_noise
         self.clamp_futures_grad_max_change = clamp_futures_grad_max_change
         self.discrete_gaussian_random_noise_scaling = discrete_gaussian_random_noise_scaling
@@ -502,7 +503,7 @@ class EBT(nn.Module):
 
         # Prediction layer
         x = self.final_layer(x, c)  # (B, N, d_out)
-        x = x * mask[..., None]
+        x = x * mask.unsqueeze(-1)  # Mask out padding tokens
         return x
 
     @typecheck
@@ -578,7 +579,9 @@ class EBT(nn.Module):
         pred_lengths_scaled = lengths_scaled.clone().detach()
         pred_angles_radians = angles_radians.clone().detach()
 
-        pred_atom_types = self._corrupt_discrete_types(atom_types)  # [B, S, V]
+        pred_atom_types = self._corrupt_discrete_types(atom_types) * mask.unsqueeze(
+            -1
+        )  # [B, S, V]
 
         # Initialize `alpha` argument
         alpha = torch.clamp(self.alpha, min=0.0001)
@@ -933,6 +936,7 @@ class EBT(nn.Module):
                 elif modal == "pos":
                     target_modal = weighted_rigid_align(pred_modal, target_modal, mask=mask)
                     loss_mask = mask.unsqueeze(-1).float()
+                    loss_token_is_periodic = token_is_periodic.unsqueeze(-1).float()
                 elif modal == "frac_coords":
                     loss_mask = mask.unsqueeze(-1).float()
                     loss_token_is_periodic = token_is_periodic.unsqueeze(-1).float()
@@ -948,8 +952,14 @@ class EBT(nn.Module):
                     modal_loss_fn(pred_modal, target_modal).reshape(target_shape) * loss_mask
                 )
 
-                if modal in ("frac_coords", "lengths_scaled", "angles_radians"):
+                if modal in (
+                    "frac_coords",
+                    "lengths_scaled",
+                    "angles_radians",
+                ):  # Periodic (crystal) losses
                     modal_loss_value = modal_loss_value * loss_token_is_periodic
+                elif modal == "pos":  # Non-periodic (molecule) losses
+                    modal_loss_value = modal_loss_value * (1 - loss_token_is_periodic)
 
                 if self.truncate_mcmc:
                     if mcmc_step == (total_mcmc_steps - 1):
