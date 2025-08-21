@@ -30,8 +30,8 @@
                 "trainer=mps",
                 "trainer.log_every_n_steps=1",
                 "trainer.check_val_every_n_epoch=null",
-                "trainer.val_check_interval=3",
-                "+trainer.limit_val_batches=3",
+                "trainer.val_check_interval=2",
+                "+trainer.limit_val_batches=2",
             ]
         }
     ]
