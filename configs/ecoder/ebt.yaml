@@ -25,9 +25,9 @@ pos_reconstruction_loss_weight: 10.0
 frac_coords_reconstruction_loss_weight: 10.0
 lengths_scaled_reconstruction_loss_weight: 1.0
 angles_radians_reconstruction_loss_weight: 10.0
-truncate_mcmc: false # NOTE: With `truncate_mcmc=false` and `no_mcmc_detach=true`, (S2) MCMC gradients will be fully propagated (n.b., which may impact training stability)
+truncate_mcmc: false
 clamp_futures_grad: false
-no_mcmc_detach: true
+no_mcmc_detach: true # NOTE: With `truncate_mcmc=false` and `no_mcmc_detach=true`, (S2) MCMC gradients will be fully propagated (n.b., which may trade off training stability for performance)
 no_langevin_during_eval: false
 mcmc_step_size_learnable: false
 randomize_mcmc_num_steps_final_landscape: false
