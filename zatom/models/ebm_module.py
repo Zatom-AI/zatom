@@ -362,20 +362,24 @@ class EBMLitModule(LightningModule):
         # Subset distributions when overfitting (one-time only)
         overfitting = self.trainer.overfit_batches == 1
         if overfitting and self.trainer.global_step == 0:
-            batch_num_nodes = batch.num_nodes.item()
-            batch_spacegroup = batch.spacegroup.item()
-            for dataset_index in batch.dataset_idx.unique().tolist():
-                dataset_name = IDX_TO_DATASET[dataset_index]
+            batch_num_nodes = torch.bincount(batch.batch)
+            for batch_index, dataset_index in enumerate(batch.dataset_idx):
+                num_nodes = batch_num_nodes[batch_index]
+                dataset_name = IDX_TO_DATASET[dataset_index.item()]
+
+                # Filter `num_nodes_bincount`
                 if self.num_nodes_bincount[dataset_name] is not None:
-                    self.num_nodes_bincount[dataset_name][
-                        torch.arange(self.num_nodes_bincount[dataset_name].size(0))
-                        != batch_num_nodes
-                    ] = 0
+                    bins = torch.arange(self.num_nodes_bincount[dataset_name].size(0))
+                    mask = torch.isin(bins, num_nodes.to(bins.device))  # Keep only matching bins
+                    self.num_nodes_bincount[dataset_name][~mask] = 0
+
+                # Filter `spacegroups_bincount`
                 if self.spacegroups_bincount[dataset_name] is not None:
-                    self.spacegroups_bincount[dataset_name][
-                        torch.arange(self.spacegroups_bincount[dataset_name].size(0))
-                        != batch_spacegroup
-                    ] = 0
+                    bins = torch.arange(self.spacegroups_bincount[dataset_name].size(0))
+                    mask = torch.isin(
+                        bins, batch.spacegroup[batch_index].to(bins.device)
+                    )  # Keep only matching bins
+                    self.spacegroups_bincount[dataset_name][~mask] = 0
 
         # Corrupt and densify batch using the interpolant
         self.interpolant.device = self.device

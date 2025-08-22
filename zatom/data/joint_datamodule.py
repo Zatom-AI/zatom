@@ -139,14 +139,21 @@ class JointDataModule(LightningDataModule):
         self.qm9_val_dataset = qm9_dataset[100000:118000]
         self.qm9_test_dataset = qm9_dataset[118000:]
         # Retain subset of dataset; can be used to train on only one dataset, too
-        self.qm9_train_dataset = self.qm9_train_dataset[
-            : int(len(self.qm9_train_dataset) * self.hparams.datasets.qm9.proportion)
-        ]
+        qm9_train_subset_size = int(
+            len(self.qm9_train_dataset) * self.hparams.datasets.qm9.proportion
+        )
+        self.qm9_train_dataset = self.qm9_train_dataset[:qm9_train_subset_size]
         self.qm9_val_dataset = self.qm9_val_dataset[
-            : int(len(self.qm9_val_dataset) * self.hparams.datasets.qm9.proportion)
+            : max(
+                qm9_train_subset_size,
+                int(len(self.qm9_val_dataset) * self.hparams.datasets.qm9.proportion),
+            )
         ]
         self.qm9_test_dataset = self.qm9_test_dataset[
-            : int(len(self.qm9_test_dataset) * self.hparams.datasets.qm9.proportion)
+            : max(
+                qm9_train_subset_size,
+                int(len(self.qm9_test_dataset) * self.hparams.datasets.qm9.proportion),
+            )
         ]
 
         # MP20 dataset
@@ -162,14 +169,21 @@ class JointDataModule(LightningDataModule):
         self.mp20_val_dataset = mp20_dataset[27138 : 27138 + 9046]
         self.mp20_test_dataset = mp20_dataset[27138 + 9046 :]
         # Retain subset of dataset; can be used to train on only one dataset, too
-        self.mp20_train_dataset = self.mp20_train_dataset[
-            : int(len(self.mp20_train_dataset) * self.hparams.datasets.mp20.proportion)
-        ]
+        mp20_train_subset_size = int(
+            len(self.mp20_train_dataset) * self.hparams.datasets.mp20.proportion
+        )
+        self.mp20_train_dataset = self.mp20_train_dataset[:mp20_train_subset_size]
         self.mp20_val_dataset = self.mp20_val_dataset[
-            : int(len(self.mp20_val_dataset) * self.hparams.datasets.mp20.proportion)
+            : max(
+                mp20_train_subset_size,
+                int(len(self.mp20_val_dataset) * self.hparams.datasets.mp20.proportion),
+            )
         ]
         self.mp20_test_dataset = self.mp20_test_dataset[
-            : int(len(self.mp20_test_dataset) * self.hparams.datasets.mp20.proportion)
+            : max(
+                mp20_train_subset_size,
+                int(len(self.mp20_test_dataset) * self.hparams.datasets.mp20.proportion),
+            )
         ]
 
         # QMOF150 dataset
@@ -185,14 +199,21 @@ class JointDataModule(LightningDataModule):
         self.qmof150_val_dataset = qmof150_dataset[:1024]
         self.qmof150_test_dataset = qmof150_dataset[1024:2048]
         # Retain subset of dataset; can be used to train on only one dataset, too
-        self.qmof150_train_dataset = self.qmof150_train_dataset[
-            : int(len(self.qmof150_train_dataset) * self.hparams.datasets.qmof150.proportion)
-        ]
+        qmof150_train_subset_size = int(
+            len(self.qmof150_train_dataset) * self.hparams.datasets.qmof150.proportion
+        )
+        self.qmof150_train_dataset = self.qmof150_train_dataset[:qmof150_train_subset_size]
         self.qmof150_val_dataset = self.qmof150_val_dataset[
-            : int(len(self.qmof150_val_dataset) * self.hparams.datasets.qmof150.proportion)
+            : max(
+                qmof150_train_subset_size,
+                int(len(self.qmof150_val_dataset) * self.hparams.datasets.qmof150.proportion),
+            )
         ]
         self.qmof150_test_dataset = self.qmof150_test_dataset[
-            : int(len(self.qmof150_test_dataset) * self.hparams.datasets.qmof150.proportion)
+            : max(
+                qmof150_train_subset_size,
+                int(len(self.qmof150_test_dataset) * self.hparams.datasets.qmof150.proportion),
+            )
         ]
 
         if stage is None or stage in ["fit", "validate"]:
