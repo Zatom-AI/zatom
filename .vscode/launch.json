@@ -72,6 +72,7 @@
                 "trainer=mps",
                 "trainer.check_val_every_n_epoch=null",
                 "trainer.val_check_interval=200",
+                "trainer.max_epochs=2500",
                 "trainer.overfit_batches=1"
             ]
         }

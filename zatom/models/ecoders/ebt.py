@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Literal, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch._C import _SDPBackend as SDPBackend
 
 from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
@@ -420,10 +421,7 @@ class EBT(nn.Module):
             weight_initialization_gain=weight_initialization_gain,
         )
 
-        # Instantiate parameter-free modules
-        self.softmax = nn.Softmax(dim=-1)
-        self.log_softmax = nn.LogSoftmax(dim=-1)
-
+        # Instantiate losses
         self.nll_loss = nn.NLLLoss(ignore_index=-100, reduction="none")
         self.mse_loss = nn.MSELoss(reduction="none")
 
@@ -693,7 +691,7 @@ class EBT(nn.Module):
 
                 # Combine input and current discrete modality embeddings
                 if self.normalize_discrete_initial_condition:
-                    pred_atom_types = self.softmax(pred_atom_types)
+                    pred_atom_types = F.softmax(pred_atom_types, dim=-1)
 
                 pred_atom_type_embedding = self.atom_type_vocab_to_embedding(pred_atom_types)
                 pred_atom_types_embeddings = torch.cat(
@@ -820,7 +818,7 @@ class EBT(nn.Module):
                 if return_raw_discrete_logits:
                     pred_atom_types_for_loss = pred_atom_types.reshape(-1, self.vocab_size)
                 else:
-                    pred_atom_types_for_loss = self.log_softmax(pred_atom_types).reshape(
+                    pred_atom_types_for_loss = F.log_softmax(pred_atom_types, dim=-1).reshape(
                         -1, self.vocab_size
                     )
 
@@ -931,7 +929,7 @@ class EBT(nn.Module):
 
                 # Calculate modality-specific losses
                 if modal == "atom_types":
-                    pred_modal = self.log_softmax(pred_modal).reshape(-1, self.vocab_size)
+                    pred_modal = F.log_softmax(pred_modal, dim=-1).reshape(-1, self.vocab_size)
                     target_modal = target_modal.reshape(-1)
                 elif modal == "pos":
                     target_modal = weighted_rigid_align(pred_modal, target_modal, mask=mask)

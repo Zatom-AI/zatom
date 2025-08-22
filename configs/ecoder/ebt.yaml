@@ -23,7 +23,7 @@ sharpen_predicted_discrete_distribution: 0.0
 atom_types_reconstruction_loss_weight: 1.0
 pos_reconstruction_loss_weight: 10.0
 frac_coords_reconstruction_loss_weight: 10.0
-lengths_scaled_reconstruction_loss_weight: 1.0
+lengths_scaled_reconstruction_loss_weight: 10.0
 angles_radians_reconstruction_loss_weight: 10.0
 truncate_mcmc: false
 clamp_futures_grad: false
