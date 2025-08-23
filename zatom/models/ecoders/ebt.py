@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Literal, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch._C import _SDPBackend as SDPBackend
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
 from zatom.utils.typing_utils import typecheck
@@ -230,12 +230,11 @@ class EBTBlock(nn.Module):
             c
         ).chunk(6, dim=1)
         _x = modulate(self.norm1(x), shift_msa, scale_msa)
-        # with torch.nn.attention.sdpa_kernel(
-        #     # NOTE: May need to set this, as regular SDPA from PyTorch may not support higher order gradients here
-        #     # NOTE: May want to turn this off for inference eventually
-        #     backends=[SDPBackend.MATH]
-        # ):
-        attn_results = self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
+        with sdpa_kernel(SDPBackend.MATH):
+            # NOTE: May need to use this context, as regular SDPA from PyTorch
+            # may not support higher order gradients (e.g., for CUDA devices).
+            # NOTE: May want to turn this off for inference eventually.
+            attn_results = self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
         x = x + gate_msa.unsqueeze(1) * attn_results
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x

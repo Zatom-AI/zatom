@@ -547,7 +547,7 @@ class EBMLitModule(LightningModule):
         examples_per_second = torch.tensor(
             batch.batch_size / step_time, device=self.device, dtype=torch.float
         )
-        example_length = torch.bincount(batch.batch).mean()
+        example_length = torch.bincount(batch.batch).float().mean()
 
         self.log(
             "train/examples_per_second",

@@ -7,6 +7,7 @@ import math
 
 import torch
 from torch import nn
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from zatom.utils.typing_utils import typecheck
 
@@ -139,6 +140,10 @@ class TransformerEncoder(nn.Module):
         x += get_index_embedding(token_idx, self.d_model)
 
         # Transformer forward pass
-        x = self.transformer.forward(x, src_key_padding_mask=(~mask))
+        with sdpa_kernel(SDPBackend.MATH):
+            # NOTE: May need to use this context, as regular SDPA from PyTorch
+            # may not support higher order gradients (e.g., for CUDA devices).
+            # NOTE: May want to turn this off for inference eventually.
+            x = self.transformer.forward(x, src_key_padding_mask=(~mask))
 
         return x
