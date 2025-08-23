@@ -45,7 +45,7 @@ RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if n
 TASK_NAME="train_ebm"                     # Name of the task to perform
 
 # Inform user of job details
-echo -e "Job details:\n==================\n"
+echo -e "Job details:\n========================================================================\n"
 
 echo "Run name: $RUN_NAME"
 echo "Run ID: $RUN_ID"
@@ -63,7 +63,7 @@ echo "Current time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script $TASK_NAME.py:\n==================\n"
+echo -e "\nExecuting script $TASK_NAME.py:\n========================================================================\n"
 
 # Run script
 bash -c "
@@ -83,9 +83,9 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
-    trainer.limit_train_batches=0.01 \
-    trainer.limit_val_batches=0.01 \
-    trainer.limit_test_batches=0.01 \
+    +trainer.limit_train_batches=0.01 \
+    +trainer.limit_val_batches=0.01 \
+    +trainer.limit_test_batches=0.01 \
     trainer.max_time='06:00:00:00' \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
