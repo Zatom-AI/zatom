@@ -50,7 +50,7 @@ RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if n
 
 TASK_NAME="train_ebm"                     # Name of the task to perform
 
-CKPT_PATH="logs/$TASK_NAME/runs/$RUN_NAME\_$RUN_DATE/checkpoints/" # Path at which to find model checkpoints
+CKPT_PATH="logs/$TASK_NAME/runs/$RUN_NAME\\_$RUN_DATE/checkpoints/" # Path at which to find model checkpoints
 mkdir -p "$CKPT_PATH"
 
 # Inform user of job details
