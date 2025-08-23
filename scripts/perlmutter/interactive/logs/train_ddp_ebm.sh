@@ -54,15 +54,15 @@ echo "Run name: $RUN_NAME"
 echo "Run ID: $RUN_ID"
 echo "Run start time: $RUN_DATE"
 
-echo "SLURM job name: $SLURM_JOB_NAME"
+echo -e "\nSLURM job name: $SLURM_JOB_NAME"
 echo "SLURM job ID: $SLURM_JOB_ID"
 echo "SLURM master node: $SLURMD_NODENAME"
 echo "SLURM all nodes: $SLURM_NODELIST"
 echo "SLURM node count: $SLURM_JOB_NUM_NODES"
 
-echo "CUDA visible devices: $CUDA_VISIBLE_DEVICES"
+echo -e "\nCUDA visible devices: $CUDA_VISIBLE_DEVICES"
 
-echo "Current time: $(date)"
+echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
