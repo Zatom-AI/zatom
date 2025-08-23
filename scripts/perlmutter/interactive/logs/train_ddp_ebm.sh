@@ -80,6 +80,7 @@ bash -c "
     ecoder.nhead=$NHEAD \
     logger=wandb \
     name=$RUN_NAME \
+    strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
     trainer.max_time='06:00:00:00' \
