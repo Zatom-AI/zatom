@@ -89,7 +89,7 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
-    trainer.max_time='06:00:00:00' \
+    +trainer.max_time='06:00:00:00' \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
     ckpt_path=logs/$TASK_NAME/runs/$RUN_NAME\_$RUN_DATE/checkpoints/
