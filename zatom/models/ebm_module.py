@@ -363,22 +363,21 @@ class EBMLitModule(LightningModule):
         overfitting = self.trainer.overfit_batches == 1
         if overfitting and self.trainer.global_step == 0:
             batch_num_nodes = torch.bincount(batch.batch)
-            for batch_index, dataset_index in enumerate(batch.dataset_idx):
-                num_nodes = batch_num_nodes[batch_index]
+            for dataset_index in batch.dataset_idx.unique():
+                num_nodes = batch_num_nodes[batch.dataset_idx == dataset_index]
+                spacegroups = batch.spacegroup[batch.dataset_idx == dataset_index]
                 dataset_name = IDX_TO_DATASET[dataset_index.item()]
 
                 # Filter `num_nodes_bincount`
                 if self.num_nodes_bincount[dataset_name] is not None:
                     bins = torch.arange(self.num_nodes_bincount[dataset_name].size(0))
-                    mask = torch.isin(bins, num_nodes.to(bins.device))  # Keep only matching bins
+                    mask = torch.isin(bins, num_nodes.to(bins.device))  # Keep matching bins
                     self.num_nodes_bincount[dataset_name][~mask] = 0
 
                 # Filter `spacegroups_bincount`
                 if self.spacegroups_bincount[dataset_name] is not None:
                     bins = torch.arange(self.spacegroups_bincount[dataset_name].size(0))
-                    mask = torch.isin(
-                        bins, batch.spacegroup[batch_index].to(bins.device)
-                    )  # Keep only matching bins
+                    mask = torch.isin(bins, spacegroups.to(bins.device))  # Keep matching bins
                     self.spacegroups_bincount[dataset_name][~mask] = 0
 
         # Corrupt and densify batch using the interpolant
