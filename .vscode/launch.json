@@ -67,12 +67,12 @@
                 // "ecoder.randomize_mcmc_step_size_scale=1",
                 // "ecoder.truncate_mcmc=false",
                 "logger=wandb",
-                "name='EBT-B__encoder@768_ecoder@768_joint_overfitting_molecule-and-material_10k-epochs'",
+                "name='EBT-B__encoder@768_ecoder@768_joint_overfitting_molecule-and-material'",
                 // "trainer=ddp",
                 "trainer=mps",
                 "trainer.check_val_every_n_epoch=null",
                 "trainer.val_check_interval=200",
-                "trainer.max_epochs=10000",
+                "trainer.max_epochs=5000",
                 "trainer.overfit_batches=1"
             ]
         }

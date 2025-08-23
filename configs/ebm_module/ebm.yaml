@@ -13,7 +13,7 @@ interpolant:
   disc_interpolant_type: masking # NOTE: must be one of (`uniform`, `masking`)
 
 augmentations:
-  frac_coords: true
+  frac_coords: false
   pos: true
 
 sampling:
