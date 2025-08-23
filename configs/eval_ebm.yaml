@@ -14,8 +14,9 @@ defaults:
   - hydra: default
   - environment: default
 
-# run name, e.g., for logging
+# run name and date, e.g., for logging
 name: ""
+date: ${now:%Y-%m-%d}_${now:%H-%M-%S}
 
 # task name, determines output directory path
 task_name: "eval_ebm"

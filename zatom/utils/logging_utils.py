@@ -41,6 +41,7 @@ def log_hyperparameters(object_dict: Dict[str, Any]) -> None:
         p.numel() for p in model.parameters() if not p.requires_grad
     )
 
+    # Save data and trainer hyperparameters
     hparams["data"] = cfg["data"]
     hparams["trainer"] = cfg["trainer"]
 

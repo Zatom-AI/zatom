@@ -472,6 +472,8 @@ class EBMLitModule(LightningModule):
         Returns:
             A tensor of losses between model predictions and targets.
         """
+        t_start = time.time()
+
         with torch.no_grad():
             # Save masks used to apply augmentations
             sample_is_periodic = batch.dataset_idx != DATASET_TO_IDX["qm9"]
@@ -535,6 +537,28 @@ class EBMLitModule(LightningModule):
         self.log(
             "global_step",
             torch.tensor(self.global_step, device=self.device, dtype=torch.float),
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+
+        # Log throughput metrics
+        step_time = time.time() - t_start
+        examples_per_second = torch.tensor(
+            batch.batch_size / step_time, device=self.device, dtype=torch.float
+        )
+        example_length = torch.bincount(batch.batch).mean()
+
+        self.log(
+            "train/examples_per_second",
+            examples_per_second,
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            "train/example_length",
+            example_length,
             on_step=True,
             on_epoch=False,
             sync_dist=True,

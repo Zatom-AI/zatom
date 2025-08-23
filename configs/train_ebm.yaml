@@ -17,8 +17,9 @@ defaults:
   - hydra: default
   - environment: default
 
-# run name, e.g., for logging
+# run name and date, e.g., for logging
 name: ""
+date: ${now:%Y-%m-%d}_${now:%H-%M-%S}
 
 # task name, determines output directory path
 task_name: "train_ebm"
@@ -40,7 +41,7 @@ ckpt_path: null
 resume_from_last_step_dir: True # if `True`, resume from the last (i.e., max '{epoch}-{step}') checkpoint in the specified directory
 
 # seed for random number generators in pytorch, numpy and python.random
-seed: 42
+seed: ${generate_index:8}
 
 # precision for PyTorch's floating-point matrix multiplication
 float32_matmul_precision: highest # NOTE: must be one of (`medium`, `high`, `highest`)

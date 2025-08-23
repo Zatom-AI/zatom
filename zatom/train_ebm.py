@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -142,7 +143,50 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     if cfg.get("train"):
         log.info("Starting training!")
-        trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
+
+        ckpt_path = None
+        if cfg.get("ckpt_path") and os.path.exists(cfg.get("ckpt_path")):
+            ckpt_path = cfg.get("ckpt_path")
+
+            if cfg.resume_from_last_step_dir and os.path.isdir(ckpt_path):
+                last_ckpt_cb_files = [
+                    f
+                    for f in os.listdir(cfg.get("ckpt_path"))
+                    if re.match(r"^\d+-\d+\.ckpt$", f)
+                    is not None  # Enforce `{epoch}-{step}.ckpt` format
+                ]
+                if last_ckpt_cb_files:
+                    # Extract latest (i.e., maximum) checkpoint epoch and step numbers using string splitting
+                    latest_ckpt = max(
+                        last_ckpt_cb_files,
+                        key=lambda x: [int(n) for n in x.replace(".ckpt", "").split("-")],
+                    )
+                    ckpt_path = os.path.join(cfg.get("ckpt_path"), latest_ckpt)
+                    assert os.path.exists(
+                        ckpt_path
+                    ), f"Failed to resume from the last step. Checkpoint path does not exist: {ckpt_path}."
+                else:
+                    log.warning(
+                        f"No checkpoint files found in the given directory: {cfg.get('ckpt_path')}. "
+                        "Resuming from the last step is not possible. Training with new model weights."
+                    )
+
+            elif cfg.resume_from_last_step_dir:
+                raise ValueError(
+                    f"`resume_from_last_step_dir` is set to `True`, but the given path {ckpt_path} is not a checkpoint directory. "
+                    "Resuming from the last checkpoint is not possible."
+                )
+
+            elif os.path.isdir(ckpt_path):
+                raise ValueError(
+                    f"`ckpt_path` is unexpectedly set to a directory {ckpt_path}. "
+                    "Resuming from a directory is only supported when `resume_from_last_step_dir` is `True`. "
+                )
+
+        elif cfg.get("ckpt_path"):
+            raise ValueError("`ckpt_path` was given, but the path does not exist.")
+
+        trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
 
     train_metrics = trainer.callback_metrics
 

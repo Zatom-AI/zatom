@@ -8,7 +8,7 @@ defaults:
 last_model_checkpoint:
   dirpath: ${paths.output_dir}/checkpoints
   verbose: True
-  every_n_train_steps: 2000 # NOTE: this is an improvised fault-tolerance value to enable one to resume training from the most-recent checkpoint, which may need to be adjusted
+  every_n_train_steps: 10000 # NOTE: this is an estimated fault-tolerance value to enable one to resume training from the most-recent checkpoint, which may need to be adjusted
 
 model_summary:
   max_depth: -1

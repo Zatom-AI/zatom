@@ -216,7 +216,7 @@ class MOFGenerationEvaluator:
                     center_in_uc=False,
                 )
             except Exception as e:
-                log.error(f"Failed to load 2D structure for pred sample {sample_idx}.")
+                log.error(f"Failed to load 2D structure for predicted sample {sample_idx}.")
                 pred_2d = None
 
             # Update table

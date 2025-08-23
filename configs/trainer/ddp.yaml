@@ -1,7 +1,7 @@
 defaults:
   - default
 
-strategy: ddp
+strategy: optimized_ddp
 
 accelerator: gpu
 devices: auto
