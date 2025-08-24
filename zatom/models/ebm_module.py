@@ -910,6 +910,9 @@ class EBMLitModule(LightningModule):
         if self.hparams.compile:
             # Prefer `self.ecoder.compile` over `torch.compile(self.ecoder)` to avoid `_orig_` prefix checkpoint issues.
             # Reference: https://github.com/Lightning-AI/pytorch-lightning/issues/20233#issuecomment-2868169706.
+            log.info(
+                f"Rank {self.trainer.global_rank}: Compiling model with `torch.compile(fullgraph=True)`."
+            )
             self.ecoder.compile(fullgraph=True)
 
         # Using WandB, log model topology once and gradients as well as parameter histogram every N steps
@@ -918,6 +921,9 @@ class EBMLitModule(LightningModule):
             and self.hparams.log_all > 0
             and isinstance(self.logger, WandbLogger)
         ):
+            log.info(
+                f"Rank {self.trainer.global_rank}: Logging model topology once and gradients/parameters to WandB every {self.hparams.log_all} steps."
+            )
             self.logger.watch(
                 self.ecoder, log="all", log_freq=self.hparams.log_all, log_graph=True
             )
