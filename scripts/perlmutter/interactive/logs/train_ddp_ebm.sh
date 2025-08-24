@@ -34,8 +34,8 @@ NHEAD=12  # 6, 12, 16
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`)
-DEFAULT_RUN_ID="qka2mi55"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-08-24_10-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="k40uij6u"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-08-24_11-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_NAME="EBT-B__${DATASET}"              # Name of the model type and dataset configuration
