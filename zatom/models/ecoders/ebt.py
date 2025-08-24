@@ -334,13 +334,13 @@ class EBT(nn.Module):
         mcmc_step_size: int = 5,
         randomize_mcmc_num_steps: int = 2,
         randomize_mcmc_num_steps_min: int = 2,
-        randomize_mcmc_step_size_scale: int = 2,
+        randomize_mcmc_step_size_scale: float = 1.25,
         num_datasets: int = 2,  # Context conditioning input
         num_spacegroups: int = 230,  # Context conditioning input
         max_num_elements: int = 100,
         mlp_ratio: float = 4.0,
         class_dropout_prob: float = 0.1,
-        langevin_dynamics_noise: float = 0.1,
+        langevin_dynamics_noise: float = 0.01,
         weight_initialization_gain: float = 1.0,
         clamp_futures_grad_max_change: float = 9.0,
         discrete_gaussian_random_noise_scaling: float = 1.0,

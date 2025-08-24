@@ -53,7 +53,7 @@
                 "data.datamodule.datasets.mp20.proportion=4e-5",
                 "data.datamodule.datasets.qm9.proportion=1e-5",
                 "data.datamodule.datasets.qmof150.proportion=0.0",
-                "date=2025-08-24_10-00-00",
+                "date=2025-08-24_11-00-00",
                 // "ebm_module.augmentations.frac_coords=false",
                 // "ebm_module.augmentations.pos=false",
                 // "ebm_module.interpolant.corrupt=false",

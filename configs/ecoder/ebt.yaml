@@ -10,11 +10,11 @@ mcmc_num_steps: 1
 mcmc_step_size: 5
 randomize_mcmc_num_steps: 2
 randomize_mcmc_num_steps_min: 2
-randomize_mcmc_step_size_scale: 2
+randomize_mcmc_step_size_scale: 1.25
 num_datasets: 2
 max_num_elements: 100
 class_dropout_prob: 0.0
-langevin_dynamics_noise: 0.1
+langevin_dynamics_noise: 0.01
 weight_initialization_gain: 1.0
 clamp_futures_grad_max_change: 9.0
 discrete_gaussian_random_noise_scaling: 1.0
