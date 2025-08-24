@@ -542,3 +542,8 @@ def initialize_module_weights(
                 )
 
     module.apply(init_weights)
+
+
+# Optimize common operations
+if BEST_DEVICE.type != "mps":  # NOTE: Some devices do not support Kabsch compilation yet
+    weighted_rigid_align = torch.compile(weighted_rigid_align)

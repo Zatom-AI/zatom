@@ -16,9 +16,6 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
 from zatom.utils.typing_utils import typecheck
 
-# Optimize common operations
-weighted_rigid_align = torch.compile(weighted_rigid_align)
-
 #################################################################################
 #                             Embedding Layers                                  #
 #################################################################################
@@ -333,10 +330,10 @@ class EBT(nn.Module):
         d_model: int = 768,
         num_layers: int = 12,
         nhead: int = 12,
-        mcmc_num_steps: int = 2,
+        mcmc_num_steps: int = 1,
         mcmc_step_size: int = 5,
-        randomize_mcmc_num_steps: int = 1,
-        randomize_mcmc_num_steps_min: int = 1,
+        randomize_mcmc_num_steps: int = 2,
+        randomize_mcmc_num_steps_min: int = 2,
         randomize_mcmc_step_size_scale: int = 2,
         num_datasets: int = 2,  # Context conditioning input
         num_spacegroups: int = 230,  # Context conditioning input

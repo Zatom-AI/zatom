@@ -35,7 +35,6 @@ optimizer:
   _partial_: true
   lr: 0.0001
   weight_decay: 0.0
-  foreach: false # NOTE: if `false`, reduces peak GPU memory spikes at the cost of improved parameter and state update speed
 
 scheduler:
   # _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
@@ -48,4 +47,4 @@ scheduler_frequency: ${trainer.check_val_every_n_epoch}
 compile: true
 
 # using WandB, log model topology once and gradients as well as parameter histogram every N steps
-log_all: null
+log_all: 1000
