@@ -16,6 +16,9 @@ from torch.nn.attention import SDPBackend, sdpa_kernel
 from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
 from zatom.utils.typing_utils import typecheck
 
+# Optimize common operations
+weighted_rigid_align = torch.compile(weighted_rigid_align)
+
 #################################################################################
 #                             Embedding Layers                                  #
 #################################################################################

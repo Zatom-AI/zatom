@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from lightning import LightningModule
 from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.strategies import FSDPStrategy
 from omegaconf import DictConfig
 from torch.nn import ModuleDict
 from torch_geometric.data import Batch
@@ -40,7 +41,7 @@ DATASET_TO_IDX = {
 class EBMLitModule(LightningModule):
     """LightningModule for generative energy-based modeling (EBM) of 3D atomic systems.
 
-    A `LightningModule` implements 7 key methods:
+    A `LightningModule` implements 6 key methods:
 
     ```python
     def __init__(self):
@@ -59,11 +60,8 @@ class EBMLitModule(LightningModule):
     def test_step(self, batch, batch_idx):
     # The complete test step.
 
-    def predict_step(self, batch, batch_idx):
-    # The complete predict step.
-
-    def configure_optimizers(self):
-    # Define and configure optimizers and LR schedulers.
+    def configure_model(self):
+    # Define and configure model.
     ```
 
     Docs:
@@ -81,6 +79,7 @@ class EBMLitModule(LightningModule):
         scheduler: torch.optim.lr_scheduler.LRScheduler,
         scheduler_frequency: str,
         compile: bool,
+        log_all: int | None,
     ) -> None:
         super().__init__()
 
@@ -881,17 +880,47 @@ class EBMLitModule(LightningModule):
 
     #####################################################################################################
 
-    def setup(self, stage: str) -> None:
-        """Lightning hook that is called at the beginning of fit (train + validate), validate,
-        test, or predict.
+    def configure_model(self):
+        """Configure the model to be used for training, validation, testing, or prediction."""
+        if self.ecoder is not None:
+            return
 
-        This is a good hook when you need to build models dynamically or adjust something about
-        them. This hook is called on every process when using DDP.
+        if self.trainer is not None:
+            sleep = self.trainer.global_rank
+            log.info(f"Rank {self.trainer.global_rank}: Sleeping for {sleep}s to avoid CPU OOMs.")
+            time.sleep(sleep)
 
-        :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
-        """
-        if self.hparams.compile and stage == "fit":
-            self.ecoder = torch.compile(self.ecoder)
+        # In a memory-efficient way, exclude certain (unmanaged) modules from being managed by FSDP
+        if isinstance(self.trainer.strategy, FSDPStrategy) and hasattr(self, "ignored_modules"):
+            ignored_modules = []
+            ecoder_list_grouped_modules = [
+                lst
+                for n in dir(self.ecoder)
+                if isinstance(getattr(self.ecoder, n), list)
+                and all(isinstance(x, torch.nn.Module) for x in getattr(self.ecoder, n))
+                for lst in getattr(self.ecoder, n)
+            ]
+            ecoder_modules = list(self.ecoder.modules()) + ecoder_list_grouped_modules
+            for module in ecoder_modules:
+                if module.__class__ in self.ignored_modules:
+                    ignored_modules.append(module)
+
+            self.trainer.strategy.kwargs["ignored_modules"] = ignored_modules
+
+        if self.hparams.compile:
+            # Prefer `self.ecoder.compile` over `torch.compile(self.ecoder)` to avoid `_orig_` prefix checkpoint issues.
+            # Reference: https://github.com/Lightning-AI/pytorch-lightning/issues/20233#issuecomment-2868169706.
+            self.ecoder.compile(fullgraph=True)
+
+        # Using WandB, log model topology once and gradients as well as parameter histogram every N steps
+        if (
+            isinstance(self.hparams.log_all, int)
+            and self.hparams.log_all > 0
+            and isinstance(self.logger, WandbLogger)
+        ):
+            self.logger.watch(
+                self.ecoder, log="all", log_freq=self.hparams.log_all, log_graph=True
+            )
 
     def configure_optimizers(self) -> Dict[str, Any]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
