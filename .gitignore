@@ -148,6 +148,7 @@ dmypy.json
 configs/local/default.yaml
 /data/
 /logs/
+/wandb/
 .env
 /scripts/**/logs/*.out
 /scripts/**/logs/*.err

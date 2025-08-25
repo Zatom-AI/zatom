@@ -54,7 +54,7 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting sweep $TASK_NAME.py:\n==================\n"
+echo -e "\nExecuting sweep:\n==================\n"
 
 # Launch sweep
 bash -c "
