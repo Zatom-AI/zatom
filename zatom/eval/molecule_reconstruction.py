@@ -59,7 +59,7 @@ class MoleculeReconstructionEvaluator:
         self.pred_mol_list = []
         self.gt_mol_list = []
 
-    def _arrays_to_molecules(self, save: bool = False, save_dir: str = ""):
+    def _arrays_to_molecules(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Convert stored predictions and ground truths to Molecule objects for evaluation."""
         self.pred_mol_list = joblib_map(
             partial(
@@ -68,7 +68,7 @@ class MoleculeReconstructionEvaluator:
                 save_dir_name=f"{save_dir}/pred",
             ),
             self.pred_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    Pred to Molecule",
             total=len(self.pred_arrays_list),
@@ -80,7 +80,7 @@ class MoleculeReconstructionEvaluator:
                 save_dir_name=f"{save_dir}/gt",
             ),
             self.gt_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    G.T. to Molecule",
             total=len(self.gt_arrays_list),
@@ -96,7 +96,7 @@ class MoleculeReconstructionEvaluator:
             return float("inf")
 
     def get_metrics(
-        self, current_epoch: int = 0, save: bool = False, save_dir: str = ""
+        self, current_epoch: int = 0, save: bool = False, save_dir: str = "", n_jobs: int = -4
     ) -> Dict[str, Any]:
         """Compute the match rate and avg. RMS distance between predictions and ground truths.
 
@@ -110,7 +110,7 @@ class MoleculeReconstructionEvaluator:
         ), "Number of predictions and ground truths must match."
 
         # Convert predictions and ground truths to Molecule objects
-        self._arrays_to_molecules(save, save_dir)
+        self._arrays_to_molecules(save, save_dir, n_jobs=n_jobs)
 
         self.rms_dists = []
         for i in tqdm(

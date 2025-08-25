@@ -65,7 +65,7 @@ class MOFGenerationEvaluator:
         self.pred_arrays_list = []
         self.pred_mof_list = []
 
-    def _arrays_to_structures(self, save: bool = False, save_dir: str = ""):
+    def _arrays_to_structures(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Convert stored predictions and ground truths to PyMatGen Structure objects for
         evaluation."""
         self.pred_mof_list = joblib_map(
@@ -75,18 +75,18 @@ class MOFGenerationEvaluator:
                 save_dir_name=f"{save_dir}/pred",
             ),
             self.pred_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    Pred to Structure",
             total=len(self.pred_arrays_list),
         )
 
-    def get_metrics(self, save: bool = False, save_dir: str = ""):
+    def get_metrics(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Get metrics."""
         assert len(self.pred_arrays_list) > 0, "No predictions to evaluate."
 
         # Convert predictions and ground truths to Crystal objects
-        self._arrays_to_structures(save, save_dir)
+        self._arrays_to_structures(save, save_dir, n_jobs=n_jobs)
 
         # Compute validity metrics
         metrics_dict = {

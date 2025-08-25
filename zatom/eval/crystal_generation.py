@@ -70,7 +70,7 @@ class CrystalGenerationEvaluator:
         self.pred_arrays_list = []
         self.pred_crys_list = []
 
-    def _arrays_to_crystals(self, save: bool = False, save_dir: str = ""):
+    def _arrays_to_crystals(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Convert stored predictions and ground truths to Crystal objects for evaluation."""
         self.pred_crys_list = joblib_map(
             partial(
@@ -79,19 +79,19 @@ class CrystalGenerationEvaluator:
                 save_dir_name=save_dir,
             ),
             self.pred_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    Pred to Crystal",
             total=len(self.pred_arrays_list),
         )
 
-    def _dataset_cif_to_struct(self):
+    def _dataset_cif_to_struct(self, n_jobs: int = -4):
         """Convert dataset CIFs to Structure objects for novelty evaluation."""
         if self.dataset_struct_list is None:
             self.dataset_struct_list = joblib_map(
                 partial(Structure.from_str, fmt="cif"),
                 self.dataset_cif_list,
-                n_jobs=-4,
+                n_jobs=n_jobs,
                 inner_max_num_threads=1,
                 desc="    Load dataset CIFs (one time)",
                 total=len(self.dataset_cif_list),
@@ -105,12 +105,12 @@ class CrystalGenerationEvaluator:
                 return False
         return True
 
-    def get_metrics(self, save: bool = False, save_dir: str = ""):
+    def get_metrics(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Get metrics."""
         assert len(self.pred_arrays_list) > 0, "No predictions to evaluate."
 
         # Convert predictions and ground truths to Crystal objects
-        self._arrays_to_crystals(save, save_dir)
+        self._arrays_to_crystals(save, save_dir, n_jobs=n_jobs)
 
         # Compute validity metrics
         metrics_dict = {
@@ -135,7 +135,7 @@ class CrystalGenerationEvaluator:
 
         # Compute novelty (slow to compute)
         if self.compute_novelty:
-            self._dataset_cif_to_struct()
+            self._dataset_cif_to_struct(n_jobs=n_jobs)
             struct_is_novel = []
             for struct in tqdm(
                 [group[0] for group in unique_struct_groups],
@@ -147,7 +147,7 @@ class CrystalGenerationEvaluator:
             # struct_is_novel = joblib_map(
             #     self._get_novelty,
             #     [group[0] for group in unique_struct_groups],
-            #     n_jobs=-4,
+            #     n_jobs=n_jobs,
             #     inner_max_num_threads=1,
             #     desc="    Novelty",
             #     total=len(unique_struct_groups),

@@ -71,7 +71,7 @@ class MOFReconstructionEvaluator:
         self.pred_mof_list = []
         self.gt_mof_list = []
 
-    def _arrays_to_structures(self, save: bool = False, save_dir: str = ""):
+    def _arrays_to_structures(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Convert stored predictions and ground truths to PyMatGen Structure objects for
         evaluation."""
         self.pred_mof_list = joblib_map(
@@ -81,7 +81,7 @@ class MOFReconstructionEvaluator:
                 save_dir_name=f"{save_dir}/pred",
             ),
             self.pred_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    Pred to Structure",
             total=len(self.pred_arrays_list),
@@ -93,7 +93,7 @@ class MOFReconstructionEvaluator:
                 save_dir_name=f"{save_dir}/gt",
             ),
             self.gt_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    G.T. to Structure",
             total=len(self.gt_arrays_list),
@@ -109,7 +109,9 @@ class MOFReconstructionEvaluator:
         except Exception:
             return float("inf")
 
-    def get_metrics(self, save: bool = False, save_dir: str = "") -> Dict[str, Any]:
+    def get_metrics(
+        self, save: bool = False, save_dir: str = "", n_jobs: int = -4
+    ) -> Dict[str, Any]:
         """Compute the match rate and avg. RMS distance between predictions and ground truths.
 
         Note: self.rms_dists can be used to access RMSD per sample but is not returned.
@@ -122,7 +124,7 @@ class MOFReconstructionEvaluator:
         ), "Number of predictions and ground truths must match."
 
         # Convert predictions and ground truths to MOF objects
-        self._arrays_to_structures(save, save_dir)
+        self._arrays_to_structures(save, save_dir, n_jobs=n_jobs)
 
         # Check validity of predictions and ground truths
         validity = [

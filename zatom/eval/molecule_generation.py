@@ -53,7 +53,7 @@ class MoleculeGenerationEvaluator:
         self.pred_mol_list = []
         self.pred_rdkit_list = []
 
-    def _arrays_to_molecules(self, save: bool = False, save_dir: str = ""):
+    def _arrays_to_molecules(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
         """Convert stored predictions and ground truths to Molecule objects for evaluation."""
         self.pred_mol_list = joblib_map(
             partial(
@@ -62,19 +62,19 @@ class MoleculeGenerationEvaluator:
                 save_dir_name=save_dir,
             ),
             self.pred_arrays_list,
-            n_jobs=-4,
+            n_jobs=n_jobs,
             inner_max_num_threads=1,
             desc="    Pred to Molecule",
             total=len(self.pred_arrays_list),
         )
 
-    def get_metrics(self, save: bool = True, save_dir: str = ""):
+    def get_metrics(self, save: bool = True, save_dir: str = "", n_jobs: int = -4):
         """Compute metrics for the generated molecules."""
         assert len(self.pred_arrays_list) > 0, "No predictions to evaluate."
         assert save, "Metric computation currently requires saving as pdb files."
 
         # Convert predictions to Molecule objects
-        self._arrays_to_molecules(save, save_dir)
+        self._arrays_to_molecules(save, save_dir, n_jobs=n_jobs)
 
         valid_molecules = []
         valid_smiles = []

@@ -717,6 +717,7 @@ class EBMLitModule(LightningModule):
                 save_dir=os.path.join(
                     self.hparams.sampling.save_dir, f"{dataset}_{stage}_{self.global_rank}"
                 ),
+                n_jobs=4,
             )
             gen_metrics_dict["sampling_time"] = t_end - t_start
             for k, v in gen_metrics_dict.items():
