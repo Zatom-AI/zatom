@@ -36,6 +36,7 @@ randomize_mcmc_num_steps_final_landscape: false
 normalize_discrete_initial_condition: true
 weighted_rigid_align_pos: true
 weighted_rigid_align_frac_coords: false
+use_pytorch_implementation: true
 add_mask_atom_type: ${ebm_module.interpolant.corrupt}
 weight_initialization_method: xavier # NOTE: must be one of (`he`, `xavier`)
 discrete_denoising_initial_condition: random # NOTE: must be one of (`random`, `zeros`)

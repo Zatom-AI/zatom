@@ -321,6 +321,7 @@ class EBT(nn.Module):
         normalize_discrete_initial_condition: Whether to normalize discrete initial embeddings using softmax.
         weighted_rigid_align_pos: Whether to apply weighted rigid alignment between target and predicted atom positions for loss calculation.
         weighted_rigid_align_frac_coords: Whether to apply weighted rigid alignment between target and predicted atom fractional coordinates for loss calculation.
+        use_pytorch_implementation: Whether to use PyTorch's Transformer implementation.
         add_mask_atom_type: Whether to add a mask token for atom types.
         weight_initialization_method: Initialization method for discrete embedding weights.
         discrete_denoising_initial_condition: Whether to use random or zero-based discrete denoising for initial conditions.
@@ -365,6 +366,7 @@ class EBT(nn.Module):
         normalize_discrete_initial_condition: bool = True,
         weighted_rigid_align_pos: bool = True,
         weighted_rigid_align_frac_coords: bool = False,
+        use_pytorch_implementation: bool = True,
         add_mask_atom_type: bool = True,
         weight_initialization_method: Literal["he", "xavier"] = "xavier",
         discrete_denoising_initial_condition: Literal["random", "zeros"] = "random",

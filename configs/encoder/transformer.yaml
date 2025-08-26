@@ -3,8 +3,9 @@ _target_: zatom.models.encoders.transformer.TransformerEncoder
 d_model: ${ebm_module.ecoder.d_model}
 nhead: 8
 dim_feedforward: 2048
+num_layers: 8
 activation: "gelu"
 dropout: 0.0
-norm_first: true
 bias: true
-num_layers: 8
+norm_first: true
+use_pytorch_implementation: true

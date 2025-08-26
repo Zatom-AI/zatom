@@ -42,11 +42,12 @@ class TransformerEncoder(nn.Module):
         d_model: Dimension of the model.
         nhead: Number of attention heads.
         dim_feedforward: Dimension of the feedforward network.
+        num_layers: Number of layers.
         activation: Activation function to use.
         dropout: Dropout rate.
-        norm_first: Whether to use pre-normalization in Transformer blocks.
         bias: Whether to use bias.
-        num_layers: Number of layers.
+        norm_first: Whether to use pre-normalization in Transformer blocks.
+        use_pytorch_implementation: Whether to use PyTorch's Transformer implementation.
     """
 
     def __init__(
@@ -54,11 +55,12 @@ class TransformerEncoder(nn.Module):
         d_model: int = 1024,
         nhead: int = 8,
         dim_feedforward: int = 2048,
+        num_layers: int = 6,
         activation: str = "gelu",
         dropout: float = 0.0,
-        norm_first: bool = True,
         bias: bool = True,
-        num_layers: int = 6,
+        norm_first: bool = True,
+        use_pytorch_implementation: bool = True,
     ):
         super().__init__()
 
