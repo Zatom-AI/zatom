@@ -30,7 +30,11 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
-from zatom import register_custom_omegaconf_resolvers, resolve_omegaconf_variable
+from zatom import (
+    register_custom_omegaconf_resolvers,
+    resolve_omegaconf_variable,
+    set_omegaconf_flag_recursive,
+)
 from zatom.utils import (
     RankedLogger,
     extras,
@@ -167,6 +171,9 @@ def main(cfg: DictConfig) -> None:
         torch.set_float32_matmul_precision(cfg.float32_matmul_precision)
 
     # Run evaluation
+    set_omegaconf_flag_recursive(
+        cfg, "allow_objects", value=True
+    )  # NOTE: Workaround for a Hydra issue: https://stackoverflow.com/q/69651138
     evaluate(cfg)
 
     # Report timing

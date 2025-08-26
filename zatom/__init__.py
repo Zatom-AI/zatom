@@ -3,9 +3,23 @@ import secrets
 import string
 from typing import Any
 
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from zatom.utils.training_utils import get_lr_scheduler
+
+
+def set_omegaconf_flag_recursive(cfg: Any, flag: str, value: bool) -> None:
+    """Recursively set an OmegaConf flag on all nodes in the config tree.
+
+    Args:
+        cfg: The config node (DictConfig, ListConfig, or primitive).
+        flag: The OmegaConf flag name ('readonly', 'allow_objects', etc.).
+        value: The boolean value to set for the flag.
+    """
+    if isinstance(cfg, (DictConfig, ListConfig)):
+        cfg._set_flag(flag, value)
+        for v in cfg.values() if isinstance(cfg, DictConfig) else cfg:
+            set_omegaconf_flag_recursive(v, flag, value)
 
 
 def generate_index(length: int = 8) -> str:

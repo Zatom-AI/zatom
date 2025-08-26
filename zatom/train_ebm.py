@@ -31,7 +31,11 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # more info: https://github.com/ashleve/rootutils
 # ------------------------------------------------------------------------------------ #
 
-from zatom import register_custom_omegaconf_resolvers, resolve_omegaconf_variable
+from zatom import (
+    register_custom_omegaconf_resolvers,
+    resolve_omegaconf_variable,
+    set_omegaconf_flag_recursive,
+)
 from zatom.utils import (
     RankedLogger,
     extras,
@@ -68,7 +72,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     datamodule: LightningDataModule = hydra.utils.instantiate(
         cfg.data.datamodule, _recursive_=False
     )
-    # datamodule.setup()  # NOTE: use this to save metadata (only) the first time code is run
+    # datamodule.setup()  # NOTE: Use this to save metadata (only) the first time code is run
 
     log.info(f"Instantiating EBM model <{cfg.ebm_module._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.ebm_module)
@@ -231,6 +235,9 @@ def main(cfg: DictConfig) -> float | None:
         torch.set_float32_matmul_precision(cfg.float32_matmul_precision)
 
     # Train the model
+    set_omegaconf_flag_recursive(
+        cfg, "allow_objects", value=True
+    )  # NOTE: Workaround for a Hydra issue: https://stackoverflow.com/q/69651138
     metric_dict, _ = train(cfg)
 
     # Safely retrieve metric value for hydra-based hyperparameter optimization
