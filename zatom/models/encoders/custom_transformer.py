@@ -9,7 +9,7 @@ c   - Number of latent embedding channels
 import collections.abc
 from dataclasses import dataclass
 from itertools import repeat
-from typing import Type
+from typing import Callable, Type
 
 import numpy as np
 import torch
@@ -75,6 +75,35 @@ class TransformerInputs:
 
 
 # Helper functions
+
+
+@typecheck
+def build_attention_mask(
+    mask: Bool["b m"], seq_idx: Int["b m"], dtype: str | torch.dtype  # type: ignore
+) -> Float["b 1 m m"]:  # type: ignore
+    """Build an attention mask for an input batch.
+
+    Args:
+        mask: A tensor containing the non-padding mask.
+        seq_idx: A tensor containing unique token sequence IDs.
+        dtype: The data type of the attention mask.
+
+    Returns:
+        A tensor representing the additive mask for pairwise attention scores.
+    """
+    non_padding_mask = mask
+    attn_mask = non_padding_mask.unsqueeze(1) & non_padding_mask.unsqueeze(2)
+    attn_mask = attn_mask & (
+        # Only attend to atoms with the same sequence (i.e., example)
+        seq_idx.unsqueeze(1)
+        == seq_idx.unsqueeze(2)
+    )
+    attn_mask = attn_mask.unsqueeze(1).type(dtype)
+    attn_mask.masked_fill_(attn_mask == 0, float("-inf"))
+    attn_mask.masked_fill_(attn_mask == 1, 0.0)
+    return attn_mask
+
+
 @typecheck
 def maybe_add_mask(scores: torch.Tensor, attn_mask: torch.Tensor | None = None) -> torch.Tensor:
     """Maybe add an attention mask to the scores tensor.
@@ -251,13 +280,13 @@ class Mlp(nn.Module):
 
     def __init__(
         self,
-        in_features,
-        hidden_features=None,
-        out_features=None,
-        act_layer=nn.GELU,
-        norm_layer=None,
-        bias=False,
-        drop=0.0,
+        in_features: int,
+        hidden_features: int | None = None,
+        out_features: int | None = None,
+        act_layer: Type[nn.Module] | Callable = nn.GELU,
+        norm_layer: Type[nn.Module] | Callable | None = None,
+        bias: bool = False,
+        drop: float = 0.0,
     ):
         super().__init__()
         out_features = out_features or in_features
@@ -877,31 +906,6 @@ class Transformer(nn.Module):
         return next(self.parameters()).device
 
     @typecheck
-    def build_attention_mask(
-        self, batch: TransformerInputs, dtype: str | torch.dtype  # type: ignore
-    ) -> Float["b 1 m m"]:  # type: ignore
-        """Build an attention mask for the input batch.
-
-        Args:
-            batch: A `TransformerInputs` object containing atom sequences and coordinates.
-            dtype: The data type of the attention mask.
-
-        Returns:
-            A tensor representing the additive mask for pairwise attention scores.
-        """
-        non_padding_mask = batch.atom_seq != 0
-        attn_mask = non_padding_mask.unsqueeze(1) & non_padding_mask.unsqueeze(2)
-        attn_mask = attn_mask & (
-            # Only attend to atoms with the same sequence (i.e., example)
-            batch.atom_seq_ids.unsqueeze(1)
-            == batch.atom_seq_ids.unsqueeze(2)
-        )
-        attn_mask = attn_mask.unsqueeze(1).type(dtype)
-        attn_mask.masked_fill_(attn_mask == 0, float("-inf"))
-        attn_mask.masked_fill_(attn_mask == 1, 0.0)
-        return attn_mask
-
-    @typecheck
     def forward(self, batch: TransformerInputs) -> Float["b 1 1"]:  # type: ignore
         """Perform a single forward pass through the network.
 
@@ -946,7 +950,7 @@ class Transformer(nn.Module):
                 device=self.device,
             )
             if self.flex_attn
-            else self.build_attention_mask(batch, dtype=x.dtype)
+            else build_attention_mask(batch, dtype=x.dtype)
         )
 
         # Embed the input batch with transformer blocks

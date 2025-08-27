@@ -5,17 +5,24 @@ Adapted from:
     - https://github.com/facebookresearch/all-atom-diffusion-transformer
 """
 
-import math
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Dict, List, Literal, Tuple, Type
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.attention import SDPBackend, sdpa_kernel
+from torch.nn.attention.flex_attention import create_block_mask
 
+from zatom.models.encoders.custom_transformer import (
+    Attention,
+    LayerNorm,
+    Mlp,
+    build_attention_mask,
+)
+from zatom.models.encoders.transformer import get_index_embedding
 from zatom.utils import pylogger
 from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
-from zatom.utils.typing_utils import typecheck
+from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
 log = pylogger.RankedLogger(__name__)
 
@@ -84,87 +91,6 @@ class LabelEmbedder(nn.Module):
         return embeddings
 
 
-@typecheck
-def get_pos_embedding(indices: torch.Tensor, emb_dim: int, max_len: int = 2048) -> torch.Tensor:
-    """Create sine / cosine positional embeddings from a prespecified indices.
-
-    Args:
-        indices: Offsets of size [..., num_tokens] of type integer.
-        emb_dim: Embedding dimension.
-        max_len: Maximum length.
-
-    Returns:
-        Positional embedding of shape [..., num_tokens, emb_dim].
-    """
-    K = torch.arange(emb_dim // 2, device=indices.device)
-    pos_embedding_sin = torch.sin(
-        indices[..., None] * math.pi / (max_len ** (2 * K[None] / emb_dim))
-    )
-    pos_embedding_cos = torch.cos(
-        indices[..., None] * math.pi / (max_len ** (2 * K[None] / emb_dim))
-    )
-    pos_embedding = torch.cat([pos_embedding_sin, pos_embedding_cos], axis=-1)
-    return pos_embedding
-
-
-#################################################################################
-#                               Transformer blocks                              #
-#################################################################################
-
-
-class Mlp(nn.Module):
-    """MLP as used in Vision Transformer, MLP-Mixer and related networks.
-
-    Args:
-        in_features: The number of input features.
-        hidden_features: The number of hidden features.
-        out_features: The number of output features.
-        act_layer: The activation layer to use.
-        norm_layer: The normalization layer to use.
-        bias: Whether to use bias in the linear layers.
-        drop: The dropout rate.
-    """
-
-    def __init__(
-        self,
-        in_features: int,
-        hidden_features: int | None = None,
-        out_features: int | None = None,
-        act_layer: type[nn.Module] = nn.GELU,
-        norm_layer: type[nn.Module] | None = None,
-        bias: bool = True,
-        drop: float = 0.0,
-    ):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-
-        self.fc1 = nn.Linear(in_features, hidden_features, bias=bias)
-        self.act = act_layer()
-        self.drop1 = nn.Dropout(drop)
-        self.norm = norm_layer(hidden_features) if norm_layer is not None else nn.Identity()
-        self.fc2 = nn.Linear(hidden_features, out_features, bias=bias)
-        self.drop2 = nn.Dropout(drop)
-
-    @typecheck
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the MLP.
-
-        Args:
-            x: The input tensor.
-
-        Returns:
-            The output tensor.
-        """
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop1(x)
-        x = self.norm(x)
-        x = self.fc2(x)
-        x = self.drop2(x)
-        return x
-
-
 #################################################################################
 #                                 Core EBT Model                                #
 #################################################################################
@@ -193,17 +119,66 @@ class EBTBlock(nn.Module):
     Args:
         hidden_dim: The dimensionality of the hidden representations.
         num_heads: The number of attention heads.
+        context_length: The context length for the attention mechanism.
+        rope_base: The base frequency for the rotary positional encoding.
         mlp_ratio: The ratio of the MLP hidden dimension to the input dimension.
+        attn_drop: The dropout rate for the attention layers.
+        proj_drop: The dropout rate for the projection layers.
+        qkv_bias: Whether to use bias in the QKV projections.
+        qk_norm: Whether to apply normalization to the QK attention scores.
+        scale_attn_norm: Whether to scale the attention normalization.
+        proj_bias: Whether to use bias in the projection layers.
+        flex_attn: Whether to use flexible attention.
+        fused_attn: Whether to use fused attention.
+        use_pytorch_implementation: Whether to use the PyTorch implementation of the block.
+        norm_layer: The normalization layer to use.
         block_kwargs: Additional keyword arguments for the block.
     """
 
     def __init__(
-        self, hidden_dim: int, num_heads: int, mlp_ratio: float = 4.0, **block_kwargs: Any
+        self,
+        hidden_dim: int,
+        num_heads: int,
+        context_length: int = 2048,
+        rope_base: int = 10_000,
+        mlp_ratio: float = 4.0,
+        attn_drop: float = 0.0,
+        proj_drop: float = 0.1,
+        qkv_bias: bool = False,
+        qk_norm: bool = True,
+        scale_attn_norm: bool = False,
+        proj_bias: bool = False,
+        flex_attn: bool = False,
+        fused_attn: bool = True,
+        use_pytorch_implementation: bool = True,
+        norm_layer: Type[nn.Module] | None = None,
+        **block_kwargs: Any,
     ):
         super().__init__()
+
+        self.use_pytorch_implementation = use_pytorch_implementation
+
         self.norm1 = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
-        self.attn = nn.MultiheadAttention(
-            hidden_dim, num_heads=num_heads, dropout=0, bias=True, batch_first=True
+        self.attn = (
+            nn.MultiheadAttention(
+                hidden_dim, num_heads=num_heads, dropout=0, bias=True, batch_first=True
+            )
+            if use_pytorch_implementation
+            else Attention(
+                hidden_dim,
+                num_heads=num_heads,
+                context_length=context_length,
+                rope_base=rope_base,
+                qkv_bias=qkv_bias,
+                qk_norm=qk_norm,
+                scale_norm=scale_attn_norm,
+                proj_bias=proj_bias,
+                flex_attn=flex_attn,
+                fused_attn=fused_attn,
+                attn_drop=attn_drop,
+                proj_drop=proj_drop,
+                norm_layer=norm_layer,
+            )
         )
         self.norm2 = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_dim * mlp_ratio)
@@ -211,20 +186,28 @@ class EBTBlock(nn.Module):
             in_features=hidden_dim,
             hidden_features=mlp_hidden_dim,
             act_layer=lambda: nn.GELU(approximate="tanh"),
-            drop=0,
+            bias=use_pytorch_implementation,
+            drop=0.0,
         )
         self.adaLN_modulation = nn.Sequential(
             nn.SiLU(), nn.Linear(hidden_dim, 6 * hidden_dim, bias=True)
         )
 
     @typecheck
-    def forward(self, x: torch.Tensor, c: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        c: torch.Tensor,
+        mask: torch.Tensor,
+        pos_ids: Int["b m"] | None = None,  # type: ignore
+    ) -> torch.Tensor:
         """Forward pass for the EBT block.
 
         Args:
             x: The input tensor.
             c: The context tensor.
             mask: The attention mask tensor.
+            pos_ids: The position IDs tensor.
 
         Returns:
             The output tensor.
@@ -237,7 +220,11 @@ class EBTBlock(nn.Module):
             # NOTE: May need to use this context, as regular SDPA from PyTorch
             # may not support higher order gradients (e.g., for CUDA devices).
             # NOTE: May want to turn this off for inference eventually.
-            attn_results = self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
+            attn_results = (
+                self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
+                if self.use_pytorch_implementation
+                else self.attn(_x, pos_ids=pos_ids, attn_mask=mask)
+            )
         x = x + gate_msa.unsqueeze(1) * attn_results
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
@@ -293,14 +280,18 @@ class EBT(nn.Module):
         mcmc_step_size: Markov chain Monte Carlo (MCMC) step size.
         randomize_mcmc_num_steps: Number of steps to randomize MCMC.
         randomize_mcmc_num_steps_min: Minimum number of steps to randomize MCMC.
-        randomize_mcmc_step_size_scale: Scale factor for randomizing MCMC step size.
         num_datasets: Number of datasets for context conditioning.
         num_spacegroups: Number of spacegroups for context conditioning.
         max_num_elements: Maximum number of elements in the dataset.
+        context_length: Context length for the attention mechanism.
+        rope_base: Base frequency for rotary positional encoding.
         mlp_ratio: Ratio of hidden to input dimension in MLP.
+        proj_drop: Dropout probability for the projection layer.
+        attn_drop: Dropout probability for the attention layer.
         class_dropout_prob: Probability of dropping class labels for context conditioning.
         langevin_dynamics_noise: Standard deviation of Langevin dynamics noise.
         weight_initialization_gain: Gain for discrete embedding weight initialization.
+        randomize_mcmc_step_size_scale: Scale factor for randomizing MCMC step size.
         clamp_futures_grad_max_change: Maximum change for clamping future gradients.
         discrete_gaussian_random_noise_scaling: Scale factor for discrete Gaussian random noise.
         discrete_absolute_clamp: Maximum absolute value for discrete predictions.
@@ -310,6 +301,16 @@ class EBT(nn.Module):
         frac_coords_reconstruction_loss_weight: Weighting factor for the atom fractional coordinates reconstruction loss.
         lengths_scaled_reconstruction_loss_weight: Weighting factor for the atom lengths (scaled) reconstruction loss.
         angles_radians_reconstruction_loss_weight: Weighting factor for the atom angles (radians) reconstruction loss.
+        qkv_bias: If True, add a learnable bias to query, key, value.
+        qk_norm: If True, apply normalization to query and key.
+        scale_attn_norm: If True, apply scaling to attention
+            normalization.
+        proj_bias: If True, add bias to output projection.
+        flex_attn: If True, use the flexible attention implementation
+            (flex_attention) for more efficient attention computation with
+            Triton kernels.
+        fused_attn: If True, use the fused attention implementation
+            (scaled_dot_product_attention) for efficiency.
         truncate_mcmc: Whether to truncate MCMC sample gradient trajectories.
         clamp_futures_grad: Whether to clamp future gradients.
         no_mcmc_detach: Whether to detach MCMC samples from the graph.
@@ -325,6 +326,7 @@ class EBT(nn.Module):
         add_mask_atom_type: Whether to add a mask token for atom types.
         weight_initialization_method: Initialization method for discrete embedding weights.
         discrete_denoising_initial_condition: Whether to use random or zero-based discrete denoising for initial conditions.
+        norm_layer: Normalization layer.
     """
 
     def __init__(
@@ -338,14 +340,18 @@ class EBT(nn.Module):
         mcmc_step_size: int = 5,
         randomize_mcmc_num_steps: int = 2,
         randomize_mcmc_num_steps_min: int = 2,
-        randomize_mcmc_step_size_scale: float = 1.25,
         num_datasets: int = 2,  # Context conditioning input
         num_spacegroups: int = 230,  # Context conditioning input
         max_num_elements: int = 100,
+        context_length: int | None = 2048,
+        rope_base: int | None = 10_000,
         mlp_ratio: float = 4.0,
+        proj_drop: float = 0.1,
+        attn_drop: float = 0.0,
         class_dropout_prob: float = 0.1,
         langevin_dynamics_noise: float = 0.01,
         weight_initialization_gain: float = 1.0,
+        randomize_mcmc_step_size_scale: float = 1.25,
         clamp_futures_grad_max_change: float = 9.0,
         discrete_gaussian_random_noise_scaling: float = 1.0,
         discrete_absolute_clamp: float = 0.0,
@@ -355,6 +361,12 @@ class EBT(nn.Module):
         frac_coords_reconstruction_loss_weight: float = 10.0,
         lengths_scaled_reconstruction_loss_weight: float = 1.0,
         angles_radians_reconstruction_loss_weight: float = 10.0,
+        qkv_bias: bool = False,
+        qk_norm: bool = True,
+        scale_attn_norm: bool = False,
+        proj_bias: bool = False,
+        flex_attn: bool = False,
+        fused_attn: bool = True,
         truncate_mcmc: bool = False,
         clamp_futures_grad: bool = False,
         no_mcmc_detach: bool = True,
@@ -370,6 +382,7 @@ class EBT(nn.Module):
         add_mask_atom_type: bool = True,
         weight_initialization_method: Literal["he", "xavier"] = "xavier",
         discrete_denoising_initial_condition: Literal["random", "zeros"] = "random",
+        norm_layer: Type[nn.Module] = LayerNorm,
     ):
         super().__init__()
 
@@ -385,10 +398,10 @@ class EBT(nn.Module):
         self.mcmc_num_steps = mcmc_num_steps
         self.randomize_mcmc_num_steps = randomize_mcmc_num_steps
         self.randomize_mcmc_num_steps_min = randomize_mcmc_num_steps_min
-        self.randomize_mcmc_step_size_scale = randomize_mcmc_step_size_scale
-        self.randomize_mcmc_num_steps_final_landscape = randomize_mcmc_num_steps_final_landscape
+        self.context_length = context_length
         self.class_dropout_prob = class_dropout_prob
         self.langevin_dynamics_noise = langevin_dynamics_noise
+        self.randomize_mcmc_step_size_scale = randomize_mcmc_step_size_scale
         self.clamp_futures_grad_max_change = clamp_futures_grad_max_change
         self.discrete_gaussian_random_noise_scaling = discrete_gaussian_random_noise_scaling
         self.discrete_absolute_clamp = discrete_absolute_clamp
@@ -398,6 +411,7 @@ class EBT(nn.Module):
         self.frac_coords_reconstruction_loss_weight = frac_coords_reconstruction_loss_weight
         self.lengths_scaled_reconstruction_loss_weight = lengths_scaled_reconstruction_loss_weight
         self.angles_radians_reconstruction_loss_weight = angles_radians_reconstruction_loss_weight
+        self.flex_attn = flex_attn
         self.truncate_mcmc = truncate_mcmc
         self.clamp_futures_grad = clamp_futures_grad
         self.no_mcmc_detach = no_mcmc_detach
@@ -405,9 +419,11 @@ class EBT(nn.Module):
         self.no_randomize_mcmc_step_size_scale_during_eval = (
             no_randomize_mcmc_step_size_scale_during_eval
         )
+        self.randomize_mcmc_num_steps_final_landscape = randomize_mcmc_num_steps_final_landscape
         self.normalize_discrete_initial_condition = normalize_discrete_initial_condition
         self.weighted_rigid_align_pos = weighted_rigid_align_pos
         self.weighted_rigid_align_frac_coords = weighted_rigid_align_frac_coords
+        self.use_pytorch_implementation = use_pytorch_implementation
         self.discrete_denoising_initial_condition = discrete_denoising_initial_condition
 
         self.alpha = nn.Parameter(
@@ -430,7 +446,26 @@ class EBT(nn.Module):
         self.learnable_embedder = nn.Embedding(1, d_model)
 
         self.blocks = nn.ModuleList(
-            [EBTBlock(d_model, nhead, mlp_ratio=mlp_ratio) for _ in range(num_layers)]
+            [
+                EBTBlock(
+                    d_model,
+                    nhead,
+                    context_length=context_length,
+                    rope_base=rope_base,
+                    mlp_ratio=mlp_ratio,
+                    attn_drop=attn_drop,
+                    proj_drop=proj_drop,
+                    qkv_bias=qkv_bias,
+                    qk_norm=qk_norm,
+                    scale_attn_norm=scale_attn_norm,
+                    proj_bias=proj_bias,
+                    flex_attn=flex_attn,
+                    fused_attn=fused_attn,
+                    use_pytorch_implementation=use_pytorch_implementation,
+                    norm_layer=norm_layer,
+                )
+                for _ in range(num_layers)
+            ]
         )
         self.final_layer = FinalLayer(d_model)
         self.initialize_weights()
@@ -478,22 +513,28 @@ class EBT(nn.Module):
         nn.init.constant_(self.final_layer.linear.weight, 0)
         # nn.init.constant_(self.final_layer.linear.bias, 0)  # NOTE: Turned off bias for final layer of EBT
 
+    @property
+    def device(self) -> torch.device:
+        """Return the device of the model."""
+        return next(self.parameters()).device
+
     @typecheck
     def _forward(
         self,
-        atom_types: torch.Tensor,
-        pos: torch.Tensor,
-        frac_coords: torch.Tensor,
-        lengths_scaled: torch.Tensor,
-        angles_radians: torch.Tensor,
-        dataset_idx: torch.Tensor,
-        spacegroup: torch.Tensor,
-        mask: torch.Tensor,
+        atom_types: Float["b m c2"],  # type: ignore
+        pos: Float["b m 3"],  # type: ignore
+        frac_coords: Float["b m 3"],  # type: ignore
+        lengths_scaled: Float["b 1 3"],  # type: ignore
+        angles_radians: Float["b 1 3"],  # type: ignore
+        dataset_idx: Int[" b"],  # type: ignore
+        spacegroup: Int[" b"],  # type: ignore
+        mask: Bool["b m"],  # type: ignore
+        seq_idx: Int["b m"] | None = None,  # type: ignore
     ) -> torch.Tensor:
         """Forward pass of EBT.
 
         Args:
-            atom_types: Combined input and predicted atom type embeddings tensor (B, N, D * 2).
+            atom_types: Combined input and predicted atom type embeddings tensor (B, N, C * 2).
             pos: Atom positions tensor (B, N, 3).
             frac_coords: Fractional coordinates tensor (B, N, 3).
             lengths_scaled: Scaled lengths tensor (B, 1, 3).
@@ -501,32 +542,84 @@ class EBT(nn.Module):
             dataset_idx: Dataset index for each sample (B,).
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
+            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
 
         Returns:
             Output energy tensor (B, N, 1).
         """
-        # Positional embedding
-        token_index = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
-        pos_emb = get_pos_embedding(token_index, self.d_model)
+        batch_size, num_tokens, _ = atom_types.shape
 
-        # Input embeddings: (B, N, d)
+        # Positional embedding
+        token_idx = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
+        pos_emb = get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
+
+        # Create the attention mask
+        attn_mask = None
+        if not self.use_pytorch_implementation:
+            if seq_idx is None:
+                seq_idx = torch.ones_like(token_idx)
+
+            def padded_document_mask_mod(
+                b: torch.Tensor, h: torch.Tensor, q_idx: torch.Tensor, kv_idx: torch.Tensor
+            ) -> torch.Tensor:
+                """Create a padded document mask for the attention mechanism.
+
+                Args:
+                    b: Batch index.
+                    h: Head index (not used in this implementation).
+                    q_idx: Index of the query token.
+                    kv_idx: Index of the key-value tokens.
+
+                Returns:
+                    A boolean tensor value.
+                """
+                seq_ids = seq_idx
+                non_padding_mask = (seq_ids[b, q_idx] != 0) & (seq_ids[b, kv_idx] != 0)
+                document_mask = seq_ids[b, q_idx] == seq_ids[b, kv_idx]
+                return non_padding_mask & document_mask
+
+            attn_mask = (
+                create_block_mask(
+                    mask_mod=padded_document_mask_mod,
+                    B=batch_size,
+                    H=None,
+                    Q_LEN=num_tokens,
+                    KV_LEN=num_tokens,
+                    device=self.device,
+                )
+                if self.flex_attn
+                else build_attention_mask(mask, seq_idx, dtype=atom_types.dtype)
+            )
+
+        # Input embeddings: [B, N, C]
         x_encoding = self.encoder(
-            atom_types, pos, frac_coords, lengths_scaled, angles_radians, token_index, mask
+            atom_types,
+            pos,
+            frac_coords,
+            lengths_scaled,
+            angles_radians,
+            token_idx,
+            mask,
+            attn_mask=attn_mask,
         )
-        x = self.x_embedder(x_encoding) + pos_emb
+        x = self.x_embedder(x_encoding)
 
         # Conditioning embeddings
-        d = self.dataset_embedder(dataset_idx, self.training)  # (B, d)
-        s = self.spacegroup_embedder(spacegroup, self.training)  # (B, d)
-        lt = self.learnable_embedder(torch.zeros_like(token_index[..., 0]))
-        c = d + s + lt  # (B, d)
+        d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
+        s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
+        lt = self.learnable_embedder(torch.zeros_like(token_idx[..., 0]))
+        c = d + s + lt  # [B, C]
 
         # Transformer blocks
         for block in self.blocks:
-            x = block(x, c, ~mask)  # (B, N, d)
+            if self.use_pytorch_implementation:  # PyTorch-native Transformer
+                x += pos_emb  # Absolute positional embedding
+                x = block(x, c, ~mask)  # [B, N, C]
+            else:  # Custom Transformer
+                x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
 
         # Prediction layer
-        x = self.final_layer(x, c)  # (B, N, d_out)
+        x = self.final_layer(x, c)  # [B, N, 1]
         x = x * mask.unsqueeze(-1)  # Mask out padding tokens
         return x
 
@@ -720,7 +813,7 @@ class EBT(nn.Module):
                 pred_atom_type_embedding = self.atom_type_vocab_to_embedding(pred_atom_types)
                 pred_atom_types_embeddings = torch.cat(
                     (atom_types_input_embedding, pred_atom_type_embedding), dim=-1
-                )  # [B, S, D * 2]
+                )  # [B, S, C * 2]
 
                 pred_energy = self._forward(
                     pred_atom_types_embeddings,

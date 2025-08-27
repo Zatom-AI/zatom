@@ -88,7 +88,7 @@ repos:
             "--extend-ignore",
             "E203,E402,E501,F401,F841,RST2,RST301",
             "--exclude",
-            "logs/*,data/*,zatom/models/encoders/*transformer.py,zatom/tools/ase_notebook/*,zatom/utils/training_utils.py",
+            "logs/*,data/*,zatom/models/ecoders/ebt.py,zatom/models/encoders/*transformer.py,zatom/tools/ase_notebook/*,zatom/utils/training_utils.py",
           ]
         additional_dependencies: [flake8-rst-docstrings==0.3.0]
 

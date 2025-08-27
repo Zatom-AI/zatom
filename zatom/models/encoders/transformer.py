@@ -11,7 +11,12 @@ from torch import nn
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.attention.flex_attention import create_block_mask
 
-from zatom.models.encoders.custom_transformer import Block, LayerNorm, Mlp
+from zatom.models.encoders.custom_transformer import (
+    Block,
+    LayerNorm,
+    Mlp,
+    build_attention_mask,
+)
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
 
@@ -19,7 +24,7 @@ from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 @typecheck
 def get_index_embedding(
     indices: Int["... m"], emb_dim: int, max_len: int | None = 2048  # type: ignore
-) -> torch.Tensor:
+) -> Float["... m c"]:  # type: ignore
     """Create sine / cosine positional embeddings from a prespecified indices.
 
     Args:
@@ -35,10 +40,10 @@ def get_index_embedding(
     K = torch.arange(emb_dim // 2, device=indices.device)
     pos_embedding_sin = torch.sin(
         indices[..., None] * math.pi / (max_len ** (2 * K[None] / emb_dim))
-    ).to(indices.device)
+    )
     pos_embedding_cos = torch.cos(
         indices[..., None] * math.pi / (max_len ** (2 * K[None] / emb_dim))
-    ).to(indices.device)
+    )
     pos_embedding = torch.cat([pos_embedding_sin, pos_embedding_cos], axis=-1)
     return pos_embedding
 
@@ -185,32 +190,6 @@ class TransformerEncoder(nn.Module):
         return next(self.parameters()).device
 
     @typecheck
-    def build_attention_mask(
-        self, mask: Bool["b m"], seq_idx: Int["b m"], dtype: str | torch.dtype  # type: ignore
-    ) -> Float["b 1 m m"]:  # type: ignore
-        """Build an attention mask for the input batch.
-
-        Args:
-            mask: A tensor containing the non-padding mask.
-            seq_idx: A tensor containing unique token sequence IDs.
-            dtype: The data type of the attention mask.
-
-        Returns:
-            A tensor representing the additive mask for pairwise attention scores.
-        """
-        non_padding_mask = mask
-        attn_mask = non_padding_mask.unsqueeze(1) & non_padding_mask.unsqueeze(2)
-        attn_mask = attn_mask & (
-            # Only attend to atoms with the same sequence (i.e., example)
-            seq_idx.unsqueeze(1)
-            == seq_idx.unsqueeze(2)
-        )
-        attn_mask = attn_mask.unsqueeze(1).type(dtype)
-        attn_mask.masked_fill_(attn_mask == 0, float("-inf"))
-        attn_mask.masked_fill_(attn_mask == 1, 0.0)
-        return attn_mask
-
-    @typecheck
     def forward(
         self,
         atom_types: Float["b m c2"],  # type: ignore
@@ -220,6 +199,7 @@ class TransformerEncoder(nn.Module):
         angles_radians: Float["b 1 3"],  # type: ignore
         token_idx: Int["b m"],  # type: ignore
         mask: Bool["b m"],  # type: ignore
+        attn_mask: Float["b 1 m m"] | None = None,  # type: ignore
         seq_idx: Int["b m"] | None = None,  # type: ignore
     ) -> Float["b m c"]:  # type: ignore
         """Forward pass for the Transformer encoder.
@@ -232,6 +212,7 @@ class TransformerEncoder(nn.Module):
             angles_radians: Lattice angles tensor (with a singular global value for each batch element).
             token_idx: Indices of tokens in the batch.
             mask: Attention mask for the batch.
+            attn_mask: Pre-computed attention mask for the batch (optional).
             seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
 
         Returns:
@@ -245,23 +226,13 @@ class TransformerEncoder(nn.Module):
         x += self.lengths_scaled_embedder(lengths_scaled)
         x += self.angles_radians_embedder(angles_radians)
 
-        if seq_idx is None:
-            seq_idx = torch.ones_like(token_idx)
+        # Token index positional embedding
+        token_idx_emb = get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
 
-        # PyTorch-native Transformer
-        if self.use_pytorch_implementation:
-            # Absolute positional embedding
-            x += get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
-
-            # PyTorch Transformer forward pass
-            with sdpa_kernel(SDPBackend.MATH):
-                # NOTE: May need to use this context, as regular SDPA from PyTorch
-                # may not support higher order gradients (e.g., for CUDA devices).
-                # NOTE: May want to turn this off for inference eventually.
-                x = self.transformer.forward(x, src_key_padding_mask=(~mask))
-
-        # Custom Transformer
-        else:
+        # Create the attention mask
+        if attn_mask is None and not self.use_pytorch_implementation:
+            if seq_idx is None:
+                seq_idx = torch.ones_like(token_idx)
 
             def padded_document_mask_mod(
                 b: torch.Tensor, h: torch.Tensor, q_idx: torch.Tensor, kv_idx: torch.Tensor
@@ -282,7 +253,6 @@ class TransformerEncoder(nn.Module):
                 document_mask = seq_ids[b, q_idx] == seq_ids[b, kv_idx]
                 return non_padding_mask & document_mask
 
-            # Create the attention mask
             attn_mask = (
                 create_block_mask(
                     mask_mod=padded_document_mask_mod,
@@ -293,11 +263,20 @@ class TransformerEncoder(nn.Module):
                     device=self.device,
                 )
                 if self.flex_attn
-                else self.build_attention_mask(mask, seq_idx, dtype=x.dtype)
+                else build_attention_mask(mask, seq_idx, dtype=x.dtype)
             )
 
-            # Embed the input batch with Transformer blocks
-            for block in self.transformer:
-                x = block(x, pos_ids=token_idx, attn_mask=attn_mask)  # [B, M, D]
+        # Transformer blocks
+        with sdpa_kernel(SDPBackend.MATH):
+            # NOTE: May need to use this context, as regular SDPA from PyTorch
+            # may not support higher order gradients (e.g., for CUDA devices).
+            # NOTE: May want to turn this off for inference eventually.
+
+            if self.use_pytorch_implementation:  # PyTorch-native Transformer
+                x += token_idx_emb  # Absolute positional embedding
+                x = self.transformer.forward(x, src_key_padding_mask=(~mask))  # [B, M, D]
+            else:
+                for block in self.transformer:  # Custom Transformer
+                    x = block(x, pos_ids=token_idx, attn_mask=attn_mask)  # [B, M, D]
 
         return x
