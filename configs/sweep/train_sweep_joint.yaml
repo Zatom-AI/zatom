@@ -1,4 +1,4 @@
-name: train_sweep_joint
+name: train_sweep_joint_custom_transformer
 project: zatom
 program: zatom/train_ebm.py
 
@@ -19,7 +19,7 @@ parameters:
     value: 42
 
   ++ecoder.use_pytorch_implementation:
-    value: true
+    value: false
 
   ++ecoder.randomize_mcmc_num_steps:
     values: [0, 2]
@@ -31,7 +31,7 @@ parameters:
     values: [2, 3, 5, 10]
 
   ++encoder.use_pytorch_implementation:
-    value: true
+    value: false
 
   trainer:
     value: gpu
