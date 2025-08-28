@@ -38,7 +38,7 @@ DEFAULT_RUN_ID="d4x5d7dk"                 # NOTE: Generate a unique ID for each 
 DEFAULT_RUN_DATE="2025-08-28_12-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="EBT-B__${DATASET}_subset"       # Name of the model type and dataset configuration
+RUN_NAME="EBT-B__${DATASET}_subset_s1-best-hparams"       # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
