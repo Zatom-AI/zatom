@@ -669,14 +669,14 @@ class EBT(nn.Module):
     @typecheck
     def forward(
         self,
-        atom_types: torch.Tensor,
-        pos: torch.Tensor,
-        frac_coords: torch.Tensor,
-        lengths_scaled: torch.Tensor,
-        angles_radians: torch.Tensor,
-        dataset_idx: torch.Tensor,
-        spacegroup: torch.Tensor,
-        mask: torch.Tensor,
+        atom_types: Int["b m"],  # type: ignore
+        pos: Float["b m 3"],  # type: ignore
+        frac_coords: Float["b m 3"],  # type: ignore
+        lengths_scaled: Float["b 1 3"],  # type: ignore
+        angles_radians: Float["b 1 3"],  # type: ignore
+        dataset_idx: Int[" b"],  # type: ignore
+        spacegroup: Int[" b"],  # type: ignore
+        mask: Bool["b m"],  # type: ignore
         training: bool,
         no_randomness: bool = True,
         return_raw_discrete_logits: bool = False,
@@ -684,14 +684,14 @@ class EBT(nn.Module):
         """MCMC-driven forward pass of EBT.
 
         Args:
-            atom_types: Atom types tensor (B, N).
-            pos: Atom positions tensor (B, N, 3).
-            frac_coords: Fractional coordinates tensor (B, N, 3).
-            lengths_scaled: Lengths scaled tensor (B, 1, 3).
-            angles_radians: Angles in radians tensor (B, 1, 3).
-            dataset_idx: Dataset index for each sample (B,).
-            spacegroup: Spacegroup index for each sample (B,).
-            mask: True if valid token, False if padding (B, N).
+            atom_types: Atom types tensor.
+            pos: Atom positions tensor.
+            frac_coords: Fractional coordinates tensor.
+            lengths_scaled: Lengths scaled tensor.
+            angles_radians: Angles in radians tensor.
+            dataset_idx: Dataset index for each sample.
+            spacegroup: Spacegroup index for each sample.
+            mask: True if valid token, False if padding.
             training: If True, enables computation graph tracking in final MCMC step.
             no_randomness: If True, disables randomness in MCMC steps.
             return_raw_discrete_logits: If True, returns raw logits instead of log-probabilities.
@@ -970,30 +970,30 @@ class EBT(nn.Module):
     @typecheck
     def forward_with_loss_wrapper(
         self,
-        atom_types: torch.Tensor,
-        pos: torch.Tensor,
-        frac_coords: torch.Tensor,
-        lengths_scaled: torch.Tensor,
-        angles_radians: torch.Tensor,
-        dataset_idx: torch.Tensor,
-        spacegroup: torch.Tensor,
-        mask: torch.Tensor,
-        token_is_periodic: torch.Tensor,
+        atom_types: Int["b m"],  # type: ignore
+        pos: Float["b m 3"],  # type: ignore
+        frac_coords: Float["b m 3"],  # type: ignore
+        lengths_scaled: Float["b 1 3"],  # type: ignore
+        angles_radians: Float["b 1 3"],  # type: ignore
+        dataset_idx: Int[" b"],  # type: ignore
+        spacegroup: Int[" b"],  # type: ignore
+        mask: Bool["b m"],  # type: ignore
+        token_is_periodic: Bool["b m"],  # type: ignore
         target_tensors: Dict[str, torch.Tensor],
         stage: Literal["train", "sanity_check", "validate", "test", "predict"] = "train",
     ) -> Dict[str, torch.Tensor]:
         """MCMC-driven forward pass of EBT with loss calculation.
 
         Args:
-            atom_types: Atom types tensor (B, N).
-            pos: Atom positions tensor (B, N, 3).
-            frac_coords: Fractional coordinates tensor (B, N, 3).
-            lengths_scaled: Lattice lengths tensor (B, 1, 3).
-            angles_radians: Lattice angles tensor (B, 1, 3).
-            dataset_idx: Dataset index for each sample (B,).
-            spacegroup: Spacegroup index for each sample (B,).
-            mask: True if valid token, False if padding (B, N).
-            token_is_periodic: Boolean mask indicating periodic tokens (B, N).
+            atom_types: Atom types tensor.
+            pos: Atom positions tensor.
+            frac_coords: Fractional coordinates tensor.
+            lengths_scaled: Lattice lengths tensor.
+            angles_radians: Lattice angles tensor.
+            dataset_idx: Dataset index for each sample.
+            spacegroup: Spacegroup index for each sample.
+            mask: True if valid token, False if padding.
+            token_is_periodic: Boolean mask indicating periodic tokens.
             target_tensors: Dictionary containing the following target tensors for loss calculation:
                 atom_types: Target atom types tensor (B, N).
                 pos: Target positions tensor (B, N, 3).
