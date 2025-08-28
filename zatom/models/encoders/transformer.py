@@ -103,7 +103,7 @@ class TransformerEncoder(nn.Module):
         flex_attn: bool = False,
         fused_attn: bool = True,
         checkpoint_activations: bool = False,
-        use_pytorch_implementation: bool = True,
+        use_pytorch_implementation: bool = False,
         act_layer: Type[nn.Module] = nn.GELU,
         norm_layer: Type[nn.Module] = LayerNorm,
         mlp_layer: Type[nn.Module] = Mlp,

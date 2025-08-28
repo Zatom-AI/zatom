@@ -947,11 +947,36 @@ class EBMLitModule(LightningModule):
 
         :return: A dict containing the configured optimizers and learning-rate schedulers to be used for training.
         """
+        alpha_param = self.trainer.model.ecoder.alpha
+        other_params = [
+            param
+            for name, param in self.trainer.model.named_parameters()
+            if not any(keyword in name for keyword in ["alpha"])
+        ]
+
+        assert (
+            len(other_params) > 1
+        ), "Could not gather model parameters successfully. Please verify correctness of model definition."
+        optimizer_parameters = [
+            {
+                **self.hparams.optimizer.keywords,
+                "params": alpha_param,
+                "weight_decay": 0.0,  # No weight decay for `alpha`, but maybe for other parameters
+                "lr": self.hparams.optimizer.keywords["lr"]
+                * self.hparams.ecoder.mcmc_step_size_lr_multiplier,
+            },
+            {
+                **self.hparams.optimizer.keywords,
+                "params": other_params,
+            },
+        ]
+
         try:
-            optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
+            optimizer = self.hparams.optimizer(params=optimizer_parameters)
         except TypeError:
-            # NOTE: strategies such as DeepSpeed require `params` to instead be specified as `model_params`
-            optimizer = self.hparams.optimizer(model_params=self.trainer.model.parameters())
+            # NOTE: Strategies such as DeepSpeed require `params` to instead be specified as `model_params`
+            optimizer = self.hparams.optimizer(model_params=optimizer_parameters)
+
         if self.hparams.scheduler is not None:
             scheduler = self.hparams.scheduler(optimizer=optimizer)
             return {
@@ -963,4 +988,5 @@ class EBMLitModule(LightningModule):
                     "frequency": self.hparams.scheduler_frequency,
                 },
             }
+
         return {"optimizer": optimizer}

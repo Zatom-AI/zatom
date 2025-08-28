@@ -81,8 +81,6 @@ bash -c "
     ecoder.d_model=$D_MODEL \
     ecoder.num_layers=$NUM_LAYERS \
     ecoder.nhead=$NHEAD \
-    ecoder.use_pytorch_implementation=false \
-    encoder.use_pytorch_implementation=false \
     logger=wandb \
     name=$RUN_NAME \
     strategy=optimized_ddp \

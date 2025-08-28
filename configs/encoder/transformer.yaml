@@ -21,7 +21,7 @@ proj_bias: false
 flex_attn: false
 fused_attn: true
 checkpoint_activations: false
-use_pytorch_implementation: true
+use_pytorch_implementation: false
 act_layer: ${resolve_variable:torch.nn.GELU}
 norm_layer: ${resolve_variable:zatom.models.encoders.custom_transformer.LayerNorm}
 mlp_layer: ${resolve_variable:zatom.models.encoders.custom_transformer.Mlp}

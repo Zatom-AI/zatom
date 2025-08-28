@@ -150,7 +150,7 @@ class EBTBlock(nn.Module):
         proj_bias: bool = False,
         flex_attn: bool = False,
         fused_attn: bool = True,
-        use_pytorch_implementation: bool = True,
+        use_pytorch_implementation: bool = False,
         norm_layer: Type[nn.Module] | None = None,
         **block_kwargs: Any,
     ):
@@ -278,6 +278,7 @@ class EBT(nn.Module):
         nhead: Number of attention heads.
         mcmc_num_steps: Number of MCMC steps.
         mcmc_step_size: Markov chain Monte Carlo (MCMC) step size.
+        mcmc_step_size_lr_multiplier: Learning rate multiplier for MCMC step size.
         randomize_mcmc_num_steps: Number of steps to randomize MCMC.
         randomize_mcmc_num_steps_min: Minimum number of steps to randomize MCMC.
         num_datasets: Number of datasets for context conditioning.
@@ -313,10 +314,11 @@ class EBT(nn.Module):
             (scaled_dot_product_attention) for efficiency.
         truncate_mcmc: Whether to truncate MCMC sample gradient trajectories.
         clamp_futures_grad: Whether to clamp future gradients.
-        no_mcmc_detach: Whether to detach MCMC samples from the graph.
+        no_mcmc_detach: Whether to (not) detach MCMC samples from the graph.
         no_langevin_during_eval: Whether to disable Langevin dynamics during evaluation.
         no_randomize_mcmc_step_size_scale_during_eval: Whether to disable randomizing MCMC step size scale during evaluation.
         mcmc_step_size_learnable: Whether to make the MCMC step size learnable.
+        mcmc_step_index_learnable: Whether to embed the MCMC step index.
         langevin_dynamics_noise_learnable: Whether to make the Langevin dynamics noise learnable.
         randomize_mcmc_num_steps_final_landscape: Whether to randomize MCMC steps for the final landscape.
         normalize_discrete_initial_condition: Whether to normalize discrete initial embeddings using softmax.
@@ -336,10 +338,11 @@ class EBT(nn.Module):
         d_model: int = 768,
         num_layers: int = 12,
         nhead: int = 12,
-        mcmc_num_steps: int = 1,
-        mcmc_step_size: int = 5,
-        randomize_mcmc_num_steps: int = 2,
-        randomize_mcmc_num_steps_min: int = 2,
+        mcmc_num_steps: int = 3,
+        mcmc_step_size: int = 3000,
+        mcmc_step_size_lr_multiplier: int = 9000,
+        randomize_mcmc_num_steps: int = 0,
+        randomize_mcmc_num_steps_min: int = 0,
         num_datasets: int = 2,  # Context conditioning input
         num_spacegroups: int = 230,  # Context conditioning input
         max_num_elements: int = 100,
@@ -349,9 +352,9 @@ class EBT(nn.Module):
         proj_drop: float = 0.1,
         attn_drop: float = 0.0,
         class_dropout_prob: float = 0.1,
-        langevin_dynamics_noise: float = 0.01,
+        langevin_dynamics_noise: float = 0.0,
         weight_initialization_gain: float = 1.0,
-        randomize_mcmc_step_size_scale: float = 1.25,
+        randomize_mcmc_step_size_scale: float = 1.0,
         clamp_futures_grad_max_change: float = 9.0,
         discrete_gaussian_random_noise_scaling: float = 1.0,
         discrete_absolute_clamp: float = 0.0,
@@ -369,16 +372,17 @@ class EBT(nn.Module):
         fused_attn: bool = True,
         truncate_mcmc: bool = False,
         clamp_futures_grad: bool = False,
-        no_mcmc_detach: bool = True,
+        no_mcmc_detach: bool = False,
         no_langevin_during_eval: bool = False,
         no_randomize_mcmc_step_size_scale_during_eval: bool = False,
-        mcmc_step_size_learnable: bool = False,
+        mcmc_step_size_learnable: bool = True,
+        mcmc_step_index_learnable: bool = True,
         langevin_dynamics_noise_learnable: bool = False,
         randomize_mcmc_num_steps_final_landscape: bool = False,
         normalize_discrete_initial_condition: bool = True,
         weighted_rigid_align_pos: bool = True,
         weighted_rigid_align_frac_coords: bool = False,
-        use_pytorch_implementation: bool = True,
+        use_pytorch_implementation: bool = False,
         add_mask_atom_type: bool = True,
         weight_initialization_method: Literal["he", "xavier"] = "xavier",
         discrete_denoising_initial_condition: Literal["random", "zeros"] = "random",
@@ -396,6 +400,7 @@ class EBT(nn.Module):
         self.encoder = encoder
         self.d_model = d_model
         self.mcmc_num_steps = mcmc_num_steps
+        self.mcmc_step_size_lr_multiplier = mcmc_step_size_lr_multiplier
         self.randomize_mcmc_num_steps = randomize_mcmc_num_steps
         self.randomize_mcmc_num_steps_min = randomize_mcmc_num_steps_min
         self.context_length = context_length
@@ -419,6 +424,7 @@ class EBT(nn.Module):
         self.no_randomize_mcmc_step_size_scale_during_eval = (
             no_randomize_mcmc_step_size_scale_during_eval
         )
+        self.mcmc_step_index_learnable = mcmc_step_index_learnable
         self.randomize_mcmc_num_steps_final_landscape = randomize_mcmc_num_steps_final_landscape
         self.normalize_discrete_initial_condition = normalize_discrete_initial_condition
         self.weighted_rigid_align_pos = weighted_rigid_align_pos
@@ -443,7 +449,7 @@ class EBT(nn.Module):
         self.x_embedder = nn.Linear(d_x, d_model, bias=True)
         self.dataset_embedder = LabelEmbedder(num_datasets, d_model, class_dropout_prob)
         self.spacegroup_embedder = LabelEmbedder(num_spacegroups, d_model, class_dropout_prob)
-        self.learnable_embedder = nn.Embedding(1, d_model)
+        self.step_index_embedder = nn.Embedding(100, d_model)  # Placeholder for maximum step index
 
         self.blocks = nn.ModuleList(
             [
@@ -530,6 +536,7 @@ class EBT(nn.Module):
         spacegroup: Int[" b"],  # type: ignore
         mask: Bool["b m"],  # type: ignore
         seq_idx: Int["b m"] | None = None,  # type: ignore
+        step_index: int = 0,
     ) -> torch.Tensor:
         """Forward pass of EBT.
 
@@ -543,6 +550,7 @@ class EBT(nn.Module):
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
             seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
+            step_index: Current optimizer step (optional).
 
         Returns:
             Output energy tensor (B, N, 1).
@@ -605,9 +613,14 @@ class EBT(nn.Module):
         x = self.x_embedder(x_encoding)
 
         # Conditioning embeddings
+        step = (
+            torch.full_like(token_idx[..., 0], fill_value=step_index)
+            if self.mcmc_step_index_learnable
+            else torch.zeros_like(token_idx[..., 0])
+        )
         d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
         s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-        lt = self.learnable_embedder(torch.zeros_like(token_idx[..., 0]))
+        lt = self.step_index_embedder(step)
         c = d + s + lt  # [B, C]
 
         # Transformer blocks
@@ -824,6 +837,7 @@ class EBT(nn.Module):
                     dataset_idx,
                     spacegroup,
                     mask,
+                    step_index=i,
                 )
 
                 # Retain computation graph conditionally

@@ -6,10 +6,11 @@ d_x: ${encoder.d_model}
 d_model: 768 # 384, 768, 1024
 num_layers: 12 # 12, 12, 24
 nhead: 12 # 6, 12, 16
-mcmc_num_steps: 1
-mcmc_step_size: 5
-randomize_mcmc_num_steps: 2
-randomize_mcmc_num_steps_min: 2
+mcmc_num_steps: 3
+mcmc_step_size: 3000
+mcmc_step_size_lr_multiplier: 9000 # 3 x mcmc_step_size as a rule of thumb
+randomize_mcmc_num_steps: 0
+randomize_mcmc_num_steps_min: 0
 num_datasets: 2
 max_num_elements: 100
 context_length: 2048
@@ -18,9 +19,9 @@ mlp_ratio: 4.0
 proj_drop: 0.1
 attn_drop: 0.0
 class_dropout_prob: 0.0
-langevin_dynamics_noise: 0.01
+langevin_dynamics_noise: 0.0
 weight_initialization_gain: 1.0
-randomize_mcmc_step_size_scale: 1.25
+randomize_mcmc_step_size_scale: 1.0
 clamp_futures_grad_max_change: 9.0
 discrete_gaussian_random_noise_scaling: 1.0
 discrete_absolute_clamp: 0.0
@@ -28,7 +29,7 @@ sharpen_predicted_discrete_distribution: 0.0
 atom_types_reconstruction_loss_weight: 1.0
 pos_reconstruction_loss_weight: 10.0
 frac_coords_reconstruction_loss_weight: 10.0
-lengths_scaled_reconstruction_loss_weight: 10.0
+lengths_scaled_reconstruction_loss_weight: 1.0
 angles_radians_reconstruction_loss_weight: 10.0
 qkv_bias: false
 qk_norm: true
@@ -38,16 +39,17 @@ flex_attn: false
 fused_attn: true
 truncate_mcmc: false
 clamp_futures_grad: false
-no_mcmc_detach: true # NOTE: With `truncate_mcmc=false` and `no_mcmc_detach=true`, (S2) MCMC gradients will be fully propagated (n.b., which may trade off training stability for performance)
+no_mcmc_detach: false
 no_langevin_during_eval: false
 no_randomize_mcmc_step_size_scale_during_eval: false
-mcmc_step_size_learnable: false
+mcmc_step_size_learnable: true
+mcmc_step_index_learnable: true
 langevin_dynamics_noise_learnable: false
 randomize_mcmc_num_steps_final_landscape: false
 normalize_discrete_initial_condition: true
 weighted_rigid_align_pos: true
 weighted_rigid_align_frac_coords: false
-use_pytorch_implementation: true
+use_pytorch_implementation: false
 add_mask_atom_type: ${ebm_module.interpolant.corrupt}
 weight_initialization_method: xavier # NOTE: must be one of (`he`, `xavier`)
 discrete_denoising_initial_condition: random # NOTE: must be one of (`random`, `zeros`)
