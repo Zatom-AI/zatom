@@ -443,9 +443,7 @@ class EBT(nn.Module):
             # Each modality gets its own learnable `alpha` parameter
             self.alpha_dict = nn.ParameterDict(
                 {
-                    f"{modal}_alpha": nn.Parameter(
-                        torch.tensor(float(mcmc_step_size)), requires_grad=True
-                    )
+                    modal: nn.Parameter(torch.tensor(float(mcmc_step_size)), requires_grad=True)
                     for modal in self.modals
                 }
             )
@@ -454,9 +452,7 @@ class EBT(nn.Module):
             shared_alpha = nn.Parameter(
                 torch.tensor(float(mcmc_step_size)), requires_grad=mcmc_step_size_learnable
             )
-            self.alpha_dict = nn.ParameterDict(
-                {f"{modal}_alpha": shared_alpha for modal in self.modals}
-            )
+            self.alpha_dict = nn.ParameterDict({modal: shared_alpha for modal in self.modals})
 
         self.langevin_dynamics_noise_std = nn.Parameter(
             torch.tensor(float(langevin_dynamics_noise)),
@@ -736,8 +732,7 @@ class EBT(nn.Module):
 
         # Initialize `alpha` parameter(s)
         alpha_dict = {
-            modal: torch.clamp(self.alpha_dict[f"{modal}_alpha"], min=0.0001)
-            for modal in self.modals
+            modal: torch.clamp(self.alpha_dict[modal], min=0.0001) for modal in self.modals
         }
         if self.randomize_mcmc_step_size_scale != 1.0 and not (
             no_randomness and self.no_randomize_mcmc_step_size_scale_during_eval
@@ -915,8 +910,7 @@ class EBT(nn.Module):
                 # Maybe clamp gradients
                 if self.clamp_futures_grad:
                     min_and_max_dict = {
-                        modal: self.clamp_futures_grad_max_change
-                        / (self.alpha_dict[f"{modal}_alpha"])
+                        modal: self.clamp_futures_grad_max_change / (self.alpha_dict[modal])
                         for modal in self.modals
                     }
                     pred_atom_types_grad = torch.clamp(
