@@ -355,7 +355,7 @@ class EBT(nn.Module):
         class_dropout_prob: float = 0.1,
         langevin_dynamics_noise: float = 0.0,
         weight_initialization_gain: float = 1.0,
-        randomize_mcmc_step_size_scale: float = 2.0,
+        randomize_mcmc_step_size_scale: float = 1.0,
         clamp_futures_grad_max_change: float = 9.0,
         discrete_gaussian_random_noise_scaling: float = 1.0,
         discrete_absolute_clamp: float = 0.0,

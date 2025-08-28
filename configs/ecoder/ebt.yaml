@@ -21,7 +21,7 @@ attn_drop: 0.0
 class_dropout_prob: 0.0
 langevin_dynamics_noise: 0.0
 weight_initialization_gain: 1.0
-randomize_mcmc_step_size_scale: 2.0
+randomize_mcmc_step_size_scale: 1.0
 clamp_futures_grad_max_change: 9.0
 discrete_gaussian_random_noise_scaling: 1.0
 discrete_absolute_clamp: 0.0
