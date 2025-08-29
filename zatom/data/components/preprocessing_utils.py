@@ -361,8 +361,8 @@ def build_crystal_graph(crystal: Structure, graph_method: str = "crystalnn") -> 
 
 @typecheck
 def abs_cap(
-    val: float | np.float_ | torch.Tensor, max_abs_val: float = 1
-) -> float | np.float_ | torch.Tensor:
+    val: float | np.float64 | torch.Tensor, max_abs_val: float = 1
+) -> float | np.float64 | torch.Tensor:
     """Return the value with its absolute value capped at `max_abs_val`. Particularly useful in
     passing values to trigonometric functions where numerical errors may result in an argument > 1
     being passed in.

@@ -5,7 +5,7 @@ datamodule:
     mp20:
       _target_: zatom.data.components.mp20_dataset.MP20
       root: ${paths.data_dir}/mp_20
-      proportion: 1.0
+      proportion: 0.0
 
     qm9:
       _target_: torch_geometric.datasets.QM9
@@ -21,7 +21,7 @@ datamodule:
     omol25:
       _target_: zatom.data.components.omol25_dataset.OMol25
       root: ${paths.data_dir}/omol25
-      proportion: 0.0
+      proportion: 1.0
       subset: "_4M" # NOTE: must be one of ("", "_4M")
 
   batch_size:

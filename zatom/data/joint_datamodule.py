@@ -12,6 +12,7 @@ from torch_geometric.datasets import QM9
 from torch_geometric.loader import DataLoader
 
 from zatom.data.components.mp20_dataset import MP20
+from zatom.data.components.omol25_dataset import OMol25
 from zatom.data.components.qmof150_dataset import QMOF150
 from zatom.utils import pylogger
 from zatom.utils.typing_utils import typecheck
@@ -64,6 +65,7 @@ class JointDataModule(LightningDataModule):
     - MP20: crystal structures
     - QM9: small molecules
     - QMOF150: metal-organic frameworks
+    - OMol25: chemically diverse molecules
 
     A `LightningDataModule` implements 7 key methods:
 
@@ -216,21 +218,61 @@ class JointDataModule(LightningDataModule):
             )
         ]
 
+        # OMol25 dataset
+        # Create train, val, test splits
+        self.omol25_train_dataset = OMol25(
+            root=self.hparams.datasets.omol25.root,
+            split="train",
+            subset=self.hparams.datasets.omol25.subset,
+        )  # .shuffle()
+        self.omol25_val_dataset = OMol25(root=self.hparams.datasets.omol25.root, split="val")
+        self.omol25_test_dataset = OMol25(root=self.hparams.datasets.omol25.root, split="test")
+        # # Save num_nodes histogram for sampling from generative models
+        # num_nodes = torch.tensor([data["num_nodes"] for data in omol25_dataset])
+        # torch.save(
+        #     torch.bincount(num_nodes),
+        #     os.path.join(self.hparams.datasets.omol25.root, "num_nodes_bincount.pt"),
+        # )
+        # Retain subset of dataset; can be used to train on only one dataset, too
+        omol25_train_subset_size = int(
+            len(self.omol25_train_dataset) * self.hparams.datasets.omol25.proportion
+        )
+        self.omol25_train_dataset = self.omol25_train_dataset[:omol25_train_subset_size]
+        self.omol25_val_dataset = self.omol25_val_dataset[
+            : max(
+                omol25_train_subset_size,
+                int(len(self.omol25_val_dataset) * self.hparams.datasets.omol25.proportion),
+            )
+        ]
+        self.omol25_test_dataset = self.omol25_test_dataset[
+            : max(
+                omol25_train_subset_size,
+                int(len(self.omol25_test_dataset) * self.hparams.datasets.omol25.proportion),
+            )
+        ]
+
         if stage is None or stage in ["fit", "validate"]:
             self.train_dataset = ConcatDataset(
-                [self.mp20_train_dataset, self.qm9_train_dataset, self.qmof150_train_dataset]
+                [
+                    self.mp20_train_dataset,
+                    self.qm9_train_dataset,
+                    self.qmof150_train_dataset,
+                    self.omol25_train_dataset,
+                ]
             )
             log.info(
-                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)})"
+                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)})"
             )
             log.info(f"MP20 validation dataset: {len(self.mp20_val_dataset)} samples")
             log.info(f"QM9 validation dataset: {len(self.qm9_val_dataset)} samples")
             log.info(f"QMOF150 validation dataset: {len(self.qmof150_val_dataset)} samples")
+            log.info(f"OMol25 validation dataset: {len(self.omol25_val_dataset)} samples")
 
         if stage is None or stage in ["test", "predict"]:
             log.info(f"MP20 test dataset: {len(self.mp20_test_dataset)} samples")
             log.info(f"QM9 test dataset: {len(self.qm9_test_dataset)} samples")
             log.info(f"QMOF150 test dataset: {len(self.qmof150_test_dataset)} samples")
+            log.info(f"OMol25 test dataset: {len(self.omol25_test_dataset)} samples")
 
     def train_dataloader(self) -> DataLoader:
         """Create and return the train dataloader.
@@ -275,6 +317,13 @@ class JointDataModule(LightningDataModule):
                 pin_memory=False,
                 shuffle=False,
             ),
+            DataLoader(
+                dataset=self.omol25_val_dataset,
+                batch_size=self.hparams.batch_size.val,
+                num_workers=self.hparams.num_workers.val,
+                pin_memory=False,
+                shuffle=False,
+            ),
         ]
 
     def test_dataloader(self) -> Sequence[DataLoader]:
@@ -300,6 +349,13 @@ class JointDataModule(LightningDataModule):
             ),
             DataLoader(
                 dataset=self.qmof150_test_dataset,
+                batch_size=self.hparams.batch_size.test,
+                num_workers=self.hparams.num_workers.test,
+                pin_memory=False,
+                shuffle=False,
+            ),
+            DataLoader(
+                dataset=self.omol25_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
                 pin_memory=False,

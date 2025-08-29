@@ -18,6 +18,12 @@ datamodule:
       root: ${paths.data_dir}/qmof
       proportion: 1.0
 
+    omol25:
+      _target_: zatom.data.components.omol25_dataset.OMol25
+      root: ${paths.data_dir}/omol25
+      proportion: 0.0
+      subset: "_4M" # NOTE: must be one of ("", "_4M")
+
   batch_size:
     train: 128
     val: 128
