@@ -21,16 +21,16 @@ parameters:
   ckpt_path:
     value: ...
 
-  ++ecoder.mcmc_num_steps:
+  ecoder.mcmc_num_steps:
     values: [1, 2, 3, 5, 10, 20]
 
-  ++ecoder.randomize_mcmc_step_size_scale:
+  ecoder.randomize_mcmc_step_size_scale:
     values: [1.0, 1.25, 1.5, 2.0, 2.5, 5.0]
 
-  ++ebm_module.sampling.num_samples:
+  ebm_module.sampling.num_samples:
     value: 10000
 
-  ++ebm_module.sampling.batch_size:
+  ebm_module.sampling.batch_size:
     value: 1000
 
   trainer:

@@ -1,4 +1,4 @@
-name: train_sweep_joint
+name: train_sweep_joint_msmssl_tune-mss-mns_2025-08-28_17-00-00
 project: zatom
 program: zatom/train_ebm.py
 
@@ -18,26 +18,23 @@ parameters:
   seed:
     value: 42
 
-  ++ecoder.randomize_mcmc_step_size_scale:
-    values: [1.0, 2.0]
+  ecoder.mcmc_step_size:
+    values: [5, 10, 50, 500, 1000, 3000, 5000, 10000]
 
-  ++ecoder.mcmc_step_size:
-    values: [50, 500, 1000, 3000]
-
-  ++ecoder.mcmc_step_size_learnable:
-    values: [True, False]
+  ecoder.mcmc_num_steps:
+    values: [2, 3]
 
   trainer:
     value: gpu
 
-  ++trainer.accumulate_grad_batches:
+  trainer.accumulate_grad_batches:
     value: 8
 
   logger:
     value: wandb
 
   name:
-    value: "train_${hydra:runtime.choices.data}_rmsss@${ecoder.randomize_mcmc_step_size_scale}_mss@${ecoder.mcmc_step_size}_mssl@${ecoder.mcmc_step_size_learnable}"
+    value: "train_${hydra:runtime.choices.data}_mss@${ecoder.mcmc_step_size}_mns@${ecoder.mcmc_num_steps}"
 
 command:
   - ${env}
