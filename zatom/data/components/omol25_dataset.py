@@ -108,7 +108,7 @@ class OMol25(InMemoryDataset):
         for i in tqdm(range(len(dataset)), desc="Processing OMol25 dataset"):
             atoms = dataset.get_atoms(i)
 
-            num_atoms = atoms.info["num_atoms"]
+            num_atoms = len(atoms)
             atoms_to_keep = torch.ones((num_atoms,), dtype=torch.bool)
 
             data = Data(

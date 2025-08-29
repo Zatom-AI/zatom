@@ -214,7 +214,17 @@ class JointDataModule(LightningDataModule):
         self.omol25_val_dataset = OMol25(root=self.hparams.datasets.omol25.root, split="val")
         self.omol25_test_dataset = OMol25(root=self.hparams.datasets.omol25.root, split="test")
         # # Save num_nodes histogram for sampling from generative models
-        # num_nodes = torch.tensor([data["num_nodes"] for dataset in [self.omol25_train_dataset, self.omol25_val_dataset, self.omol25_test_dataset] for data in dataset])
+        # num_nodes = torch.tensor(
+        #     [
+        #         data["num_nodes"]
+        #         for dataset in [
+        #             self.omol25_train_dataset,
+        #             self.omol25_val_dataset,
+        #             self.omol25_test_dataset,
+        #         ]
+        #         for data in dataset
+        #     ]
+        # )
         # torch.save(
         #     torch.bincount(num_nodes),
         #     os.path.join(self.hparams.datasets.omol25.root, "num_nodes_bincount.pt"),
