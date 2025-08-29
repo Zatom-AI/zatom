@@ -2,4 +2,3 @@ _target_: lightning.pytorch.strategies.DDPStrategy
 static_graph: false
 gradient_as_bucket_view: true
 find_unused_parameters: false
-start_method: spawn # NOTE: must be one of (`popen`, `spawn`, `fork`, `forkserver`)

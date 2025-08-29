@@ -68,9 +68,17 @@ class JointDataModule(LightningDataModule):
     - QMOF150: metal-organic frameworks
     - OMol25: chemically diverse molecules
 
-    A `LightningDataModule` implements 5 key methods:
+    A `LightningDataModule` implements 7 key methods:
 
     ```python
+        def prepare_data(self):
+        # Things to do on 1 GPU/TPU (not on every GPU/TPU in DDP).
+        # Download data, pre-process, split, save to disk, etc...
+
+        def setup(self, stage):
+        # Things to do on every process in DDP.
+        # Load data, set variables, etc...
+
         def train_dataloader(self):
         # return train dataloader
 
@@ -107,10 +115,17 @@ class JointDataModule(LightningDataModule):
         # Also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
-        #################################################################################
-        #                             Data Pre-Loading                                  #
-        #################################################################################
+    def setup(self, stage: str | None = None) -> None:
+        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
+        This method is called by Lightning before `trainer.fit()`, `trainer.validate()`, `trainer.test()`, and
+        `trainer.predict()`, so be careful not to execute things like random split twice! Also, it is called after
+        `self.prepare_data()` and there is a barrier in between which ensures that all the processes proceed to
+        `self.setup()` once the data is prepared and available for use.
+
+        Args:
+            stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
+        """
         # QM9 dataset
         qm9_dataset = QM9(
             root=self.hparams.datasets.qm9.root,
@@ -247,36 +262,28 @@ class JointDataModule(LightningDataModule):
             )
         ]
 
-        # Data composition
-        self.train_dataset = ConcatDataset(
-            [
-                self.mp20_train_dataset,
-                self.qm9_train_dataset,
-                self.qmof150_train_dataset,
-                self.omol25_train_dataset,
-            ]
-        )
-        log.info(
-            f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)})"
-        )
+        if stage is None or stage in ["fit", "validate"]:
+            self.train_dataset = ConcatDataset(
+                [
+                    self.mp20_train_dataset,
+                    self.qm9_train_dataset,
+                    self.qmof150_train_dataset,
+                    self.omol25_train_dataset,
+                ]
+            )
+            log.info(
+                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)})"
+            )
+            log.info(f"MP20 validation dataset: {len(self.mp20_val_dataset)} samples")
+            log.info(f"QM9 validation dataset: {len(self.qm9_val_dataset)} samples")
+            log.info(f"QMOF150 validation dataset: {len(self.qmof150_val_dataset)} samples")
+            log.info(f"OMol25 validation dataset: {len(self.omol25_val_dataset)} samples")
 
-        log.info(f"MP20 validation dataset: {len(self.mp20_val_dataset)} samples")
-        log.info(f"QM9 validation dataset: {len(self.qm9_val_dataset)} samples")
-        log.info(f"QMOF150 validation dataset: {len(self.qmof150_val_dataset)} samples")
-        log.info(f"OMol25 validation dataset: {len(self.omol25_val_dataset)} samples")
-
-        log.info(f"MP20 test dataset: {len(self.mp20_test_dataset)} samples")
-        log.info(f"QM9 test dataset: {len(self.qm9_test_dataset)} samples")
-        log.info(f"QMOF150 test dataset: {len(self.qmof150_test_dataset)} samples")
-        log.info(f"OMol25 test dataset: {len(self.omol25_test_dataset)} samples")
-
-        # Clean up data
-        del (
-            self.mp20_train_dataset,
-            self.qm9_train_dataset,
-            self.qmof150_train_dataset,
-            self.omol25_train_dataset,
-        )
+        if stage is None or stage in ["test", "predict"]:
+            log.info(f"MP20 test dataset: {len(self.mp20_test_dataset)} samples")
+            log.info(f"QM9 test dataset: {len(self.qm9_test_dataset)} samples")
+            log.info(f"QMOF150 test dataset: {len(self.qmof150_test_dataset)} samples")
+            log.info(f"OMol25 test dataset: {len(self.omol25_test_dataset)} samples")
 
     def train_dataloader(self) -> DataLoader:
         """Create and return the train dataloader.
