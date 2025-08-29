@@ -32,7 +32,7 @@ export HF_HOME="/pscratch/sd/${USER:0:1}/$USER/hf_cache"       # high-performanc
 mkdir -p "$TORCH_HOME"
 mkdir -p "$HF_HOME"
 
-# Select model configuration -> EBT-{S/B/L}
+# Select model configuration -> EBT-{S/M/L}
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
@@ -44,7 +44,7 @@ DEFAULT_RUN_ID="hnoh5fse"                 # NOTE: Generate a unique ID for each 
 DEFAULT_RUN_DATE="2025-08-27_22-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="EBT-B__${DATASET}"              # Name of the model type and dataset configuration
+RUN_NAME="EBT-M__${DATASET}"              # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
