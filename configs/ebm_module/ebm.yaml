@@ -30,6 +30,8 @@ conditioning:
   dataset_idx: true # always true
   spacegroup: false
 
+datasets: ${data.datamodule.datasets}
+
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true

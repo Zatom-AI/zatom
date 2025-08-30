@@ -36,7 +36,7 @@ source ~/.bashrc  # or `source ~/.zshrc` - alternatively, one can restart their 
 With `conda` available, one can build a virtual environment for `zatom`.
 
 ```bash
-# Clone project
+# Clone project, making sure Git LFS is installed beforehand (https://git-lfs.com/)
 git clone https://github.com/amorehead/zatom
 cd zatom
 
@@ -72,7 +72,7 @@ pre-commit install
 For sake of reproducibility, one can alternatively build a (CUDA-based) Docker image for `zatom`.
 
 ```bash
-# Clone project
+# Clone project, making sure Git LFS is installed beforehand (https://git-lfs.com/)
 git clone https://github.com/amorehead/zatom
 cd zatom
 

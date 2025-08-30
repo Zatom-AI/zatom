@@ -11,7 +11,7 @@ from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.fabric.plugins.environments.cluster_environment import ClusterEnvironment
 from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies.strategy import Strategy
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -73,6 +73,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cfg.data.datamodule, _recursive_=False
     )
     # datamodule.setup()  # NOTE: Use this to save metadata (only) the first time code is run
+
+    # Avoid instantiating the `datasets` config as an object
+    with open_dict(cfg):
+        for dataset in cfg.ebm_module.datasets:
+            cfg.ebm_module.datasets[dataset].pop("_target_")
 
     log.info(f"Instantiating EBM model <{cfg.ebm_module._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.ebm_module)

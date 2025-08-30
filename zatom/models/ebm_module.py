@@ -81,6 +81,7 @@ class EBMLitModule(LightningModule):
         augmentations: DictConfig,
         sampling: DictConfig,
         conditioning: DictConfig,
+        datasets: DictConfig,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler.LRScheduler,
         scheduler_frequency: str,
@@ -114,7 +115,13 @@ class EBMLitModule(LightningModule):
             ),
             "qmof150": MOFGenerationEvaluator(),
             "omol25": MoleculeGenerationEvaluator(
-                dataset_smiles_list=None,  # TODO: Add SMILES loading for OMol25
+                dataset_smiles_list=(
+                    torch.load(  # nosec
+                        os.path.join(self.hparams.sampling.data_dir, "omol25", "smiles.pt"),
+                    )
+                    if self.hparams.datasets["omol25"].proportion > 0.0
+                    else None
+                ),
                 removeHs=self.hparams.sampling.removeHs,
             ),
         }
@@ -438,8 +445,6 @@ class EBMLitModule(LightningModule):
         Returns:
             A dictionary of loss values.
         """
-        datasets_dict = self.trainer.datamodule.hparams.datasets
-
         # Subset distributions when overfitting (one-time only)
         overfitting = self.trainer.overfit_batches == 1
         if overfitting and self.trainer.global_step == 0:
@@ -465,8 +470,8 @@ class EBMLitModule(LightningModule):
         self.interpolant.device = self.device
         self.interpolant.max_num_nodes = max(
             len(self.num_nodes_bincount[dataset]) - 1
-            for dataset in datasets_dict
-            if datasets_dict[dataset].proportion > 0.0
+            for dataset in self.hparams.datasets
+            if self.hparams.datasets[dataset].proportion > 0.0
         )
         noisy_dense_batch = self.interpolant.corrupt_batch(batch)
 
