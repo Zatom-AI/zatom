@@ -38,10 +38,14 @@ DATASET_TO_IDX = {
     "qmof150": 0,  # Periodic
     "omol25": 1,  # Non-periodic
 }
-PERIODIC_DATASETS = [
-    0,  # `mp20`
-    2,  # `qmof150`
-]
+PERIODIC_DATASETS = {
+    "mp20": 0,
+    "qmof150": 2,
+}
+NON_PERIODIC_DATASETS = {
+    "qm9": 1,
+    "omol25": 3,
+}
 
 
 class EBMLitModule(LightningModule):
@@ -166,215 +170,104 @@ class EBMLitModule(LightningModule):
                 "dataset_idx": MeanMetric(),
             }
         )
-        self.val_metrics = ModuleDict(
-            {
-                "mp20": ModuleDict(
-                    {
-                        "atom_types_loss": MeanMetric(),
-                        "atom_types_initial_loss": MeanMetric(),
-                        "atom_types_final_step_loss": MeanMetric(),
-                        "atom_types_initial_final_pred_energies_gap": MeanMetric(),
-                        "atom_types_ce_loss": MeanMetric(),
-                        "atom_types_ppl_loss": MeanMetric(),
-                        "pos_loss": MeanMetric(),
-                        "pos_initial_loss": MeanMetric(),
-                        "pos_final_step_loss": MeanMetric(),
-                        "pos_initial_final_pred_energies_gap": MeanMetric(),
-                        "pos_mse_loss": MeanMetric(),
-                        "frac_coords_loss": MeanMetric(),
-                        "frac_coords_initial_loss": MeanMetric(),
-                        "frac_coords_final_step_loss": MeanMetric(),
-                        "frac_coords_initial_final_pred_energies_gap": MeanMetric(),
-                        "frac_coords_mse_loss": MeanMetric(),
-                        "lengths_scaled_loss": MeanMetric(),
-                        "lengths_scaled_initial_loss": MeanMetric(),
-                        "lengths_scaled_final_step_loss": MeanMetric(),
-                        "lengths_scaled_initial_final_pred_energies_gap": MeanMetric(),
-                        "lengths_scaled_mse_loss": MeanMetric(),
-                        "angles_radians_loss": MeanMetric(),
-                        "angles_radians_initial_loss": MeanMetric(),
-                        "angles_radians_final_step_loss": MeanMetric(),
-                        "angles_radians_initial_final_pred_energies_gap": MeanMetric(),
-                        "angles_radians_mse_loss": MeanMetric(),
-                        "loss": MeanMetric(),
-                        "initial_loss": MeanMetric(),
-                        "final_step_loss": MeanMetric(),
-                        "initial_final_pred_energies_gap": MeanMetric(),
-                        "ce_loss": MeanMetric(),
-                        "ppl_loss": MeanMetric(),
-                        "mse_loss": MeanMetric(),
-                        "valid_rate": MeanMetric(),
-                        "struct_valid_rate": MeanMetric(),
-                        "comp_valid_rate": MeanMetric(),
-                        "unique_rate": MeanMetric(),
-                        "novel_rate": MeanMetric(),
-                        "sampling_time": MeanMetric(),
-                    }
-                ),
-                "qm9": ModuleDict(
-                    {
-                        "atom_types_loss": MeanMetric(),
-                        "atom_types_initial_loss": MeanMetric(),
-                        "atom_types_final_step_loss": MeanMetric(),
-                        "atom_types_initial_final_pred_energies_gap": MeanMetric(),
-                        "atom_types_ce_loss": MeanMetric(),
-                        "atom_types_ppl_loss": MeanMetric(),
-                        "pos_loss": MeanMetric(),
-                        "pos_initial_loss": MeanMetric(),
-                        "pos_final_step_loss": MeanMetric(),
-                        "pos_initial_final_pred_energies_gap": MeanMetric(),
-                        "pos_mse_loss": MeanMetric(),
-                        "frac_coords_loss": MeanMetric(),
-                        "frac_coords_initial_loss": MeanMetric(),
-                        "frac_coords_final_step_loss": MeanMetric(),
-                        "frac_coords_initial_final_pred_energies_gap": MeanMetric(),
-                        "frac_coords_mse_loss": MeanMetric(),
-                        "lengths_scaled_loss": MeanMetric(),
-                        "lengths_scaled_initial_loss": MeanMetric(),
-                        "lengths_scaled_final_step_loss": MeanMetric(),
-                        "lengths_scaled_initial_final_pred_energies_gap": MeanMetric(),
-                        "lengths_scaled_mse_loss": MeanMetric(),
-                        "angles_radians_loss": MeanMetric(),
-                        "angles_radians_initial_loss": MeanMetric(),
-                        "angles_radians_final_step_loss": MeanMetric(),
-                        "angles_radians_initial_final_pred_energies_gap": MeanMetric(),
-                        "angles_radians_mse_loss": MeanMetric(),
-                        "loss": MeanMetric(),
-                        "initial_loss": MeanMetric(),
-                        "final_step_loss": MeanMetric(),
-                        "initial_final_pred_energies_gap": MeanMetric(),
-                        "ce_loss": MeanMetric(),
-                        "ppl_loss": MeanMetric(),
-                        "mse_loss": MeanMetric(),
-                        "valid_rate": MeanMetric(),
-                        "unique_rate": MeanMetric(),
-                        "novel_rate": MeanMetric(),
-                        "mol_pred_loaded": MeanMetric(),
-                        "sanitization": MeanMetric(),
-                        "inchi_convertible": MeanMetric(),
-                        "all_atoms_connected": MeanMetric(),
-                        "bond_lengths": MeanMetric(),
-                        "bond_angles": MeanMetric(),
-                        "internal_steric_clash": MeanMetric(),
-                        "aromatic_ring_flatness": MeanMetric(),
-                        "non-aromatic_ring_non-flatness": MeanMetric(),
-                        "double_bond_flatness": MeanMetric(),
-                        "internal_energy": MeanMetric(),
-                        "sampling_time": MeanMetric(),
-                    }
-                ),
-                "qmof150": ModuleDict(
-                    {
-                        "atom_types_loss": MeanMetric(),
-                        "atom_types_initial_loss": MeanMetric(),
-                        "atom_types_final_step_loss": MeanMetric(),
-                        "atom_types_initial_final_pred_energies_gap": MeanMetric(),
-                        "atom_types_ce_loss": MeanMetric(),
-                        "atom_types_ppl_loss": MeanMetric(),
-                        "pos_loss": MeanMetric(),
-                        "pos_initial_loss": MeanMetric(),
-                        "pos_final_step_loss": MeanMetric(),
-                        "pos_initial_final_pred_energies_gap": MeanMetric(),
-                        "pos_mse_loss": MeanMetric(),
-                        "frac_coords_loss": MeanMetric(),
-                        "frac_coords_initial_loss": MeanMetric(),
-                        "frac_coords_final_step_loss": MeanMetric(),
-                        "frac_coords_initial_final_pred_energies_gap": MeanMetric(),
-                        "frac_coords_mse_loss": MeanMetric(),
-                        "lengths_scaled_loss": MeanMetric(),
-                        "lengths_scaled_initial_loss": MeanMetric(),
-                        "lengths_scaled_final_step_loss": MeanMetric(),
-                        "lengths_scaled_initial_final_pred_energies_gap": MeanMetric(),
-                        "lengths_scaled_mse_loss": MeanMetric(),
-                        "angles_radians_loss": MeanMetric(),
-                        "angles_radians_initial_loss": MeanMetric(),
-                        "angles_radians_final_step_loss": MeanMetric(),
-                        "angles_radians_initial_final_pred_energies_gap": MeanMetric(),
-                        "angles_radians_mse_loss": MeanMetric(),
-                        "loss": MeanMetric(),
-                        "initial_loss": MeanMetric(),
-                        "final_step_loss": MeanMetric(),
-                        "initial_final_pred_energies_gap": MeanMetric(),
-                        "ce_loss": MeanMetric(),
-                        "ppl_loss": MeanMetric(),
-                        "mse_loss": MeanMetric(),
-                        "valid_rate": MeanMetric(),
-                        "unique_rate": MeanMetric(),
-                        "has_carbon": MeanMetric(),
-                        "has_hydrogen": MeanMetric(),
-                        "has_atomic_overlaps": MeanMetric(),
-                        "has_overcoordinated_c": MeanMetric(),
-                        "has_overcoordinated_n": MeanMetric(),
-                        "has_overcoordinated_h": MeanMetric(),
-                        "has_undercoordinated_c": MeanMetric(),
-                        "has_undercoordinated_n": MeanMetric(),
-                        "has_undercoordinated_rare_earth": MeanMetric(),
-                        "has_metal": MeanMetric(),
-                        "has_lone_molecule": MeanMetric(),
-                        "has_high_charges": MeanMetric(),
-                        # "is_porous": MeanMetric(),
-                        "has_suspicicious_terminal_oxo": MeanMetric(),
-                        "has_undercoordinated_alkali_alkaline": MeanMetric(),
-                        "has_geometrically_exposed_metal": MeanMetric(),
-                        # 'has_3d_connected_graph': MeanMetric(),
-                        "all_checks": MeanMetric(),
-                        "sampling_time": MeanMetric(),
-                    }
-                ),
-                "omol25": ModuleDict(
-                    {
-                        "atom_types_loss": MeanMetric(),
-                        "atom_types_initial_loss": MeanMetric(),
-                        "atom_types_final_step_loss": MeanMetric(),
-                        "atom_types_initial_final_pred_energies_gap": MeanMetric(),
-                        "atom_types_ce_loss": MeanMetric(),
-                        "atom_types_ppl_loss": MeanMetric(),
-                        "pos_loss": MeanMetric(),
-                        "pos_initial_loss": MeanMetric(),
-                        "pos_final_step_loss": MeanMetric(),
-                        "pos_initial_final_pred_energies_gap": MeanMetric(),
-                        "pos_mse_loss": MeanMetric(),
-                        "frac_coords_loss": MeanMetric(),
-                        "frac_coords_initial_loss": MeanMetric(),
-                        "frac_coords_final_step_loss": MeanMetric(),
-                        "frac_coords_initial_final_pred_energies_gap": MeanMetric(),
-                        "frac_coords_mse_loss": MeanMetric(),
-                        "lengths_scaled_loss": MeanMetric(),
-                        "lengths_scaled_initial_loss": MeanMetric(),
-                        "lengths_scaled_final_step_loss": MeanMetric(),
-                        "lengths_scaled_initial_final_pred_energies_gap": MeanMetric(),
-                        "lengths_scaled_mse_loss": MeanMetric(),
-                        "angles_radians_loss": MeanMetric(),
-                        "angles_radians_initial_loss": MeanMetric(),
-                        "angles_radians_final_step_loss": MeanMetric(),
-                        "angles_radians_initial_final_pred_energies_gap": MeanMetric(),
-                        "angles_radians_mse_loss": MeanMetric(),
-                        "loss": MeanMetric(),
-                        "initial_loss": MeanMetric(),
-                        "final_step_loss": MeanMetric(),
-                        "initial_final_pred_energies_gap": MeanMetric(),
-                        "ce_loss": MeanMetric(),
-                        "ppl_loss": MeanMetric(),
-                        "mse_loss": MeanMetric(),
-                        "valid_rate": MeanMetric(),
-                        "unique_rate": MeanMetric(),
-                        "novel_rate": MeanMetric(),
-                        "mol_pred_loaded": MeanMetric(),
-                        "sanitization": MeanMetric(),
-                        "inchi_convertible": MeanMetric(),
-                        "all_atoms_connected": MeanMetric(),
-                        "bond_lengths": MeanMetric(),
-                        "bond_angles": MeanMetric(),
-                        "internal_steric_clash": MeanMetric(),
-                        "aromatic_ring_flatness": MeanMetric(),
-                        "non-aromatic_ring_non-flatness": MeanMetric(),
-                        "double_bond_flatness": MeanMetric(),
-                        "internal_energy": MeanMetric(),
-                        "sampling_time": MeanMetric(),
-                    }
-                ),
+
+        val_metrics = {}
+        for dataset in self.hparams.datasets:
+            if not (self.hparams.datasets[dataset].proportion > 0.0):
+                continue
+            # General evaluation metrics
+            val_metrics[dataset] = {
+                "atom_types_loss": MeanMetric(),
+                "atom_types_initial_loss": MeanMetric(),
+                "atom_types_final_step_loss": MeanMetric(),
+                "atom_types_initial_final_pred_energies_gap": MeanMetric(),
+                "atom_types_ce_loss": MeanMetric(),
+                "atom_types_ppl_loss": MeanMetric(),
+                "pos_loss": MeanMetric(),
+                "pos_initial_loss": MeanMetric(),
+                "pos_final_step_loss": MeanMetric(),
+                "pos_initial_final_pred_energies_gap": MeanMetric(),
+                "pos_mse_loss": MeanMetric(),
+                "frac_coords_loss": MeanMetric(),
+                "frac_coords_initial_loss": MeanMetric(),
+                "frac_coords_final_step_loss": MeanMetric(),
+                "frac_coords_initial_final_pred_energies_gap": MeanMetric(),
+                "frac_coords_mse_loss": MeanMetric(),
+                "lengths_scaled_loss": MeanMetric(),
+                "lengths_scaled_initial_loss": MeanMetric(),
+                "lengths_scaled_final_step_loss": MeanMetric(),
+                "lengths_scaled_initial_final_pred_energies_gap": MeanMetric(),
+                "lengths_scaled_mse_loss": MeanMetric(),
+                "angles_radians_loss": MeanMetric(),
+                "angles_radians_initial_loss": MeanMetric(),
+                "angles_radians_final_step_loss": MeanMetric(),
+                "angles_radians_initial_final_pred_energies_gap": MeanMetric(),
+                "angles_radians_mse_loss": MeanMetric(),
+                "loss": MeanMetric(),
+                "initial_loss": MeanMetric(),
+                "final_step_loss": MeanMetric(),
+                "initial_final_pred_energies_gap": MeanMetric(),
+                "ce_loss": MeanMetric(),
+                "ppl_loss": MeanMetric(),
+                "mse_loss": MeanMetric(),
+                "valid_rate": MeanMetric(),
+                "unique_rate": MeanMetric(),
+                "sampling_time": MeanMetric(),
             }
-        )
+            # Periodic sample evaluation metrics
+            if dataset in PERIODIC_DATASETS:
+                if dataset == "qmof150":
+                    val_metrics[dataset].update(
+                        {
+                            "has_carbon": MeanMetric(),
+                            "has_hydrogen": MeanMetric(),
+                            "has_atomic_overlaps": MeanMetric(),
+                            "has_overcoordinated_c": MeanMetric(),
+                            "has_overcoordinated_n": MeanMetric(),
+                            "has_overcoordinated_h": MeanMetric(),
+                            "has_undercoordinated_c": MeanMetric(),
+                            "has_undercoordinated_n": MeanMetric(),
+                            "has_undercoordinated_rare_earth": MeanMetric(),
+                            "has_metal": MeanMetric(),
+                            "has_lone_molecule": MeanMetric(),
+                            "has_high_charges": MeanMetric(),
+                            # "is_porous": MeanMetric(),
+                            "has_suspicicious_terminal_oxo": MeanMetric(),
+                            "has_undercoordinated_alkali_alkaline": MeanMetric(),
+                            "has_geometrically_exposed_metal": MeanMetric(),
+                            # 'has_3d_connected_graph': MeanMetric(),
+                            "all_checks": MeanMetric(),
+                        }
+                    )
+                else:
+                    val_metrics[dataset].update(
+                        {
+                            "novel_rate": MeanMetric(),
+                            "struct_valid_rate": MeanMetric(),
+                            "comp_valid_rate": MeanMetric(),
+                        }
+                    )
+            # Non-periodic sample evaluation metrics
+            elif dataset in NON_PERIODIC_DATASETS:
+                val_metrics[dataset].update(
+                    {
+                        "novel_rate": MeanMetric(),
+                        "mol_pred_loaded": MeanMetric(),
+                        "sanitization": MeanMetric(),
+                        "inchi_convertible": MeanMetric(),
+                        "all_atoms_connected": MeanMetric(),
+                        "bond_lengths": MeanMetric(),
+                        "bond_angles": MeanMetric(),
+                        "internal_steric_clash": MeanMetric(),
+                        "aromatic_ring_flatness": MeanMetric(),
+                        "non-aromatic_ring_non-flatness": MeanMetric(),
+                        "double_bond_flatness": MeanMetric(),
+                        "internal_energy": MeanMetric(),
+                    }
+                )
+            val_metrics[dataset] = ModuleDict(val_metrics[dataset])
+
+        self.val_metrics = ModuleDict(val_metrics)
         self.test_metrics = copy.deepcopy(self.val_metrics)
 
         # Load bincounts for sampling
@@ -431,7 +324,7 @@ class EBMLitModule(LightningModule):
         # Constants
         self.register_buffer(
             "periodic_datasets",
-            torch.tensor(PERIODIC_DATASETS, dtype=torch.long),
+            torch.tensor(list(PERIODIC_DATASETS.values()), dtype=torch.long),
             persistent=False,
         )
 
