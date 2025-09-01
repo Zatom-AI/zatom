@@ -1,12 +1,12 @@
 #!/bin/bash -l
 
 ######################### Batch Headers #########################
-#SBATCH -C gpu&hbm40g                                         # request GPU nodes
+#SBATCH -C gpu&hbm80g                                         # request GPU nodes
 #SBATCH --qos=regular                                         # use specified partition for job
 #SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
 #SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
 #SBATCH --account=m5008                                       # use specified account for billing (e.g., `m5008_g` for AI4Science proposal, `dasrepo` for all else)
-#SBATCH --nodes=1                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
+#SBATCH --nodes=2                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
 #SBATCH --gpus-per-node=4                                     # request 40GB A100 GPU resource(s)
 #SBATCH --ntasks-per-node=4                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
 #SBATCH --time=00-22:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
@@ -80,6 +80,9 @@ bash -c "
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
     data=$DATASET \
+    data.datamodule.batch_size.train=256 \
+    data.datamodule.batch_size.val=256 \
+    data.datamodule.batch_size.test=256 \
     data.datamodule.datasets.mp20.proportion=1.0 \
     data.datamodule.datasets.qm9.proportion=1.0 \
     data.datamodule.datasets.qmof150.proportion=0.0 \
@@ -93,6 +96,7 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
+    trainer.accumulate_grad_batches=1 \
     +trainer.max_time='06:00:00:00' \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
