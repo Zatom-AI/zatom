@@ -199,7 +199,6 @@ def main(args: Args) -> None:
         )
 
     for is_causal in (False, True):
-        print("is_causal:", is_causal)
         with sdpa_kernel(SDPBackend.MATH), fwAD.dual_level(), enable_grad():
             q0, k0, v0 = make_qkv(
                 q_p.clone(),
@@ -269,9 +268,8 @@ def main(args: Args) -> None:
             torch.testing.assert_close(q2.grad, q0.grad, atol=5e-4, rtol=1e-5)
             torch.testing.assert_close(k2.grad, k0.grad, atol=5e-4, rtol=1e-5)
             torch.testing.assert_close(v2.grad, v0.grad, atol=5e-4, rtol=1e-5)
-            pass
-        pass
-        print("is_causal:", is_causal, "passed all assertions.")
+
+        print(f"Passed all assertions with `is_causal={is_causal}`.")
 
 
 if __name__ == "__main__":
