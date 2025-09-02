@@ -69,6 +69,8 @@ pre-commit install
 
 > Note: If you are installing on systems without access to CUDA GPU (e.g., macOS), remove `[cuda]` from the above commands. Be aware that the CPU version (e.g., without macOS's MPS backend) will be significantly slower than the GPU version.
 
+> Note: If you want to run the unit tests verifying the correctness of the JVP Flash Attention Triton kernel, run `pip install flash-attn==2.8.3 --no-build-isolation` (on CUDA systems only).
+
 ### Docker
 
 For sake of reproducibility, one can alternatively build a (CUDA-based) Docker image for `zatom`.
