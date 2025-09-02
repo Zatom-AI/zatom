@@ -49,20 +49,29 @@ def fmt_flops(flops: int) -> str:
     return f"{flops / 1e12:5.1f} TFLOP/s"
 
 
-def get_flop_count(f: Callable[[], Any], display_ops: bool = False) -> int:
-    """Get the number of floating point operations (FLOPs) for a given function.
+def get_attention_flop_count(
+    batch_size: int,
+    num_heads: int,
+    seq_len: int,
+    head_dim: int,
+    is_causal: bool,
+    is_jvp: bool = False,
+) -> int:
+    """Calculate FLOPs for attention operations."""
+    # Base attention FLOPs
+    qk_flops = 2 * batch_size * num_heads * seq_len * seq_len * head_dim
+    softmax_flops = 5 * batch_size * num_heads * seq_len * seq_len
+    av_flops = 2 * batch_size * num_heads * seq_len * seq_len * head_dim
 
-    Args:
-        f: The function to measure FLOPs for.
-        display_ops: Whether to display the FLOPs during measurement.
+    total_flops = qk_flops + softmax_flops + av_flops
 
-    Returns:
-        The number of FLOPs.
-    """
-    flop_counter = FlopCounterMode(display=display_ops)
-    with flop_counter:
-        f()
-    return flop_counter.get_total_flops()
+    if is_causal:
+        total_flops = total_flops // 2
+
+    if is_jvp:
+        total_flops = total_flops * 2
+
+    return total_flops
 
 
 def measure_memory_usage(f: Callable[[], Any]) -> tuple[float, float]:
@@ -538,18 +547,24 @@ def run_benchmark_suite(args: Args) -> list[BenchmarkResult]:
                     )
                     out = JVPAttn.fwd_dual(q, k, v, causal=is_causal)
 
-                # Measure SDPA performance
                 print("\nBenchmarking performance...")
+                heads = args.model_dim // args.head_dim
+
+                # Measure SDPA performance
                 sdpa_time = benchmark_function(run_sdpa, args.warmup_iters, args.benchmark_iters)
                 sdpa_mem_alloc, sdpa_mem_reserved = measure_memory_usage(run_sdpa)
-                sdpa_flops = get_flop_count(run_sdpa, display_ops=False)
+                sdpa_flops = get_attention_flop_count(
+                    args.bsz, heads, seq_len, args.head_dim, is_causal, is_jvp=False
+                )
 
                 # Measure JVP Attention performance
                 jvp_time = benchmark_function(
                     run_jvp_attn, args.warmup_iters, args.benchmark_iters
                 )
                 jvp_mem_alloc, jvp_mem_reserved = measure_memory_usage(run_jvp_attn)
-                jvp_flops = get_flop_count(run_jvp_attn, display_ops=False)
+                jvp_flops = get_attention_flop_count(
+                    args.bsz, heads, seq_len, args.head_dim, is_causal, is_jvp=True
+                )
 
                 # Store results
                 results.append(
