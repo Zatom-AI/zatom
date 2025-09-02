@@ -148,7 +148,7 @@ dmypy.json
 configs/local/default.yaml
 /data/
 /logs/
-/tests/*.png
+/tests/*.json
 /wandb/
 .env
 /scripts/**/logs/*.out
