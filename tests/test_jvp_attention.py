@@ -16,7 +16,6 @@ from torch import Tensor, enable_grad
 from torch.nn import MSELoss
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.functional import scaled_dot_product_attention
-from torch.utils.flop_counter import FlopCounterMode
 
 try:
     import numpy as np
