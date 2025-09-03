@@ -42,9 +42,6 @@ parameters:
   trainer:
     value: gpu
 
-  trainer.accumulate_grad_batches:
-    value: 16
-
   trainer.check_val_every_n_epoch:
     value: 5
 
