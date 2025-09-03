@@ -38,6 +38,8 @@ try:
 except ModuleNotFoundError:
     HAS_TENSOR_DESC = False
 
+MIN_SEQUENCE_LENGTH = 32  # NOTE: All sequence lengths must be multiples of 2 >= 32
+
 
 def is_hip():
     """Check if the current device is HIP."""
@@ -389,8 +391,8 @@ configs = [
         num_warps=w,
         pre_hook=_host_descriptor_pre_hook,
     )
-    for BM in [64, 128]
-    for BN in [32, 64, 128]
+    for BM in [MIN_SEQUENCE_LENGTH, 64, 128]
+    for BN in [MIN_SEQUENCE_LENGTH, 64, 128]
     for s in NUM_STAGES_OPTIONS
     for w in [4, 8]
 ]
@@ -430,8 +432,16 @@ def prune_invalid_configs(configs, named_args, **kwargs):
     """
     N_CTX = kwargs["N_CTX"]
 
-    # Filter out configs where BLOCK_M > N_CTX
-    return [conf for conf in configs if conf.kwargs.get("BLOCK_M", 0) <= N_CTX]
+    if N_CTX == MIN_SEQUENCE_LENGTH:
+        # Filter out configs where BLOCK_M > MIN_SEQUENCE_LENGTH
+        return [conf for conf in configs if conf.kwargs.get("BLOCK_M", 0) <= MIN_SEQUENCE_LENGTH]
+
+    # Filter out configs where BLOCK_M > N_CTX or BLOCK_M <= MIN_SEQUENCE_LENGTH, as
+    # BLOCK_M = MIN_SEQUENCE_LENGTH often leads to reduced numerical accuracy for longer sequences
+    # TODO: Find out why this occurs
+    return [
+        conf for conf in configs if MIN_SEQUENCE_LENGTH < conf.kwargs.get("BLOCK_M", 0) <= N_CTX
+    ]
 
 
 @triton.jit
@@ -770,8 +780,8 @@ configs_tma = [
         num_warps=w,
         pre_hook=_tma_pre_hook,
     )
-    for BM in [64, 128, 256]
-    for BN in [64, 128]
+    for BM in [MIN_SEQUENCE_LENGTH, 64, 128, 256]
+    for BN in [MIN_SEQUENCE_LENGTH, 64, 128]
     for s in [3, 4, 5]
     for w in [4, 8]
 ]
@@ -1853,7 +1863,7 @@ class JVPAttn(Function):
         dk = torch.empty_like(k)
         dv = torch.empty_like(v)
         BATCH, N_HEAD, N_CTX = q.shape[:3]
-        PRE_BLOCK = 64  # NOTE: Adjust according to minimum input sequence length
+        PRE_BLOCK = MIN_SEQUENCE_LENGTH  # NOTE: Adjust according to minimum input sequence length
         NUM_WARPS, NUM_STAGES = 4, 5
         BLOCK_M1, BLOCK_N1, BLOCK_M2, BLOCK_N2 = 32, PRE_BLOCK, PRE_BLOCK, 32
         BLK_SLICE_FACTOR = 2
