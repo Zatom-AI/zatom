@@ -1825,8 +1825,27 @@ class JVPAttn(Function):
             The backward output.
         """
         q, k, v, o, M = ctx.saved_tensors
+
+        # Ensure inputs/outputs the kernel reads share the same (contiguous) layout
+        if (
+            not q.is_contiguous()
+            or not k.is_contiguous()
+            or not v.is_contiguous()
+            or not o.is_contiguous()
+        ):
+            raise RuntimeError(
+                "JVPAttn expects q, k, v, o to be contiguous; call .contiguous() in forward."
+            )
+
+        # Autograd may deliver a non-contiguous grad_output; normalize it.
+        if (not do.is_contiguous()) or (do.stride() != o.stride()):
+            do = do.contiguous()
+
         assert do.is_contiguous()
-        assert q.stride() == k.stride() == v.stride() == o.stride() == do.stride()
+
+        assert q.stride() == k.stride() == v.stride() == o.stride()
+        assert do.stride() == o.stride()
+
         dq = torch.empty_like(q)
         dk = torch.empty_like(k)
         dv = torch.empty_like(v)
