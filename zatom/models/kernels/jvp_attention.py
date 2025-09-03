@@ -1817,6 +1817,9 @@ class JVPAttn(Function):
     def backward(ctx, do, _) -> JVPAttn.BwdOut:
         """Backward pass for JVP Attention.
 
+        NOTE: A call to `contiguous()` may be necessary to ensure the output derivatives are contiguous
+        in memory (e.g., due to autograd weirdness) but nonetheless may incur a performance cost.
+
         Args:
             ctx: The context
             do: The gradient of the output tensor
