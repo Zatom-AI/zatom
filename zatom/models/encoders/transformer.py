@@ -83,10 +83,10 @@ class TransformerEncoder(nn.Module):
 
     def __init__(
         self,
-        d_model: int = 1024,
-        nhead: int = 8,
+        d_model: int = 768,
+        nhead: int = 12,
         dim_feedforward: int = 2048,  # Argument for PyTorch implementation only
-        num_layers: int = 6,
+        num_layers: int = 8,
         context_length: int | None = 2048,
         rope_base: int | None = 10_000,
         dropout: float = 0.0,  # Argument for PyTorch implementation only

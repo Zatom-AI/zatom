@@ -82,7 +82,6 @@
                 // "ecoder.truncate_mcmc=false",
                 "ecoder.fused_attn=false",
                 "ecoder.jvp_attn=true",
-                "encoder.nhead=12",
                 "encoder.fused_attn=false",
                 "encoder.jvp_attn=true",
                 // "encoder.use_pytorch_implementation=false",
