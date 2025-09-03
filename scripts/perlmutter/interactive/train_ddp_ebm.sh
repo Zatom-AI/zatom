@@ -74,6 +74,9 @@ bash -c "
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
     data=$DATASET \
+    data.datamodule.batch_size.train=256 \
+    data.datamodule.batch_size.val=256 \
+    data.datamodule.batch_size.test=256 \
     data.datamodule.datasets.mp20.proportion=1.0 \
     data.datamodule.datasets.qm9.proportion=1.0 \
     data.datamodule.datasets.qmof150.proportion=0.0 \
@@ -91,6 +94,7 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
+    trainer.accumulate_grad_batches=8 \
     trainer.check_val_every_n_epoch=100 \
     +trainer.limit_train_batches=0.01 \
     +trainer.limit_val_batches=0.05 \

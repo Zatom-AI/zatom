@@ -46,7 +46,7 @@
             "args": [
                 // "callbacks.last_model_checkpoint.every_n_train_steps=50",
                 // "callbacks.model_checkpoint.every_n_train_steps=50",
-                // "ckpt_path=logs/train_ebm/runs/EBT-M__ecoder@768_joint_overfitting_molecule-and-material_s1_jvp-kernel-debugging/checkpoints/",
+                "ckpt_path=logs/overfit_ebm/runs/EBT-M__ecoder@768_joint_overfitting_molecule-and-material_s1_jvp-kernel-debugging_2025-09-02_19-00-00/checkpoints/",
                 // "resume_from_last_step_dir=false",
                 "data.datamodule.batch_size.train=2",
                 "data.datamodule.batch_size.val=2",
@@ -93,7 +93,7 @@
                 // "trainer=mps",
                 "trainer.check_val_every_n_epoch=null",
                 "trainer.val_check_interval=200",
-                "trainer.max_epochs=5000",
+                "trainer.max_epochs=10000",
                 "trainer.overfit_batches=1"
             ]
         },
