@@ -570,7 +570,7 @@ def _attn_fwd(
         ENABLE_JVP: Enable JVP flag.
     """
     tl.static_assert(BLOCK_N <= HEAD_DIM)
-    dtype = tl.float8e5 if FP8_OUTPUT else tl.float16  # For dot products
+    dtype = tl.float8e5 if FP8_OUTPUT else tl.float32  # For dot products
     start_m = tl.program_id(0)
     off_hz = tl.program_id(1)
     off_z = off_hz // H
@@ -845,7 +845,7 @@ def _attn_fwd_tma(
         warp_specialize: Flag indicating if warp specialization is used.
         ENABLE_JVP: Flag indicating if JVP (Jacobian-vector product) is enabled.
     """
-    dtype = tl.float8e5 if FP8_OUTPUT else tl.float16  # For dot products
+    dtype = tl.float8e5 if FP8_OUTPUT else tl.float32  # For dot products
     tl.static_assert(BLOCK_N <= HEAD_DIM)
     start_m = tl.program_id(0)
     off_hz = tl.program_id(1)
@@ -1106,7 +1106,7 @@ def _attn_bwd_dkdv(
     tl.static_assert(BLOCK_N1 % BLOCK_M1 == 0)
     curr_m = start_m
     step_m = BLOCK_M1
-    dtype = tl.float16  # For dot products
+    dtype = tl.float32  # For dot products
     for blk_idx in range(num_steps):
         qT = tl.load(qT_ptrs)
         # Load m before computing qk to reduce pipeline stall.
@@ -1197,7 +1197,7 @@ def _attn_bwd_dq(
     tl.static_assert(BLOCK_M2 % BLOCK_N2 == 0)
     curr_n = start_n
     step_n = BLOCK_N2
-    dtype = tl.float16  # For dot products
+    dtype = tl.float32  # For dot products
     for blk_idx in range(num_steps):
         kT = tl.load(kT_ptrs)
         vT = tl.load(vT_ptrs)

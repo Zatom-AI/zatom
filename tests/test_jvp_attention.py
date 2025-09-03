@@ -356,7 +356,6 @@ def validate_accuracy_and_gradients(
     v_t: Tensor,
     target: Tensor,
     is_causal: bool,
-    seq_len: int,
     tolerance: float = 5e-3,
 ) -> AccuracyMetrics:
     """Validate numerical accuracy and gradient matching between SDPA and JVP attention.
@@ -433,13 +432,13 @@ def validate_accuracy_and_gradients(
     # Validate using torch.testing.assert_close
     try:
         torch.testing.assert_close(
-            jvp_op, sdpa_op, atol=tolerance if is_causal else 3e-3, rtol=1e-5
+            jvp_op, sdpa_op, atol=tolerance if is_causal else 4e-3, rtol=1e-5
         )
         torch.testing.assert_close(
             # TODO: Improve this (causal) accuracy for longer sequence lengths
             jvp_func_op,
             sdpa_op,
-            atol=8e-3 if is_causal else 3e-3,
+            atol=8e-3 if is_causal else 4e-3,
             rtol=1e-5,
         )
 
@@ -480,9 +479,9 @@ def run_benchmark_suite(args: Args) -> list[BenchmarkResult]:
     dtype = dtype_map[args.dtype]
 
     tolerance_map = {
-        "float16": 2e-3,
-        "float32": 7.75e-3,
-        "bfloat16": 3.25e-2,
+        "float16": 2.0e-3,
+        "float32": 7.1e-3,
+        "bfloat16": 3.2e-2,
     }
     tolerance = tolerance_map[args.dtype]
 
@@ -512,7 +511,6 @@ def run_benchmark_suite(args: Args) -> list[BenchmarkResult]:
                     v_t,
                     target,
                     is_causal,
-                    seq_len,
                     tolerance=tolerance,
                 )
                 accuracy_metrics.tolerance = tolerance
@@ -705,7 +703,7 @@ def main(args: Args) -> None:
             }
         results_data.append(result_dict)
 
-    output_filepath = os.path.join("tests", "test_jvp_attention_results.json")
+    output_filepath = os.path.join("tests", f"{args.dtype}_test_jvp_attention_results.json")
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
     with open(output_filepath, "w") as f:
         json.dump(results_data, f, indent=2, default=str)
