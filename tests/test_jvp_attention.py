@@ -56,7 +56,19 @@ def get_attention_flop_count(
     is_causal: bool,
     is_jvp: bool = False,
 ) -> int:
-    """Calculate FLOPs for attention operations."""
+    """Calculate FLOPs for attention operations.
+
+    Args:
+        batch_size: Batch size.
+        num_heads: Number of attention heads.
+        seq_len: Sequence length.
+        head_dim: Dimension of each attention head.
+        is_causal: Whether the attention is causal.
+        is_jvp: Whether to include JVP (Jacobian-vector product) FLOPs.
+
+    Returns:
+        The total FLOPs for the attention operation.
+    """
     # Base attention FLOPs
     qk_flops = 2 * batch_size * num_heads * seq_len * seq_len * head_dim
     softmax_flops = 5 * batch_size * num_heads * seq_len * seq_len
@@ -241,6 +253,12 @@ def create_test_tensors(
 ) -> tuple[Tensor, ...]:
     """Create test tensors for benchmarking.
 
+    Args:
+        args: The training arguments.
+        seq_len: The sequence length.
+        device: The device to create the tensors on.
+        dtype: The data type of the tensors.
+
     Returns:
         Tuple of (q_p, q_t, k_p, k_t, v_p, v_t, target) tensors.
     """
@@ -279,7 +297,19 @@ def loss_fn(out: Tensor, target: Tensor) -> Tensor:
 def make_qkv_with_grad(
     q_p: Tensor, k_p: Tensor, v_p: Tensor, q_t: Tensor, k_t: Tensor, v_t: Tensor
 ) -> QKV:
-    """Make a QKV tuple with gradients enabled."""
+    """Make a QKV tuple with gradients enabled.
+
+    Args:
+        q_p: The query projection tensor.
+        k_p: The key projection tensor.
+        v_p: The value projection tensor.
+        q_t: The query tangent tensor.
+        k_t: The key tangent tensor.
+        v_t: The value tangent tensor.
+
+    Returns:
+        A QKV tuple containing the primal and tangent QKV tensors.
+    """
     # Create dual tensors
     q = fwAD.make_dual(q_p, q_t)
     k = fwAD.make_dual(k_p, k_t)
@@ -293,7 +323,19 @@ def make_qkv_with_grad(
 
 
 def make_qkv(q_p: Tensor, k_p: Tensor, v_p: Tensor, q_t: Tensor, k_t: Tensor, v_t: Tensor) -> QKV:
-    """Make a QKV tuple from the given tensors with dual numbers."""
+    """Make a QKV tuple from the given tensors with dual numbers.
+
+    Args:
+        q_p: The query projection tensor.
+        k_p: The key projection tensor.
+        v_p: The value projection tensor.
+        q_t: The query tangent tensor.
+        k_t: The key tangent tensor.
+        v_t: The value tangent tensor.
+
+    Returns:
+        A QKV tuple containing the primal and tangent QKV tensors.
+    """
     q = fwAD.make_dual(q_p, q_t)
     k = fwAD.make_dual(k_p, k_t)
     v = fwAD.make_dual(v_p, v_t)
@@ -335,7 +377,14 @@ def make_qkv_unpacked(
 
 
 def compute_absolute_error(*tensors: Tensor) -> float:
-    """Compute the maximum absolute pairwise error between all tensors."""
+    """Compute the maximum absolute pairwise error between all tensors.
+
+    Args:
+        tensors: The input tensors to compare.
+
+    Returns:
+        The maximum absolute pairwise error.
+    """
     if len(tensors) < 2:
         raise ValueError("At least two tensors are required to compute absolute error.")
     max_error = 0.0
@@ -361,6 +410,19 @@ def validate_accuracy_and_gradients(
     non_causal_tangent_tolerance: float = 8e-3,
 ) -> AccuracyMetrics:
     """Validate numerical accuracy and gradient matching between SDPA and JVP attention.
+
+    Args:
+        q_p: The query projection tensor.
+        k_p: The key projection tensor.
+        v_p: The value projection tensor.
+        q_t: The query tangent tensor.
+        k_t: The key tangent tensor.
+        v_t: The value tangent tensor.
+        target: The target tensor.
+        is_causal: Whether the attention is causal.
+        tolerance: The tolerance for primal errors.
+        grad_tolerance: The tolerance for gradient errors.
+        non_causal_tangent_tolerance: The tolerance for non-causal tangent errors.
 
     Returns:
         AccuracyMetrics containing all error measurements.
@@ -476,7 +538,14 @@ def validate_accuracy_and_gradients(
 
 
 def run_benchmark_suite(args: Args) -> list[BenchmarkResult]:
-    """Run comprehensive benchmarks across different configurations."""
+    """Run comprehensive benchmarks across different configurations.
+
+    Args:
+        args: The command-line arguments for the benchmark.
+
+    Returns:
+        A list of benchmark results.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     dtype_map = {
@@ -639,7 +708,11 @@ def run_benchmark_suite(args: Args) -> list[BenchmarkResult]:
 
 
 def print_summary_table(results: list[BenchmarkResult]) -> None:
-    """Print a summary table of benchmark results."""
+    """Print a summary table of benchmark results.
+
+    Args:
+        results: The list of benchmark results to summarize.
+    """
     print("\n" + "=" * 90)
     print("BENCHMARK SUMMARY")
     print("=" * 90)
