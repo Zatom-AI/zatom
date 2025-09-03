@@ -89,10 +89,10 @@ bash -c "
     trainer=ddp \
     trainer.accumulate_grad_batches=1 \
     trainer.check_val_every_n_epoch=5000 \
-    +trainer.overfit_batches=4 \
     +trainer.max_time='06:00:00:00' \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
+    ++trainer.overfit_batches=4 \
     ckpt_path=$CKPT_PATH
 "
 
