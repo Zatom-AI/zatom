@@ -39,7 +39,7 @@ NHEAD=12  # 6, 12, 16
 # NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=24 trainer.accumulate_grad_batches=8
 
 # Define run details
-DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`)
+DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
 DEFAULT_RUN_ID="zs9eg0e3"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
 DEFAULT_RUN_DATE="2025-09-03_13-15-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 

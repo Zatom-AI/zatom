@@ -15,6 +15,7 @@ from torch_geometric.datasets import QM9
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
+from zatom.data.components.geom_dataset import GEOM
 from zatom.data.components.mp20_dataset import MP20
 from zatom.data.components.omol25_dataset import OMol25
 from zatom.data.components.qmof150_dataset import QMOF150
@@ -284,6 +285,52 @@ class JointDataModule(LightningDataModule):
             )
         ]
 
+        # GEOM-Drugs dataset
+        # Create train, val, test splits
+        self.geom_train_dataset = GEOM(
+            root=self.hparams.datasets.geom.root,
+            split="train",
+        )  # .shuffle()
+        self.geom_val_dataset = GEOM(root=self.hparams.datasets.geom.root, split="val")
+        self.geom_test_dataset = GEOM(root=self.hparams.datasets.geom.root, split="test")
+        # # Save `num_nodes` histogram and SMILES strings for sampling from generative models
+        # num_nodes = torch.cat(
+        #     [
+        #         torch.load(self.geom_train_dataset.processed_num_nodes_file), # nosec
+        #         torch.load(self.geom_val_dataset.processed_num_nodes_file), # nosec
+        #         torch.load(self.geom_test_dataset.processed_num_nodes_file), # nosec
+        #     ]
+        # )
+        # smiles = (
+        #     [
+        #         *torch.load(self.geom_train_dataset.processed_smiles_file), # nosec
+        #         *torch.load(self.geom_val_dataset.processed_smiles_file), # nosec
+        #         *torch.load(self.geom_test_dataset.processed_smiles_file), # nosec
+        #     ]
+        # )
+        # torch.save(
+        #     torch.bincount(num_nodes),
+        #     os.path.join(self.hparams.datasets.geom.root, "num_nodes_bincount.pt"),
+        # )
+        # torch.save(smiles, os.path.join(self.hparams.datasets.geom.root, "smiles.pt"))
+        # Retain subset of dataset; can be used to train on only one dataset, too
+        geom_train_subset_size = int(
+            len(self.geom_train_dataset) * self.hparams.datasets.geom.proportion
+        )
+        self.geom_train_dataset = self.geom_train_dataset[:geom_train_subset_size]
+        self.geom_val_dataset = self.geom_val_dataset[
+            : max(
+                geom_train_subset_size,
+                int(len(self.geom_val_dataset) * self.hparams.datasets.geom.proportion),
+            )
+        ]
+        self.geom_test_dataset = self.geom_test_dataset[
+            : max(
+                geom_train_subset_size,
+                int(len(self.geom_test_dataset) * self.hparams.datasets.geom.proportion),
+            )
+        ]
+
         if stage is None or stage in ["fit", "validate"]:
             self.train_dataset = ConcatDataset(
                 [
@@ -291,21 +338,24 @@ class JointDataModule(LightningDataModule):
                     self.qm9_train_dataset,
                     self.qmof150_train_dataset,
                     self.omol25_train_dataset,
+                    self.geom_train_dataset,
                 ]
             )
             log.info(
-                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)})"
+                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)}, GEOM: {len(self.geom_train_dataset)})"
             )
             log.info(f"MP20 validation dataset: {len(self.mp20_val_dataset)} samples")
             log.info(f"QM9 validation dataset: {len(self.qm9_val_dataset)} samples")
             log.info(f"QMOF150 validation dataset: {len(self.qmof150_val_dataset)} samples")
             log.info(f"OMol25 validation dataset: {len(self.omol25_val_dataset)} samples")
+            log.info(f"GEOM validation dataset: {len(self.geom_val_dataset)} samples")
 
         if stage is None or stage in ["test", "predict"]:
             log.info(f"MP20 test dataset: {len(self.mp20_test_dataset)} samples")
             log.info(f"QM9 test dataset: {len(self.qm9_test_dataset)} samples")
             log.info(f"QMOF150 test dataset: {len(self.qmof150_test_dataset)} samples")
             log.info(f"OMol25 test dataset: {len(self.omol25_test_dataset)} samples")
+            log.info(f"GEOM test dataset: {len(self.geom_test_dataset)} samples")
 
     def train_dataloader(self) -> DataLoader:
         """Create and return the train dataloader.
@@ -357,6 +407,13 @@ class JointDataModule(LightningDataModule):
                 pin_memory=False,
                 shuffle=False,
             ),
+            DataLoader(
+                dataset=self.geom_val_dataset,
+                batch_size=self.hparams.batch_size.val,
+                num_workers=self.hparams.num_workers.val,
+                pin_memory=False,
+                shuffle=False,
+            ),
         ]
 
     def test_dataloader(self) -> Sequence[DataLoader]:
@@ -389,6 +446,13 @@ class JointDataModule(LightningDataModule):
             ),
             DataLoader(
                 dataset=self.omol25_test_dataset,
+                batch_size=self.hparams.batch_size.test,
+                num_workers=self.hparams.num_workers.test,
+                pin_memory=False,
+                shuffle=False,
+            ),
+            DataLoader(
+                dataset=self.geom_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
                 pin_memory=False,

@@ -31,12 +31,14 @@ IDX_TO_DATASET = {
     1: "qm9",
     2: "qmof150",
     3: "omol25",
+    4: "geom",
 }
 DATASET_TO_IDX = {
     "mp20": 0,  # Periodic
     "qm9": 1,  # Non-periodic
     "qmof150": 0,  # Periodic
     "omol25": 1,  # Non-periodic
+    "geom": 1,  # Non-periodic
 }
 PERIODIC_DATASETS = {
     "mp20": 0,
@@ -45,6 +47,7 @@ PERIODIC_DATASETS = {
 NON_PERIODIC_DATASETS = {
     "qm9": 1,
     "omol25": 3,
+    "geom": 4,
 }
 
 
@@ -124,6 +127,16 @@ class EBMLitModule(LightningModule):
                         os.path.join(self.hparams.sampling.data_dir, "omol25", "smiles.pt"),
                     )
                     if self.hparams.datasets["omol25"].proportion > 0.0
+                    else None
+                ),
+                removeHs=self.hparams.sampling.removeHs,
+            ),
+            "geom": MoleculeGenerationEvaluator(
+                dataset_smiles_list=(
+                    torch.load(  # nosec
+                        os.path.join(self.hparams.sampling.data_dir, "geom", "smiles.pt"),
+                    )
+                    if self.hparams.datasets["geom"].proportion > 0.0
                     else None
                 ),
                 removeHs=self.hparams.sampling.removeHs,
@@ -302,6 +315,13 @@ class EBMLitModule(LightningModule):
                 ),
                 requires_grad=False,
             ),
+            "geom": torch.nn.Parameter(
+                torch.load(  # nosec
+                    os.path.join(self.hparams.sampling.data_dir, "geom", "num_nodes_bincount.pt"),
+                    map_location="cpu",
+                ),
+                requires_grad=False,
+            ),
         }
         self.spacegroups_bincount = {
             "mp20": torch.nn.Parameter(
@@ -316,6 +336,7 @@ class EBMLitModule(LightningModule):
             "qm9": None,
             "qmof150": None,
             "omol25": None,
+            "geom": None,
         }
 
         # Model configuration state
