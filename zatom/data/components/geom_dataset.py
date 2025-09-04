@@ -46,6 +46,7 @@ class GEOM(InMemoryDataset):
             final dataset. (default: `None`)
         force_reload (bool, optional): Whether to re-process the dataset.
             (default: `False`)
+        load: (bool, optional): Whether to load the processed dataset into memory.
         split: The dataset split to load (train, val, test).
             (default: `train`)
     """
@@ -57,6 +58,7 @@ class GEOM(InMemoryDataset):
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
         force_reload: bool = False,
+        load: bool = True,
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         self.split = split
@@ -70,7 +72,8 @@ class GEOM(InMemoryDataset):
 
         super().__init__(root, transform, pre_transform, pre_filter, force_reload=force_reload)
 
-        self.load(self.processed_paths[0])
+        if load:
+            self.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self) -> List[str]:

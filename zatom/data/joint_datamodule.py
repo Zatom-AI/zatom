@@ -289,10 +289,19 @@ class JointDataModule(LightningDataModule):
         # Create train, val, test splits
         self.geom_train_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
+            load=self.hparams.datasets.geom.proportion > 0.0,
             split="train",
         )  # .shuffle()
-        self.geom_val_dataset = GEOM(root=self.hparams.datasets.geom.root, split="val")
-        self.geom_test_dataset = GEOM(root=self.hparams.datasets.geom.root, split="test")
+        self.geom_val_dataset = GEOM(
+            root=self.hparams.datasets.geom.root,
+            load=self.hparams.datasets.geom.proportion > 0.0,
+            split="val",
+        )
+        self.geom_test_dataset = GEOM(
+            root=self.hparams.datasets.geom.root,
+            load=self.hparams.datasets.geom.proportion > 0.0,
+            split="test",
+        )
         # # Save `num_nodes` histogram and SMILES strings for sampling from generative models
         # num_nodes = torch.cat(
         #     [
