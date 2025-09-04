@@ -62,12 +62,10 @@ class GEOM(InMemoryDataset):
         self.split = split
         self.dataset_path = os.path.join(root, "raw", split)
         self.pickle_file = os.path.join(self.dataset_path, f"{self.split}_data.pickle")
-        self.processed_file = os.path.join(root, "processed", split, f"{self.split}.pt")
-        self.processed_smiles_file = os.path.join(
-            root, "processed", split, f"{self.split}_smiles.pt"
-        )
+        self.processed_file = os.path.join(root, "processed", f"{self.split}.pt")
+        self.processed_smiles_file = os.path.join(root, "processed", f"{self.split}_smiles.pt")
         self.processed_num_nodes_file = os.path.join(
-            root, "processed", split, f"{self.split}_num_nodes.pt"
+            root, "processed", f"{self.split}_num_nodes.pt"
         )
 
         super().__init__(root, transform, pre_transform, pre_filter, force_reload=force_reload)
@@ -157,12 +155,18 @@ class GEOM(InMemoryDataset):
                         [4], dtype=torch.long
                     ),  # 4 --> Indicates non-periodic/molecule
                 )
+
+                if self.pre_filter is not None and not self.pre_filter(pyg_data):
+                    continue
+                if self.pre_transform is not None:
+                    pyg_data = self.pre_transform(pyg_data)
+
                 pyg_data_list.append(pyg_data)
                 smiles_list.append(smiles)
                 num_nodes_list.append(N)
 
         # Save the data
         log.info(f"Saving {len(pyg_data_list)} GEOM-Drugs entries to {self.split} set")
-        torch.save(pyg_data_list, self.processed_file)
+        self.save(pyg_data_list, self.processed_file)
         torch.save(smiles_list, self.processed_smiles_file)
         torch.save(torch.tensor(num_nodes_list), self.processed_num_nodes_file)

@@ -78,6 +78,7 @@ bash -c "
     data.datamodule.datasets.qm9.proportion=1.0 \
     data.datamodule.datasets.qmof150.proportion=0.0 \
     data.datamodule.datasets.omol25.proportion=0.0 \
+    data.datamodule.datasets.geom.proportion=0.0 \
     date=$RUN_DATE \
     ecoder.d_model=$D_MODEL \
     ecoder.num_layers=$NUM_LAYERS \
