@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 ######################### Batch Headers #########################
-#SBATCH -C gpu&hbm40g                                         # request GPU nodes
+#SBATCH -C gpu&hbm80g                                         # request GPU nodes
 #SBATCH --qos=shared                                          # use specified partition for job
 #SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
 #SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
@@ -9,11 +9,11 @@
 #SBATCH --nodes=1                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
 #SBATCH --gpus-per-node=1                                     # request 40GB A100 GPU resource(s)
 #SBATCH --ntasks-per-node=1                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
-#SBATCH --time=00-18:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
+#SBATCH --time=00-22:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
 #SBATCH --job-name=sweep                                      # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/sweep%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/sweep%j.err   # error log file
-#SBATCH --array=0-7                                           # create an array of jobs for the sweep (0-15 or 16 total for training and 0-35 or 36 total for evaluation)
+#SBATCH --array=0-7                                           # create an array of jobs for the sweep (0-7 or 8 total for training and 0-35 or 36 total for evaluation)
 
 # Wait for 5-10 seconds randomly to avoid race condition
 sleep $((RANDOM % 6 + 5))

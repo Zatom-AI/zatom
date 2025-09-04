@@ -383,7 +383,7 @@ class EBT(nn.Module):
         no_langevin_during_eval: bool = False,
         no_randomize_mcmc_step_size_scale_during_eval: bool = False,
         mcmc_step_size_learnable: bool = True,
-        mcmc_step_index_learnable: bool = True,
+        mcmc_step_index_learnable: bool = False,
         modality_specific_mcmc_step_sizes_learnable: bool = True,
         langevin_dynamics_noise_learnable: bool = False,
         randomize_mcmc_num_steps_final_landscape: bool = False,

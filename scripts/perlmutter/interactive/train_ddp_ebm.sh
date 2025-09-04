@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-# salloc -C "gpu&hbm40g" \
+# salloc -C "gpu&hbm80g" \
 #        --qos=shared_interactive \
 #        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
 #        --module=gpu,nccl-plugin \
@@ -30,12 +30,12 @@ mkdir -p "$HF_HOME"
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
-# NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=24 trainer.accumulate_grad_batches=8
+# NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=55 trainer.accumulate_grad_batches=8
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
-DEFAULT_RUN_ID="wjcldyhd"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-09-03_16-45-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="lsg6lpvd"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-09-04_16-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_NAME="EBT-B__${DATASET}_subset_s1_debugging"       # Name of the model type and dataset configuration
@@ -89,11 +89,10 @@ bash -c "
     task_name=$TASK_NAME \
     trainer=ddp \
     trainer.accumulate_grad_batches=1 \
-    trainer.check_val_every_n_epoch=5000 \
-    +trainer.max_time='06:00:00:00' \
+    trainer.check_val_every_n_epoch=500 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.overfit_batches=4 \
+    trainer.overfit_batches=1 \
     ckpt_path=$CKPT_PATH
 "
 
