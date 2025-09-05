@@ -10,12 +10,16 @@ Extra Credits:
 * Original flash attention paper (https://arxiv.org/abs/2205.14135)
 * Rabe and Staats (https://arxiv.org/pdf/2112.05682v2.pdf)
 
-Plus modifications to support JVP:
-- formulation of flash JVP by Cheng Lu, Yang Song in https://arxiv.org/abs/2410.11081
-- reference triton implementation by Sofian Mejjoute
-- reimplementing reference implementation as an autograd function with latest triton tutorial optimizations, by Alex Birch
-- support for forward to receive tangents, so as to compute fwd and jvp together, autograd workaround by Emily (nshepperd)
-- support for function transforms (e.g. torch.func.jvp) via the use of setup_context, by Shih-Ying Yeh
+Plus modifications to support Jacobian-vector products (JVPs) and Hessian-vector products (HVPs):
+- Formulation of flash JVP, by Cheng Lu and Yang Song in https://arxiv.org/abs/2410.11081.
+- Reference Triton implementation, by Sofian Mejjoute.
+- Reimplementing reference implementation as an autograd function with latest Triton tutorial optimizations, by Alex Birch.
+- Support for forward to receive tangents, so as to compute fwd and jvp together; autograd workaround, by Emily (nshepperd).
+- Support for function transforms (e.g., torch.func.jvp) via the use of setup_context, by Shih-Ying Yeh.
+- Support for sequence lengths 32 and 64; float32 and bfloat16 precision; comprehensive, length and dtype-stratified unit tests;
+    working backward hook w.r.t. tensor contiguity; HVP stress testing; and standardized docstrings and packaging, by Alex Morehead.
+
+Adapted from: https://github.com/amorehead/jvp_flash_attention
 """
 
 from __future__ import annotations
