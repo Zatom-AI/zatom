@@ -10,11 +10,11 @@ from typing import Dict
 
 import numpy as np
 import torch
-import wandb
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.core.lattice import Lattice
 from pymatgen.core.structure import Structure
 
+import wandb
 from zatom.tools.ase_notebook import AseView
 from zatom.utils import joblib_map, pylogger
 

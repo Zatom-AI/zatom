@@ -10,13 +10,13 @@ from typing import Any, Dict
 
 import numpy as np
 import torch
-import wandb
 from pymatgen.analysis.molecule_matcher import MoleculeMatcher
 from pymatgen.core import Molecule
 from rdkit import Chem, RDLogger
 from rdkit.Chem import Draw
 from tqdm import tqdm
 
+import wandb
 from zatom.utils import joblib_map
 
 RDLogger.DisableLog("rdApp.*")
