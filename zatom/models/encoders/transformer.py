@@ -117,6 +117,7 @@ class TransformerEncoder(nn.Module):
         ), "Only one of flex_attn, fused_attn, or jvp_attn can be True."
 
         self.d_model = d_model
+        self.nhead = nhead
         self.context_length = context_length
         self.flex_attn = flex_attn
         self.jvp_attn = jvp_attn
@@ -207,7 +208,7 @@ class TransformerEncoder(nn.Module):
         angles_radians: Float["b 1 3"],  # type: ignore
         token_idx: Int["b m"],  # type: ignore
         mask: Bool["b m"],  # type: ignore
-        attn_mask: Float["b 1 m m"] | None = None,  # type: ignore
+        attn_mask: Bool["b h m m"] | Float["b 1 m m"] | None = None,  # type: ignore
         seq_idx: Int["b m"] | None = None,  # type: ignore
     ) -> Float["b m c"]:  # type: ignore
         """Forward pass for the Transformer encoder.
@@ -271,8 +272,12 @@ class TransformerEncoder(nn.Module):
                     device=self.device,
                 )
                 if self.flex_attn
-                else build_attention_mask(mask, seq_idx, dtype=x.dtype)
+                else build_attention_mask(
+                    mask, seq_idx, dtype=torch.bool if self.jvp_attn else x.dtype
+                )
             )
+            if self.jvp_attn:
+                attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
 
         # Transformer blocks
         with sdpa_kernel(SDPBackend.MATH):

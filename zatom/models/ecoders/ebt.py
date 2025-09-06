@@ -416,6 +416,7 @@ class EBT(nn.Module):
 
         self.encoder = encoder
         self.d_model = d_model
+        self.nhead = nhead
         self.mcmc_num_steps = mcmc_num_steps
         self.mcmc_step_size_lr_multiplier = mcmc_step_size_lr_multiplier
         self.randomize_mcmc_num_steps = randomize_mcmc_num_steps
@@ -632,8 +633,12 @@ class EBT(nn.Module):
                     device=self.device,
                 )
                 if self.flex_attn
-                else build_attention_mask(mask, seq_idx, dtype=atom_types.dtype)
+                else build_attention_mask(
+                    mask, seq_idx, dtype=torch.bool if self.jvp_attn else atom_types.dtype
+                )
             )
+            if self.jvp_attn:
+                attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
 
         # Input embeddings: [B, N, C]
         x_encoding = self.encoder(

@@ -40,7 +40,7 @@ DEFAULT_ROPE_SCALE_FACTOR = 1.0
 @typecheck
 def build_attention_mask(
     mask: Bool["b m"], seq_idx: Int["b m"], dtype: str | torch.dtype  # type: ignore
-) -> Float["b 1 m m"]:  # type: ignore
+) -> Bool["b 1 m m"] | Float["b 1 m m"]:  # type: ignore
     """Build an attention mask for an input batch.
 
     Args:
@@ -49,7 +49,8 @@ def build_attention_mask(
         dtype: The data type of the attention mask.
 
     Returns:
-        A tensor representing the additive mask for pairwise attention scores.
+        A boolean mask tensor or a floating-point tensor representing
+        the additive mask for pairwise attention scores.
     """
     non_padding_mask = mask
     attn_mask = non_padding_mask.unsqueeze(1) & non_padding_mask.unsqueeze(2)
@@ -59,6 +60,8 @@ def build_attention_mask(
         == seq_idx.unsqueeze(2)
     )
     attn_mask = attn_mask.unsqueeze(1).type(dtype)
+    if dtype == torch.bool:
+        return attn_mask
     attn_mask.masked_fill_(attn_mask == 0, float("-inf"))
     attn_mask.masked_fill_(attn_mask == 1, 0.0)
     return attn_mask
@@ -504,7 +507,7 @@ class Attention(nn.Module):
         self,
         x: Float["b m c"],  # type: ignore
         pos_ids: Int["b m"] | None = None,  # type: ignore
-        attn_mask: BlockMask | Float["b 1 m m"] | None = None,  # type: ignore
+        attn_mask: BlockMask | Bool["b h m m"] | Float["b 1 m m"] | None = None,  # type: ignore
     ) -> Float["b m c"]:  # type: ignore
         """Forward pass for the attention layer.
 
@@ -513,7 +516,7 @@ class Attention(nn.Module):
             pos_ids: Optional position IDs tensor of shape
                 [batch_size, seq_len].
             attn_mask: Optional BlockMask or attention mask of shape
-                [batch_size, 1, seq_len, seq_len].
+                [batch_size, 1 or num_heads (h), seq_len, seq_len].
 
         Returns:
             Output tensor of shape [batch_size, seq_len, dim].
@@ -591,7 +594,8 @@ class Attention(nn.Module):
                     q,
                     k,
                     v,
-                    # attn_mask=attn_mask,  # NOTE: Attention masking is not yet supported
+                    attn_mask=attn_mask,
+                    dropout_p=self.attn_drop.p if self.training else 0.0,
                 )
 
             else:
@@ -706,7 +710,7 @@ class Block(nn.Module):
         self,
         x: Float["b m c"],  # type: ignore
         pos_ids: Int["b m"] | None = None,  # type: ignore
-        attn_mask: BlockMask | Float["b 1 m m"] | None = None,  # type: ignore
+        attn_mask: BlockMask | Bool["b h m m"] | Float["b 1 m m"] | None = None,  # type: ignore
     ) -> Float["b m c"]:  # type: ignore
         """Forward pass through the Transformer block.
 
@@ -716,7 +720,7 @@ class Block(nn.Module):
                 [batch_size, seq_len]. This is used for rotary positional
                 embeddings.
             attn_mask: Optional BlockMask or attention mask tensor of
-            shape [batch_size, 1, seq_len, seq_len].
+            shape [batch_size, 1 or num_heads (h), seq_len, seq_len].
 
         Returns:
             Output tensor of the same shape as input.
