@@ -26,7 +26,7 @@ except Exception:
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
-from zatom.models.kernels.jvp_attention import JVPAttn
+from zatom.models.kernels.jvp_attention import MASK_CONST, JVPAttn
 
 
 def mpi_to_flops(ms_per_iter: float, flop_count: int) -> float:
@@ -217,7 +217,7 @@ class Args:
     seed: int = 42
     validate_gradients: bool = True
     test_masks: bool = True
-    mask_prob: float = 0.1  # Probability of masking out an attention weight
+    mask_prob: float = 0.5  # Probability of masking out an attention weight
 
     @staticmethod
     def get_parser() -> ArgumentParser:
@@ -247,7 +247,7 @@ class Args:
         )
         parser.add_argument(
             "--mask-prob",
-            default=0.1,
+            default=0.5,
             type=float,
             help="Probability of masking out attention weights",
         )
@@ -335,7 +335,7 @@ def create_attention_mask(
         # Create an additive mask with values to be added to attention scores
         # Use -inf for positions to ignore, 0 for positions to attend
         rand_mask = torch.rand(args.bsz, heads, seq_len, seq_len, device=device, generator=gen)
-        mask = torch.where(rand_mask > args.mask_prob, 0.0, -float("inf"))
+        mask = torch.where(rand_mask > args.mask_prob, 0.0, MASK_CONST)
         # Convert to the target dtype
         mask = mask.to(dtype)
         return mask
