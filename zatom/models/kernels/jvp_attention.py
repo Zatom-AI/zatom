@@ -1212,6 +1212,13 @@ def _attn_bwd_dkdv(
     start_m,
     num_steps,  #
     MASK: tl.constexpr,
+    # Args for masking/dropout
+    mask_ptr,
+    MASK_TYPE: tl.constexpr,
+    dropout_p,
+    philox_seed,
+    philox_offset_base,
+    ENABLE_DROPOUT: tl.constexpr,
 ):
     """The main inner-loop logic for computing dK and dV.
 
@@ -1236,6 +1243,13 @@ def _attn_bwd_dkdv(
         start_m: Starting index for M dimension.
         num_steps: Number of steps to unroll.
         MASK: Masking tensor.
+        mask_ptr: Pointer to the mask tensor.
+        MASK_TYPE: Type of masking (0: no mask, 1: boolean mask,
+                     2: additive mask).
+        dropout_p: Dropout probability.
+        philox_seed: Seed for Philox RNG.
+        philox_offset_base: Base offset for Philox RNG.
+        ENABLE_DROPOUT: Flag to enable dropout.
 
     Returns:
         dk: Gradient of the key tensor.
@@ -1257,11 +1271,28 @@ def _attn_bwd_dkdv(
         offs_m = curr_m + tl.arange(0, BLOCK_M1)
         m = tl.load(M + offs_m)
         qkT = tl.dot(k, qT)
-        pT = tl.math.exp2(qkT - m[None, :])
-        # Autoregressive masking.
+        # Causal masking before exponentiation.
         if MASK:
-            mask = offs_m[None, :] >= offs_n[:, None]
-            pT = tl.where(mask, pT, 0.0)
+            causal_mask = offs_m[None, :] >= offs_n[:, None]
+            qkT = tl.where(causal_mask, qkT, -1e6)
+        # External masking before exponentiation.
+        if MASK_TYPE > 0:
+            mask_offs = offs_m[None, :] * N_CTX + offs_n[:, None]
+            if MASK_TYPE == 1:
+                mask = tl.load(mask_ptr + mask_offs)
+                qkT = tl.where(mask, qkT, -1e6)
+            elif MASK_TYPE == 2:
+                add_mask = tl.load(mask_ptr + mask_offs)
+                qkT += add_mask
+        # Exponentiation.
+        pT = tl.math.exp2(qkT - m[None, :])
+        # Dropout after exponentiation.
+        if ENABLE_DROPOUT:
+            philox_offset = philox_offset_base + curr_m * N_CTX + start_n
+            dropout_mask, dropout_scale = create_dropout_mask(
+                philox_seed, philox_offset, dropout_p, BLOCK_M1, BLOCK_N1, N_CTX
+            )
+            pT = pT * dropout_mask.to(pT.dtype) * dropout_scale
         do = tl.load(do_ptrs)
         # Compute dV.
         ppT = pT
@@ -1304,6 +1335,13 @@ def _attn_bwd_dq(
     start_n,
     num_steps,  #
     MASK: tl.constexpr,
+    # Args for masking/dropout
+    mask_ptr,
+    MASK_TYPE: tl.constexpr,
+    dropout_p,
+    philox_seed,
+    philox_offset_base,
+    ENABLE_DROPOUT: tl.constexpr,
 ):
     """The main inner-loop logic for computing dQ.
 
@@ -1326,6 +1364,13 @@ def _attn_bwd_dq(
         start_n: Starting index for N dimension.
         num_steps: Number of steps to unroll.
         MASK: Masking tensor.
+        mask_ptr: Pointer to the mask tensor.
+        MASK_TYPE: Type of masking (0: no mask, 1: boolean mask,
+                        2: additive mask).
+        dropout_p: Dropout probability.
+        philox_seed: Seed for Philox RNG.
+        philox_offset_base: Base offset for Philox RNG.
+        ENABLE_DROPOUT: Flag to enable dropout.
 
     Returns:
         dq: Gradient of the query tensor.
@@ -1346,12 +1391,29 @@ def _attn_bwd_dq(
         kT = tl.load(kT_ptrs)
         vT = tl.load(vT_ptrs)
         qk = tl.dot(q, kT)
-        p = tl.math.exp2(qk - m)
-        # Autoregressive masking.
+        # Causal masking before exponentiation.
         if MASK:
             offs_n = curr_n + tl.arange(0, BLOCK_N2)
-            mask = offs_m[:, None] >= offs_n[None, :]
-            p = tl.where(mask, p, 0.0)
+            causal_mask = offs_m[:, None] >= offs_n[None, :]
+            qk = tl.where(causal_mask, qk, -1e6)
+        # External masking before exponentiation.
+        if MASK_TYPE > 0:
+            mask_offs = offs_m[:, None] * N_CTX + offs_n[None, :]
+            if MASK_TYPE == 1:
+                mask = tl.load(mask_ptr + mask_offs)
+                qk = tl.where(mask, qk, -1e6)
+            elif MASK_TYPE == 2:
+                add_mask = tl.load(mask_ptr + mask_offs)
+                qk += add_mask
+        # Exponentiation.
+        p = tl.math.exp2(qk - m)
+        # Dropout after exponentiation.
+        if ENABLE_DROPOUT:
+            philox_offset = philox_offset_base + start_m * N_CTX + curr_n
+            dropout_mask, dropout_scale = create_dropout_mask(
+                philox_seed, philox_offset, dropout_p, BLOCK_M2, BLOCK_N2, N_CTX
+            )
+            p = p * dropout_mask.to(p.dtype) * dropout_scale
         # Compute dP and dS.
         dp = tl.dot(do, vT).to(tl.float32)
         ds = p * (dp - Di[:, None])
@@ -1391,6 +1453,13 @@ def _attn_bwd(
     BLOCK_N2: tl.constexpr,  #
     BLK_SLICE_FACTOR: tl.constexpr,  #
     HEAD_DIM: tl.constexpr,
+    # Args for masking/dropout
+    mask_ptr,
+    MASK_TYPE: tl.constexpr,
+    dropout_p,
+    philox_seed,
+    philox_offset_base,
+    ENABLE_DROPOUT: tl.constexpr,
 ):
     """The main backward pass for the attention mechanism.
 
@@ -1417,6 +1486,13 @@ def _attn_bwd(
         BLOCK_N2: Block size for N dimension.
         BLK_SLICE_FACTOR: Block slice factor.
         HEAD_DIM: Head dimension size.
+        mask_ptr: Pointer to the mask tensor.
+        MASK_TYPE: Type of masking (0: no mask, 1: boolean mask,
+                        2: additive mask).
+        dropout_p: Dropout probability.
+        philox_seed: Seed for Philox RNG.
+        philox_offset_base: Base offset for Philox RNG.
+        ENABLE_DROPOUT: Flag to enable dropout.
     """
     LN2: tl.constexpr = 0.6931471824645996  # = ln(2)
 
@@ -1475,6 +1551,12 @@ def _attn_bwd(
         start_m,
         num_steps,  #
         MASK=True,  #
+        mask_ptr=mask_ptr,
+        MASK_TYPE=MASK_TYPE,
+        dropout_p=dropout_p,
+        philox_seed=philox_seed,
+        philox_offset_base=philox_offset_base,
+        ENABLE_DROPOUT=ENABLE_DROPOUT,
     )
 
     start_m += num_steps * MASK_BLOCK_M1
@@ -1502,6 +1584,12 @@ def _attn_bwd(
         start_m,
         num_steps,  #
         MASK=False,  #
+        mask_ptr=mask_ptr,
+        MASK_TYPE=MASK_TYPE,
+        dropout_p=dropout_p,
+        philox_seed=philox_seed,
+        philox_offset_base=philox_offset_base,
+        ENABLE_DROPOUT=ENABLE_DROPOUT,
     )
 
     dv_ptrs = DV + offs_n[:, None] * stride_tok + offs_k[None, :] * stride_d
@@ -1551,6 +1639,12 @@ def _attn_bwd(
         end_n - num_steps * MASK_BLOCK_N2,
         num_steps,  #
         MASK=True,  #
+        mask_ptr=mask_ptr,
+        MASK_TYPE=MASK_TYPE,
+        dropout_p=dropout_p,
+        philox_seed=philox_seed,
+        philox_offset_base=philox_offset_base,
+        ENABLE_DROPOUT=ENABLE_DROPOUT,
     )
     end_n -= num_steps * MASK_BLOCK_N2
     # Stage 2
@@ -1574,6 +1668,12 @@ def _attn_bwd(
         end_n - num_steps * BLOCK_N2,
         num_steps,  #
         MASK=False,  #
+        mask_ptr=mask_ptr,
+        MASK_TYPE=MASK_TYPE,
+        dropout_p=dropout_p,
+        philox_seed=philox_seed,
+        philox_offset_base=philox_offset_base,
+        ENABLE_DROPOUT=ENABLE_DROPOUT,
     )
     # Write back dQ.
     dq_ptrs = DQ + offs_m[:, None] * stride_tok + offs_k[None, :] * stride_d
@@ -1598,6 +1698,12 @@ class JVPAttn(Function):
         HEAD_DIM_K: int
         causal: bool
         grid: JVPAttn.Grid
+        mask_tensor: Tensor
+        MASK_TYPE: int
+        dropout_p: float
+        philox_seed: int
+        philox_offset: int
+        ENABLE_DROPOUT: bool
 
     class FwdOutCtxContrib(NamedTuple):
         """Forward output context contributions for JVP Attention."""
@@ -1607,6 +1713,12 @@ class JVPAttn(Function):
         grid: JVPAttn.Grid
         HEAD_DIM_K: int
         sm_scale: float
+        mask_tensor: Tensor
+        MASK_TYPE: int
+        dropout_p: float
+        philox_seed: int
+        philox_offset: int
+        ENABLE_DROPOUT: bool
 
     class FwdOut(NamedTuple):
         """Forward output for JVP Attention."""
@@ -1913,7 +2025,24 @@ class JVPAttn(Function):
                 **extra_kern_args,
             )
 
-        return JVPAttn.FwdOut(o, JVPAttn.FwdOutCtxContrib(o_t, M, grid, HEAD_DIM_K, sm_scale))
+        # TODO: Decide whether `0` is the right philox_offset here
+        philox_offset = 0
+        return JVPAttn.FwdOut(
+            o,
+            JVPAttn.FwdOutCtxContrib(
+                o_t,
+                M,
+                grid,
+                HEAD_DIM_K,
+                sm_scale,
+                mask_tensor,
+                MASK_TYPE,
+                dropout_p,
+                philox_seed,
+                philox_offset,
+                ENABLE_DROPOUT,
+            ),
+        )
 
     @staticmethod
     def setup_context(ctx: JVPAttn.FnCtx, inputs, outputs: JVPAttn.FwdOut) -> Tensor:
@@ -1938,13 +2067,31 @@ class JVPAttn(Function):
             warp_specialize,
             USE_TMA,
         ) = inputs
-        o, (o_t, M, grid, HEAD_DIM_K, sm_scale) = outputs
+        o, (
+            o_t,
+            M,
+            grid,
+            HEAD_DIM_K,
+            sm_scale,
+            mask_tensor,
+            MASK_TYPE,
+            dropout_p,
+            philox_seed,
+            philox_offset,
+            ENABLE_DROPOUT,
+        ) = outputs
         ctx.grid = grid
         ctx.save_for_forward(o_t)
         ctx.save_for_backward(q, k, v, o, M)
         ctx.sm_scale = sm_scale
         ctx.HEAD_DIM_K = HEAD_DIM_K
         ctx.causal = causal
+        ctx.mask_tensor = mask_tensor
+        ctx.MASK_TYPE = MASK_TYPE
+        ctx.dropout_p = dropout_p
+        ctx.philox_seed = philox_seed
+        ctx.philox_offset = philox_offset
+        ctx.ENABLE_DROPOUT = ENABLE_DROPOUT
 
     @staticmethod
     def fwd(
@@ -2151,6 +2298,12 @@ class JVPAttn(Function):
             BLOCK_N2=BLOCK_N2,  #
             BLK_SLICE_FACTOR=BLK_SLICE_FACTOR,  #
             HEAD_DIM=ctx.HEAD_DIM_K,  #
+            mask_ptr=ctx.mask_tensor,
+            MASK_TYPE=ctx.MASK_TYPE,
+            dropout_p=ctx.dropout_p,
+            philox_seed=ctx.philox_seed,
+            philox_offset_base=ctx.philox_offset,  # Same as forward
+            ENABLE_DROPOUT=ctx.ENABLE_DROPOUT,
             num_warps=NUM_WARPS,  #
             num_stages=NUM_STAGES,  #
         )
