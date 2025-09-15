@@ -60,7 +60,7 @@ echo -e "\nExecuting sweep:\n==================\n"
 bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
-    srun --kill-on-bad-exit=1 shifter wandb agent amorehead/zatom/$SWEEP_ID --count 1
+    srun --kill-on-bad-exit=1 shifter wandb agent zatom/zatom/$SWEEP_ID --count 1
 "
 
 # Inform user of sweep completion
