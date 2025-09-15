@@ -43,7 +43,7 @@ RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not 
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
 TASK_NAME="overfit_ebm"                   # Name of the task to perform
-TASK_SCRIPT_NAME="train.py"               # Name of the script to run
+TASK_SCRIPT_NAME="train_ebm.py"           # Name of the script to run
 
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at which to find model checkpoints
 mkdir -p "$CKPT_PATH"
