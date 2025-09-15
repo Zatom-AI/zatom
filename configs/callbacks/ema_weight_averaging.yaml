@@ -8,5 +8,5 @@ ema_weight_averaging:
   use_buffers: false # NOTE: this should be `true` if one is using BatchNorm layers
   decay: 0.999
   update_every_n_steps: 1
-  update_starting_at_step: 100
+  update_starting_at_step: null
   update_starting_at_epoch: null

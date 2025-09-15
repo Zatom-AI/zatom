@@ -99,7 +99,7 @@
                 "task_name=overfit_ebm",
                 "trainer=ddp",
                 // "trainer=mps",
-                "trainer.accumulate_grad_batches=64",
+                "trainer.accumulate_grad_batches=4",
                 "trainer.check_val_every_n_epoch=null",
                 "trainer.val_check_interval=200",
                 "trainer.max_epochs=12000",
