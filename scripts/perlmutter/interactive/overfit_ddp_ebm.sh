@@ -107,6 +107,7 @@ bash -c "
     trainer=ddp \
     trainer.accumulate_grad_batches=4 \
     trainer.check_val_every_n_epoch=null \
+    trainer.gradient_clip_val=1.0 \
     trainer.max_epochs=50000 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
