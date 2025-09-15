@@ -43,6 +43,7 @@ RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not 
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
 TASK_NAME="overfit_ebm"                   # Name of the task to perform
+TASK_SCRIPT_NAME="train.py"               # Name of the script to run
 
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at which to find model checkpoints
 mkdir -p "$CKPT_PATH"
@@ -66,13 +67,13 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script $TASK_NAME.py:\n========================================================================\n"
+echo -e "\nExecuting script $TASK_SCRIPT_NAME:\n========================================================================\n"
 
 # Run script
 bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
-    srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
+    srun --kill-on-bad-exit=1 shifter python zatom/$TASK_SCRIPT_NAME \
     data=$DATASET \
     data.datamodule.batch_size.train=2 \
     data.datamodule.batch_size.val=2 \
