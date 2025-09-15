@@ -33,6 +33,7 @@ dependencies = [
     "einx==0.3.0",
     "jaxtyping==0.3.2",
     "torch_geometric==2.6.1",
+    "jvp_flash_attention==0.0.4",
 
     # --------- torch-scatter --------- #
     "torch-scatter @ https://data.pyg.org/whl/torch-2.8.0%2Bcpu/torch_scatter-2.1.2%2Bpt28cpu-cp310-cp310-linux_x86_64.whl ; sys_platform == 'linux'",

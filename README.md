@@ -69,8 +69,6 @@ pre-commit install
 
 > Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. For macOS specifically, make sure to set `e{n}coder.fused_attn=true` and `e{n}coder.jvp_attn=false` as well as `data.datamodule.batch_size.{train,val,test}=128`. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
 
-> Note: If you want to run the unit tests verifying the correctness of the JVP Flash Attention Triton kernel, run the following command(s): `python tests/test_jvp_attention.py --dtype {float16,bfloat16,float32}`. In principle, the kernel should support ROCm systems as well, though it has not yet been tested on them. (Triton) kernel support for macOS is currently unavailable.
-
 ### Docker
 
 For sake of reproducibility, one can alternatively build a (CUDA-based) Docker image for `zatom`.

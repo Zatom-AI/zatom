@@ -586,16 +586,14 @@ class Attention(nn.Module):
                 )
 
             elif self.jvp_attn:
-                from zatom.models.kernels.jvp_attention import (
-                    attention as jvp_attention,
-                )
+                from jvp_flash_attention.jvp_attention import attention as jvp_attention
 
                 x = jvp_attention(
                     q,
                     k,
                     v,
                     attn_mask=attn_mask,
-                    dropout_p=self.attn_drop.p if self.training else 0.0,
+                    # dropout_p=self.attn_drop.p if self.training else 0.0,  # NOTE: JVP attention dropout is currently unsupported
                 )
 
             else:
