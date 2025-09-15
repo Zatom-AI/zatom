@@ -38,7 +38,7 @@ DEFAULT_RUN_ID="b5tc1j1g"                 # NOTE: Generate a unique ID for each 
 DEFAULT_RUN_DATE="2025-09-14_19-15-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="EBT-B__ecoder@768_${DATASET}_overfitting_molecule-and-material_s1_nmsil_jvp-no-attn-masking"       # Name of the model type and dataset configuration
+RUN_NAME="EBT-B__ecoder@768_${DATASET}_overfitting_molecule-and-material_s1_nmsil_jvp-attn-masking"       # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
