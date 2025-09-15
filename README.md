@@ -103,6 +103,10 @@ shifterimg -v pull registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
 
 > Note: The Docker image is ~30 GB in size. Make sure you have enough storage space beforehand to build it.
 
+## Training
+
+See the `[DEFAULT] train_ebm.py` config within `.vscode/launch.json` for an example of how to train a model.
+
 ## Evaluation
 
 Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
