@@ -102,7 +102,7 @@
                 "trainer.accumulate_grad_batches=4",
                 "trainer.check_val_every_n_epoch=null",
                 "trainer.val_check_interval=200",
-                "trainer.max_epochs=12000",
+                "trainer.max_epochs=20000",
                 "trainer.overfit_batches=1"
             ]
         },
