@@ -30,9 +30,9 @@ datamodule:
       proportion: 1.0
 
   batch_size:
-    train: 425
-    val: 425
-    test: 425
+    train: 415
+    val: 415
+    test: 415
 
   num_workers:
     train: 16
