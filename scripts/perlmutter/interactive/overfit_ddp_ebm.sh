@@ -30,7 +30,7 @@ mkdir -p "$HF_HOME"
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
-# NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=55 trainer.accumulate_grad_batches=8
+# NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=52 trainer.accumulate_grad_batches=8
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
@@ -103,7 +103,7 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
-    trainer.accumulate_grad_batches=4 \
+    trainer.accumulate_grad_batches=8 \
     trainer.check_val_every_n_epoch=null \
     trainer.max_epochs=30000 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
