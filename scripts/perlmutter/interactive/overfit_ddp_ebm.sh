@@ -34,8 +34,8 @@ NHEAD=12  # 6, 12, 16
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
-DEFAULT_RUN_ID="du5p6vjn"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-09-14_21-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="okmrxg8c"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-09-15_16-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_NAME="EBT-B__ecoder@768_${DATASET}_overfitting_molecule-and-material_s1_nmsil_jvp-attn-masking"       # Name of the model type and dataset configuration
@@ -91,10 +91,8 @@ bash -c "
     ebm_module.sampling.num_samples=10 \
     ebm_module.sampling.batch_size=10 \
     ecoder.d_model=$D_MODEL \
-    ecoder.mcmc_step_index_learnable=false \
     ecoder.num_layers=$NUM_LAYERS \
     ecoder.nhead=$NHEAD \
-    ecoder.randomize_mcmc_num_steps=0 \
     ecoder.fused_attn=false \
     ecoder.jvp_attn=true \
     encoder.fused_attn=false \
@@ -111,7 +109,7 @@ bash -c "
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
     trainer.overfit_batches=1 \
-    trainer.val_check_interval=200 \
+    trainer.val_check_interval=500 \
     ckpt_path=$CKPT_PATH
 "
 

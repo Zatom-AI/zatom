@@ -65,7 +65,7 @@
                 "data.datamodule.datasets.qmof150.proportion=0.0",
                 "data.datamodule.datasets.omol25.proportion=0.0",
                 "data.datamodule.datasets.geom.proportion=0.0",
-                "date=2025-09-14_17-00-00",
+                "date=2025-09-16_16-15-00",
                 // "ebm_module.augmentations.frac_coords=false",
                 // "ebm_module.augmentations.pos=false",
                 // "ebm_module.compile=false",
@@ -92,8 +92,8 @@
                 "encoder.fused_attn=false",
                 "encoder.jvp_attn=true",
                 // "encoder.use_pytorch_implementation=false",
-                "logger=wandb",
-                "name='EBT-B__ecoder@768_joint_overfitting_molecule-and-material_s1_nmsil_jvp-attn-masking'",
+                // "logger=wandb",
+                "name='EBT-B__ecoder@768_joint_overfitting_molecule-and-material_s1_grad-batch-debugging'",
                 "seed=42",
                 "strategy=optimized_ddp",
                 "task_name=overfit_ebm",
@@ -101,8 +101,8 @@
                 // "trainer=mps",
                 "trainer.accumulate_grad_batches=4",
                 "trainer.check_val_every_n_epoch=null",
-                "trainer.val_check_interval=200",
-                "trainer.max_epochs=30000",
+                "trainer.val_check_interval=500",
+                "trainer.max_epochs=5000",
                 "trainer.overfit_batches=1"
             ]
         },
@@ -171,7 +171,7 @@
                 "trainer=mps",
                 "trainer.accumulate_grad_batches=4",
                 "trainer.check_val_every_n_epoch=null",
-                "trainer.val_check_interval=200",
+                "trainer.val_check_interval=500",
                 "trainer.max_epochs=30000",
                 "trainer.overfit_batches=1"
             ]

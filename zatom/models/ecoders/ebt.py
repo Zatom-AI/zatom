@@ -890,7 +890,7 @@ class EBT(nn.Module):
                     step_index=i,
                 )
 
-                # Retain computation graph conditionally
+                # Retain computation graph conditionally, following https://github.com/alexiglad/EBT/pull/12
                 is_last_mcmc_step = i == (len(mcmc_steps) - 1)
                 if self.truncate_mcmc:
                     (
@@ -900,7 +900,7 @@ class EBT(nn.Module):
                         pred_lengths_scaled_grad,
                         pred_angles_radians_grad,
                     ) = torch.autograd.grad(
-                        [pred_energy.sum()],
+                        [pred_energy],
                         [
                             pred_atom_types,
                             pred_pos,
@@ -908,6 +908,7 @@ class EBT(nn.Module):
                             pred_lengths_scaled,
                             pred_angles_radians,
                         ],
+                        grad_outputs=torch.ones_like(pred_energy),
                         create_graph=training and is_last_mcmc_step,
                     )
                 else:
@@ -918,7 +919,7 @@ class EBT(nn.Module):
                         pred_lengths_scaled_grad,
                         pred_angles_radians_grad,
                     ) = torch.autograd.grad(
-                        [pred_energy.sum()],
+                        [pred_energy],
                         [
                             pred_atom_types,
                             pred_pos,
@@ -926,6 +927,7 @@ class EBT(nn.Module):
                             pred_lengths_scaled,
                             pred_angles_radians,
                         ],
+                        grad_outputs=torch.ones_like(pred_energy),
                         create_graph=training,
                     )
 
