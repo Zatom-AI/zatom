@@ -529,6 +529,25 @@ class EBT(nn.Module):
         self.nll_loss = nn.NLLLoss(ignore_index=-100, reduction="none")
         self.mse_loss = nn.MSELoss(reduction="none")
 
+        self.modal_loss_fn_dict = {
+            "atom_types": self.nll_loss,
+            "pos": self.mse_loss,
+            "frac_coords": self.mse_loss,
+            "lengths_scaled": self.mse_loss,
+            "angles_radians": self.mse_loss,
+        }
+        self.reconstruction_loss_weight_dict = {
+            "atom_types": self.atom_types_reconstruction_loss_weight,
+            "pos": self.pos_reconstruction_loss_weight,
+            "frac_coords": self.frac_coords_reconstruction_loss_weight,
+            "lengths_scaled": self.lengths_scaled_reconstruction_loss_weight,
+            "angles_radians": self.angles_radians_reconstruction_loss_weight,
+        }
+        self.should_rigid_align = {
+            "pos": self.weighted_rigid_align_pos,
+            "frac_coords": self.weighted_rigid_align_frac_coords,
+        }
+
     @typecheck
     def initialize_weights(self):
         """Initialize transformer layers."""
@@ -1100,38 +1119,17 @@ class EBT(nn.Module):
 
         # Calculate each loss for each modality
         loss_dict = {}
-
         reconstruction_loss_dict = {modal: 0 for modal in target_tensors}
-        modal_loss_fn_dict = {
-            "atom_types": self.nll_loss,
-            "pos": self.mse_loss,
-            "frac_coords": self.mse_loss,
-            "lengths_scaled": self.mse_loss,
-            "angles_radians": self.mse_loss,
-        }
 
-        reconstruction_loss_weight_dict = {
-            "atom_types": self.atom_types_reconstruction_loss_weight,
-            "pos": self.pos_reconstruction_loss_weight,
-            "frac_coords": self.frac_coords_reconstruction_loss_weight,
-            "lengths_scaled": self.lengths_scaled_reconstruction_loss_weight,
-            "angles_radians": self.angles_radians_reconstruction_loss_weight,
-        }
         total_mcmc_steps = len(pred_energies_list)
-
-        should_rigid_align = {
-            "pos": self.weighted_rigid_align_pos,
-            "frac_coords": self.weighted_rigid_align_frac_coords,
-        }
-
         for modal in target_tensors:
             for mcmc_step, (denoised_modals, pred_energies) in enumerate(
                 zip(denoised_modals_list, pred_energies_list)
             ):
                 pred_modal = denoised_modals[modal]
                 target_modal = target_tensors[modal]
-                modal_loss_fn = modal_loss_fn_dict[modal]
-                reconstruction_loss_weight = reconstruction_loss_weight_dict[modal]
+                modal_loss_fn = self.modal_loss_fn_dict[modal]
+                reconstruction_loss_weight = self.reconstruction_loss_weight_dict[modal]
 
                 loss_mask = mask.float()
                 loss_token_is_periodic = token_is_periodic.float()
@@ -1145,14 +1143,14 @@ class EBT(nn.Module):
                 elif modal in ("pos", "frac_coords"):
                     target_modal = (
                         weighted_rigid_align(pred_modal, target_modal, mask=mask)
-                        if should_rigid_align[modal]
+                        if self.should_rigid_align[modal]
                         else target_modal
                     )
                     loss_mask = mask.unsqueeze(-1).float()
                     loss_token_is_periodic = token_is_periodic.unsqueeze(-1).float()
                 elif modal in ("lengths_scaled", "angles_radians"):
                     loss_mask = torch.ones(
-                        target_shape, dtype=torch.float, device=target_modal.device
+                        target_shape, dtype=torch.float32, device=target_modal.device
                     )
                     loss_token_is_periodic = (
                         token_is_periodic.any(-1, keepdim=True).unsqueeze(-1).float()

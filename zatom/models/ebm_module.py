@@ -544,7 +544,7 @@ class EBMLitModule(LightningModule):
         # Log metadata metrics
         self.log(
             "global_step",
-            torch.tensor(self.global_step, device=self.device, dtype=torch.float),
+            torch.tensor(self.global_step, device=self.device, dtype=torch.float32),
             on_step=True,
             on_epoch=False,
             sync_dist=True,
@@ -553,7 +553,7 @@ class EBMLitModule(LightningModule):
         # Log throughput metrics
         step_time = time.time() - t_start
         examples_per_second = torch.tensor(
-            batch.batch_size / step_time, device=self.device, dtype=torch.float
+            batch.batch_size / step_time, device=self.device, dtype=torch.float32
         )
         example_length = torch.bincount(batch.batch).float().mean()
 

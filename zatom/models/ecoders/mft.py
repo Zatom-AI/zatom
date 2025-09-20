@@ -2,6 +2,7 @@
 
 Adapted from:
     - https://github.com/alexiglad/EBT
+    - https://github.com/Gsunshine/meanflow
     - https://github.com/facebookresearch/flow_matching
     - https://github.com/facebookresearch/all-atom-diffusion-transformer
 """
@@ -12,6 +13,7 @@ from typing import Dict, List, Literal, Tuple, Type
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from flow_matching.loss.generalized_loss import MixturePathGeneralizedKL
 from flow_matching.path import AffineProbPath, MixtureDiscreteProbPath
 from flow_matching.path.scheduler import (
     CondOTScheduler,
@@ -26,7 +28,11 @@ from zatom.models.encoders.custom_transformer import (
 )
 from zatom.models.encoders.transformer import get_index_embedding
 from zatom.utils import pylogger
-from zatom.utils.training_utils import initialize_module_weights, weighted_rigid_align
+from zatom.utils.training_utils import (
+    BEST_DEVICE,
+    initialize_module_weights,
+    weighted_rigid_align,
+)
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
 log = pylogger.RankedLogger(__name__)
@@ -325,9 +331,36 @@ class MFT(nn.Module):
             weight_initialization_gain=weight_initialization_gain,
         )
 
-        # Instantiate losses
+        # Instantiate paths and losses
+        self.modal_type_path_dict = {
+            "discrete": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=2.0)),
+            "continuous": AffineProbPath(scheduler=CondOTScheduler()),
+        }
+
         self.nll_loss = nn.NLLLoss(ignore_index=-100, reduction="none")
+        self.kl_loss = MixturePathGeneralizedKL(
+            path=self.modal_type_path_dict["discrete"], reduction="none"
+        )
         self.mse_loss = nn.MSELoss(reduction="none")
+
+        self.modal_loss_fn_dict = {
+            "atom_types": self.kl_loss,
+            "pos": self.mse_loss,
+            "frac_coords": self.mse_loss,
+            "lengths_scaled": self.mse_loss,
+            "angles_radians": self.mse_loss,
+        }
+        self.reconstruction_loss_weight_dict = {
+            "atom_types": self.atom_types_reconstruction_loss_weight,
+            "pos": self.pos_reconstruction_loss_weight,
+            "frac_coords": self.frac_coords_reconstruction_loss_weight,
+            "lengths_scaled": self.lengths_scaled_reconstruction_loss_weight,
+            "angles_radians": self.angles_radians_reconstruction_loss_weight,
+        }
+        self.should_rigid_align = {
+            "pos": self.weighted_rigid_align_pos,
+            "frac_coords": self.weighted_rigid_align_frac_coords,
+        }
 
     @typecheck
     def initialize_weights(self):
@@ -380,18 +413,44 @@ class MFT(nn.Module):
     @typecheck
     def _forward(
         self,
-        modal_input_dict: Dict[
-            str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]
-        ],
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        mask: Bool["b m"],  # type: ignore
-        seq_idx: Int["b m"] | None = None,  # type: ignore
+        atom_types: Float["b m v"],  # type: ignore
+        pos: Float["b m 3"],  # type: ignore
+        frac_coords: Float["b m 3"],  # type: ignore
+        lengths_scaled: Float["b 1 3"],  # type: ignore
+        angles_radians: Float["b 1 3"],  # type: ignore
+        atom_types_r: Float[" b"],  # type: ignore
+        atom_types_t: Float[" b"],  # type: ignore
+        pos_r: Float[" b"],  # type: ignore
+        pos_t: Float[" b"],  # type: ignore
+        frac_coords_r: Float[" b"],  # type: ignore
+        frac_coords_t: Float[" b"],  # type: ignore
+        lengths_scaled_r: Float[" b"],  # type: ignore
+        lengths_scaled_t: Float[" b"],  # type: ignore
+        angles_radians_r: Float[" b"],  # type: ignore
+        angles_radians_t: Float[" b"],  # type: ignore
+        dataset_idx: Float[" b"],  # type: ignore
+        spacegroup: Float[" b"],  # type: ignore
+        mask: Float["b m"],  # type: ignore
+        seq_idx: Float["b m"] | None = None,  # type: ignore
     ) -> Dict[str, torch.Tensor]:
         """Forward pass of MFT.
 
         Args:
-            modal_input_dict: A dictionary specifying input modalities to use and their input metadata.
+            atom_types: Atom type embeddings tensor (B, N, vocab_size).
+            pos: Atom positions tensor (B, N, 3).
+            frac_coords: Fractional coordinates tensor (B, N, 3).
+            lengths_scaled: Scaled lengths tensor (B, 1, 3).
+            angles_radians: Angles in radians tensor (B, 1, 3).
+            atom_types_r: Time r for atom types (B,).
+            atom_types_t: Time t for atom types (B,).
+            pos_r: Time r for positions (B,).
+            pos_t: Time t for positions (B,).
+            frac_coords_r: Time r for fractional coordinates (B,).
+            frac_coords_t: Time t for fractional coordinates (B,).
+            lengths_scaled_r: Time r for lengths (B,).
+            lengths_scaled_t: Time t for lengths (B,).
+            angles_radians_r: Time r for angles (B,).
+            angles_radians_t: Time t for angles (B,).
             dataset_idx: Dataset index for each sample (B,).
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
@@ -400,26 +459,34 @@ class MFT(nn.Module):
         Returns:
             Output velocity fields for each modality as a dictionary.
         """
+        batch_size, num_tokens, _ = atom_types.shape
+
         # Organize inputs
-        for modal in self.modals:
-            if modal_input_dict is None or modal not in modal_input_dict:
-                raise ValueError(f"Modal input for `{modal}` must be provided.")
-
-        atom_types_x_t = modal_input_dict["atom_types"][-2]  # [B, N]
-        pos_x_t = modal_input_dict["pos"][-2]  # [B, N, 3]
-        frac_coords_x_t = modal_input_dict["frac_coords"][-2]  # [B, N, 3]
-        lengths_scaled_x_t = modal_input_dict["lengths_scaled"][-2]  # [B, 1, 3]
-        angles_radians_x_t = modal_input_dict["angles_radians"][-2]  # [B, 1, 3]
-
         modals_r = torch.cat(
-            [modal_input_dict[modal][0].unsqueeze(-1) for modal in self.modals], dim=-1
+            [
+                r.unsqueeze(-1)
+                for r in [atom_types_r, pos_r, frac_coords_r, lengths_scaled_r, angles_radians_r]
+            ],
+            dim=-1,
         )
         modals_t = torch.cat(
-            [modal_input_dict[modal][1].unsqueeze(-1) for modal in self.modals], dim=-1
+            [
+                t.unsqueeze(-1)
+                for t in [atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t]
+            ],
+            dim=-1,
         )
 
-        # Metadata
-        batch_size, num_tokens = atom_types_x_t.shape
+        # Type-cast to work around JVP requirements
+        atom_types = self.atom_type_embedder(atom_types.argmax(dim=-1)).repeat_interleave(
+            2, dim=-1
+        )
+        dataset_idx = dataset_idx.long()
+        spacegroup = spacegroup.long()
+        mask = mask.bool()
+
+        if seq_idx is not None:
+            seq_idx = seq_idx.long()
 
         # Positional embedding
         token_idx = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
@@ -463,7 +530,7 @@ class MFT(nn.Module):
                 )
                 if self.flex_attn
                 else build_attention_mask(
-                    mask, seq_idx, dtype=torch.bool if self.jvp_attn else pos_x_t.dtype
+                    mask, seq_idx, dtype=torch.bool if self.jvp_attn else pos.dtype
                 )
             )
             if self.jvp_attn:
@@ -471,12 +538,11 @@ class MFT(nn.Module):
 
         # Input embeddings: [B, N, C]
         x_encoding = self.encoder(
-            # Maintain compatibility with EBT encoder input structure
-            self.atom_type_embedder(atom_types_x_t).repeat_interleave(2, dim=-1),
-            pos_x_t,
-            frac_coords_x_t,
-            lengths_scaled_x_t,
-            angles_radians_x_t,
+            atom_types,
+            pos,
+            frac_coords,
+            lengths_scaled,
+            angles_radians,
             token_idx,
             mask,
             attn_mask=attn_mask,
@@ -484,11 +550,11 @@ class MFT(nn.Module):
         x = self.x_embedder(x_encoding)
 
         # Conditioning embeddings
-        r = self.t_embedder(modals_r).mean(-2)  # [B, C]
+        h = self.t_embedder(modals_t - modals_r).mean(-2)  # [B, C]
         t = self.t_embedder(modals_t).mean(-2)  # [B, C]
         d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
         s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-        c = r + t + d + s  # [B, C]
+        c = h + t + d + s  # [B, C]
 
         # Transformer blocks
         for block in self.blocks:
@@ -539,26 +605,31 @@ class MFT(nn.Module):
         Returns:
             A list of predicted modalities as a dictionary.
         """
+        if modal_input_dict is None:
+            raise ValueError("modal_input_dict currently must be provided for MFT forward pass.")
+
         # Predict velocity fields for each modality
-        pred_atom_types, pred_pos, pred_frac_coords, pred_lengths_scaled, pred_angles_radians = (
-            self._forward(
-                modal_input_dict,
-                dataset_idx,
-                spacegroup,
-                mask,
-            )
+        pred_modals_dict = self._forward(
+            atom_types=modal_input_dict["atom_types"][-3],
+            pos=modal_input_dict["pos"][-3],
+            frac_coords=modal_input_dict["frac_coords"][-3],
+            lengths_scaled=modal_input_dict["lengths_scaled"][-3],
+            angles_radians=modal_input_dict["angles_radians"][-3],
+            atom_types_r=modal_input_dict["atom_types"][-2],
+            atom_types_t=modal_input_dict["atom_types"][-1],
+            pos_r=modal_input_dict["pos"][-2],
+            pos_t=modal_input_dict["pos"][-1],
+            frac_coords_r=modal_input_dict["frac_coords"][-2],
+            frac_coords_t=modal_input_dict["frac_coords"][-1],
+            lengths_scaled_r=modal_input_dict["lengths_scaled"][-2],
+            lengths_scaled_t=modal_input_dict["lengths_scaled"][-1],
+            angles_radians_r=modal_input_dict["angles_radians"][-2],
+            angles_radians_t=modal_input_dict["angles_radians"][-1],
+            dataset_idx=dataset_idx,
+            spacegroup=spacegroup,
+            mask=mask,
         )
-
-        # Collect predictions
-        pred_modals = {
-            "atom_types": pred_atom_types,  # [B * S, V]
-            "pos": pred_pos,  # [B, S, 3]
-            "frac_coords": pred_frac_coords,  # [B, S, 3]
-            "lengths_scaled": pred_lengths_scaled,  # [B, 1, 3]
-            "angles_radians": pred_angles_radians,  # [B, 1, 3]
-        }
-
-        return pred_modals
+        return pred_modals_dict
 
     @typecheck
     def forward_with_loss_wrapper(
@@ -604,18 +675,14 @@ class MFT(nn.Module):
         # Assign a suitable probability path to each modality
         modal_type_dict = {
             modal: "continuous" if torch.is_floating_point(target_tensors[modal]) else "discrete"
-            for modal in target_tensors
-        }
-        modal_type_path_dict = {
-            "discrete": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=2.0)),
-            "continuous": AffineProbPath(scheduler=CondOTScheduler()),
+            for modal in self.modals
         }
 
         # Sample time points and corresponding noised inputs for each modality
         modal_input_dict = {}
-        for modal in target_tensors:
+        for modal in self.modals:
             modal_type = modal_type_dict[modal]
-            path = modal_type_path_dict[modal_type]
+            path = self.modal_type_path_dict[modal_type]
 
             x_0 = target_tensors[modal]  # Clean data
             x_1 = locals()[modal]  # Noised data
@@ -647,64 +714,73 @@ class MFT(nn.Module):
             else:
                 raise ValueError(f"Unexpected shape for x_t: {x_t.shape}")
 
+            # Embed discrete inputs to continuous space to ensure JVP differentiability
+            if modal == "atom_types":
+                x_t = F.one_hot(x_t, self.vocab_size).float()
+                dx_t = F.one_hot(
+                    path_sample.x_0, self.vocab_size
+                ).float()  # TODO: DERIVE THIS PROPERLY
+
             # Collect inputs
-            modal_input_dict[modal] = (r, t, x_t, dx_t)
+            modal_input_dict[modal] = (dx_t, x_t, r, t)
 
-        # Predict velocity fields for each modality
-        pred_modals_dict = self._forward(
-            modal_input_dict,
-            dataset_idx,
-            spacegroup,
-            mask,
-        )
+        with torch.amp.autocast(device_type=BEST_DEVICE.type, enabled=False):
+            # Predict average velocity field for each modality
+            pred_modals_dict, d_pred_modals_dict = torch.func.jvp(
+                self._forward,
+                (
+                    modal_input_dict["atom_types"][-3],  # atom_types
+                    modal_input_dict["pos"][-3],  # pos
+                    modal_input_dict["frac_coords"][-3],  # frac_coords
+                    modal_input_dict["lengths_scaled"][-3],  # lengths_scaled
+                    modal_input_dict["angles_radians"][-3],  # angles_radians
+                    modal_input_dict["atom_types"][-2],  # atom_types_r
+                    modal_input_dict["atom_types"][-1],  # atom_types_t
+                    modal_input_dict["pos"][-2],  # pos_r
+                    modal_input_dict["pos"][-1],  # pos_t
+                    modal_input_dict["frac_coords"][-2],  # frac_coords_r
+                    modal_input_dict["frac_coords"][-1],  # frac_coords_t
+                    modal_input_dict["lengths_scaled"][-2],  # lengths_scaled_r
+                    modal_input_dict["lengths_scaled"][-1],  # lengths_scaled_t
+                    modal_input_dict["angles_radians"][-2],  # angles_radians_r
+                    modal_input_dict["angles_radians"][-1],  # angles_radians_t
+                    dataset_idx.float(),
+                    spacegroup.float(),
+                    mask.float(),
+                ),
+                (
+                    modal_input_dict["atom_types"][0],  # atom_types dx_t
+                    modal_input_dict["pos"][0],  # pos dx_t
+                    modal_input_dict["frac_coords"][0],  # frac_coords dx_t
+                    modal_input_dict["lengths_scaled"][0],  # lengths_scaled dx_t
+                    modal_input_dict["angles_radians"][0],  # angles_radians dx_t
+                    torch.zeros_like(modal_input_dict["atom_types"][-2]),  # atom_types_r
+                    torch.ones_like(modal_input_dict["atom_types"][-1]),  # atom_types_t
+                    torch.zeros_like(modal_input_dict["pos"][-2]),  # pos_r
+                    torch.ones_like(modal_input_dict["pos"][-1]),  # pos_t
+                    torch.zeros_like(modal_input_dict["frac_coords"][-2]),  # frac_coords_r
+                    torch.ones_like(modal_input_dict["frac_coords"][-1]),  # frac_coords_t
+                    torch.zeros_like(modal_input_dict["lengths_scaled"][-2]),  # lengths_scaled_r
+                    torch.ones_like(modal_input_dict["lengths_scaled"][-1]),  # lengths_scaled_t
+                    torch.zeros_like(modal_input_dict["angles_radians"][-2]),  # angles_radians_r
+                    torch.ones_like(modal_input_dict["angles_radians"][-1]),  # angles_radians_t
+                    torch.zeros_like(dataset_idx, dtype=torch.float32),
+                    torch.zeros_like(spacegroup, dtype=torch.float32),
+                    torch.zeros_like(mask, dtype=torch.float32),
+                ),
+            )
 
-        # Predict average velocity field for each modality
-        v, dv_t = torch.func.jvp(
-            self._forward,
-            (
-                modal_input_dict,
-                dataset_idx,
-                spacegroup,
-                mask,
-            ),
-            (dx_t, torch.zeros_like(r), torch.ones_like(t)),
-        )
+            # Calculate each loss for each modality
+            loss_dict = {}
+            reconstruction_loss_dict = {modal: 0 for modal in self.modals}
 
-        # Calculate each loss for each modality
-        loss_dict = {}
+            for modal in self.modals:
+                pred_modal = pred_modals_dict[modal]
+                d_pred_modal = d_pred_modals_dict[modal]
+                modal_loss_fn = self.modal_loss_fn_dict[modal]
+                reconstruction_loss_weight = self.reconstruction_loss_weight_dict[modal]
 
-        reconstruction_loss_dict = {modal: 0 for modal in target_tensors}
-        modal_loss_fn_dict = {
-            "atom_types": self.nll_loss,
-            "pos": self.mse_loss,
-            "frac_coords": self.mse_loss,
-            "lengths_scaled": self.mse_loss,
-            "angles_radians": self.mse_loss,
-        }
-
-        reconstruction_loss_weight_dict = {
-            "atom_types": self.atom_types_reconstruction_loss_weight,
-            "pos": self.pos_reconstruction_loss_weight,
-            "frac_coords": self.frac_coords_reconstruction_loss_weight,
-            "lengths_scaled": self.lengths_scaled_reconstruction_loss_weight,
-            "angles_radians": self.angles_radians_reconstruction_loss_weight,
-        }
-
-        should_rigid_align = {
-            "pos": self.weighted_rigid_align_pos,
-            "frac_coords": self.weighted_rigid_align_frac_coords,
-        }
-
-        # TODO: Update
-        truncate_mcmc = False
-        total_mcmc_steps = 1
-
-        for modal in target_tensors:
-            for mcmc_step, denoised_modals in enumerate(pred_modals_dict):
-                pred_modal = denoised_modals[modal]
-                target_modal = target_tensors[modal]
-                modal_loss_fn = modal_loss_fn_dict[modal]
-                reconstruction_loss_weight = reconstruction_loss_weight_dict[modal]
+                target_modal, input_modal, r, t = modal_input_dict[modal]
 
                 loss_mask = mask.float()
                 loss_token_is_periodic = token_is_periodic.float()
@@ -713,27 +789,38 @@ class MFT(nn.Module):
 
                 # Calculate modality-specific losses
                 if modal == "atom_types":
-                    pred_modal = F.log_softmax(pred_modal, dim=-1).reshape(-1, self.vocab_size)
-                    target_modal = target_modal.reshape(-1)
+                    target_modal = (
+                        (target_modal - (t - r)[..., None, None] * d_pred_modal)
+                        .detach()
+                        .argmax(-1)
+                    )
+                    modal_loss_value = (
+                        modal_loss_fn(pred_modal, target_modal, input_modal.argmax(-1), t - r)
+                        * loss_mask
+                    )
                 elif modal in ("pos", "frac_coords"):
                     target_modal = (
                         weighted_rigid_align(pred_modal, target_modal, mask=mask)
-                        if should_rigid_align[modal]
+                        if self.should_rigid_align[modal]
                         else target_modal
                     )
+                    target_modal = (
+                        target_modal - (t - r)[..., None, None] * d_pred_modal
+                    ).detach()
                     loss_mask = mask.unsqueeze(-1).float()
                     loss_token_is_periodic = token_is_periodic.unsqueeze(-1).float()
                 elif modal in ("lengths_scaled", "angles_radians"):
                     loss_mask = torch.ones(
-                        target_shape, dtype=torch.float, device=target_modal.device
+                        target_shape, dtype=torch.float32, device=target_modal.device
                     )
                     loss_token_is_periodic = (
                         token_is_periodic.any(-1, keepdim=True).unsqueeze(-1).float()
                     )  # NOTE: A periodic sample is one with any periodic atoms
 
-                modal_loss_value = (
-                    modal_loss_fn(pred_modal, target_modal).reshape(target_shape) * loss_mask
-                )
+                if modal != "atom_types":
+                    modal_loss_value = (
+                        modal_loss_fn(pred_modal, target_modal).reshape(target_shape) * loss_mask
+                    )
 
                 if modal in (
                     "frac_coords",
@@ -744,71 +831,68 @@ class MFT(nn.Module):
                 elif modal == "pos":  # Non-periodic (molecule) losses
                     modal_loss_value = modal_loss_value * (1 - loss_token_is_periodic)
 
-                if truncate_mcmc:
-                    if mcmc_step == (total_mcmc_steps - 1):
-                        reconstruction_loss_dict[modal] = modal_loss_value
-                        final_reconstruction_loss = reconstruction_loss_dict[modal].detach()
-                        if modal == "atom_types":
-                            ppl_loss = torch.exp(modal_loss_value).detach()
-                else:
-                    reconstruction_loss_dict[modal] += modal_loss_value
-                    if mcmc_step == (total_mcmc_steps - 1):
-                        final_reconstruction_loss = modal_loss_value.detach()
-                        reconstruction_loss_dict[modal] = (
-                            reconstruction_loss_dict[modal] / total_mcmc_steps
-                        )  # Normalize so this is indifferent to the number of MCMC steps
-                        if modal == "atom_types":
-                            ppl_loss = torch.exp(modal_loss_value).detach()
+                reconstruction_loss_dict[modal] += modal_loss_value
+
+                final_reconstruction_loss = modal_loss_value.detach()
+                if modal == "atom_types":
+                    nll_loss = (
+                        self.nll_loss(
+                            F.log_softmax(pred_modal, dim=-1).reshape(-1, self.vocab_size),
+                            target_modal.reshape(-1),
+                        ).reshape(target_shape[:-1])
+                        * loss_mask
+                    )
+                    ppl_loss = torch.exp(nll_loss).detach()
 
                 # Track relevant loss values
-                if mcmc_step == 0:
-                    initial_loss = modal_loss_value.detach()
-                if mcmc_step == (total_mcmc_steps - 1):
-                    modal_loss = modal_loss_value.detach()
+                initial_loss = modal_loss_value.detach()
+                modal_loss = modal_loss_value.detach()
 
-            # Collect losses
-            total_loss = reconstruction_loss_weight * reconstruction_loss_dict[modal]
+                # Collect losses
+                total_loss = reconstruction_loss_weight * reconstruction_loss_dict[modal]
 
-            loss_dict.update(
-                {
-                    f"{modal}_loss": total_loss.mean(),
-                    f"{modal}_initial_loss": initial_loss.mean(),
-                    f"{modal}_final_step_loss": final_reconstruction_loss.mean(),
-                    f"{modal}_initial_final_pred_energies_gap": torch.nan,
-                }
+                loss_dict.update(
+                    {
+                        f"{modal}_loss": total_loss.mean(),
+                        f"{modal}_initial_loss": initial_loss.mean(),
+                        f"{modal}_final_step_loss": final_reconstruction_loss.mean(),
+                        f"{modal}_initial_final_pred_energies_gap": torch.tensor(
+                            torch.nan, device=device
+                        ),
+                    }
+                )
+
+                if modal_loss_fn is self.kl_loss:
+                    loss_dict[f"{modal}_ce_loss"] = modal_loss.mean()
+                    loss_dict[f"{modal}_ppl_loss"] = ppl_loss.mean()
+                if modal_loss_fn is self.mse_loss:
+                    loss_dict[f"{modal}_mse_loss"] = modal_loss.mean()
+
+            # Aggregate losses
+            loss_dict["loss"] = sum(loss_dict[f"{modal}_loss"] for modal in self.modals)
+            loss_dict["initial_loss"] = sum(
+                loss_dict[f"{modal}_initial_loss"] for modal in self.modals
             )
-
-            if modal_loss_fn is self.nll_loss:
-                loss_dict[f"{modal}_ce_loss"] = modal_loss.mean()
-                loss_dict[f"{modal}_ppl_loss"] = ppl_loss.mean()
-            if modal_loss_fn is self.mse_loss:
-                loss_dict[f"{modal}_mse_loss"] = modal_loss.mean()
-
-        # Aggregate losses
-        loss_dict["loss"] = sum(loss_dict[f"{modal}_loss"] for modal in denoised_modals)
-        loss_dict["initial_loss"] = sum(
-            loss_dict[f"{modal}_initial_loss"] for modal in denoised_modals
-        )
-        loss_dict["final_step_loss"] = sum(
-            loss_dict[f"{modal}_final_step_loss"] for modal in denoised_modals
-        )
-        loss_dict["initial_final_pred_energies_gap"] = sum(
-            loss_dict[f"{modal}_initial_final_pred_energies_gap"] for modal in denoised_modals
-        )
-        loss_dict["ce_loss"] = sum(
-            loss_dict[f"{modal}_ce_loss"]
-            for modal in denoised_modals
-            if f"{modal}_ce_loss" in loss_dict
-        )
-        loss_dict["ppl_loss"] = sum(
-            loss_dict[f"{modal}_ppl_loss"]
-            for modal in denoised_modals
-            if f"{modal}_ppl_loss" in loss_dict
-        )
-        loss_dict["mse_loss"] = sum(
-            loss_dict[f"{modal}_mse_loss"]
-            for modal in denoised_modals
-            if f"{modal}_mse_loss" in loss_dict
-        )
+            loss_dict["final_step_loss"] = sum(
+                loss_dict[f"{modal}_final_step_loss"] for modal in self.modals
+            )
+            loss_dict["initial_final_pred_energies_gap"] = sum(
+                loss_dict[f"{modal}_initial_final_pred_energies_gap"] for modal in self.modals
+            )
+            loss_dict["ce_loss"] = sum(
+                loss_dict[f"{modal}_ce_loss"]
+                for modal in self.modals
+                if f"{modal}_ce_loss" in loss_dict
+            )
+            loss_dict["ppl_loss"] = sum(
+                loss_dict[f"{modal}_ppl_loss"]
+                for modal in self.modals
+                if f"{modal}_ppl_loss" in loss_dict
+            )
+            loss_dict["mse_loss"] = sum(
+                loss_dict[f"{modal}_mse_loss"]
+                for modal in self.modals
+                if f"{modal}_mse_loss" in loss_dict
+            )
 
         return loss_dict
