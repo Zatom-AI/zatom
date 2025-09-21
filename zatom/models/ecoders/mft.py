@@ -793,11 +793,16 @@ class MFT(nn.Module):
                         * loss_mask
                     )
                 elif modal in ("pos", "frac_coords"):
-                    target_modal = (
-                        weighted_rigid_align(pred_modal, target_modal, mask=mask)
-                        if self.should_rigid_align[modal]
-                        else target_modal
-                    )
+                    try:
+                        target_modal = (
+                            weighted_rigid_align(pred_modal, target_modal, mask=mask)
+                            if self.should_rigid_align[modal]
+                            else target_modal
+                        )
+                    except Exception as e:
+                        log.warning(
+                            f"Falling back to unaligned target modality for loss calculation due to exception: {e}"
+                        )
                     target_modal = (
                         target_modal - (t - r)[..., None, None] * d_pred_modal
                     ).detach()
