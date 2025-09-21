@@ -844,14 +844,14 @@ class EBMLitModule(LightningModule):
 
         # Use MCMC-based forward pass of EBM to denoise (generate) sample modalities
         denoised_modals_list, _ = self.ecoder.forward(
-            noisy_dense_batch["atom_types"],
-            noisy_dense_batch["pos"],
-            noisy_dense_batch["frac_coords"],
-            noisy_dense_batch["lengths_scaled"],
-            noisy_dense_batch["angles_radians"],
-            dataset_idx,
-            spacegroup,
-            token_mask,
+            atom_types=noisy_dense_batch["atom_types"],
+            pos=noisy_dense_batch["pos"],
+            frac_coords=noisy_dense_batch["frac_coords"],
+            lengths_scaled=noisy_dense_batch["lengths_scaled"],
+            angles_radians=noisy_dense_batch["angles_radians"],
+            dataset_idx=dataset_idx,
+            spacegroup=spacegroup,
+            mask=token_mask,
             training=False,
             no_randomness=True,
             return_raw_discrete_logits=True,
