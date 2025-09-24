@@ -45,6 +45,8 @@ RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if n
 TASK_NAME="overfit_ebm"                   # Name of the task to perform
 TASK_SCRIPT_NAME="train_ebm.py"           # Name of the script to run
 
+CALLBACKS=$([[ "$DATASET" == "joint" ]] && echo "ebm_default" || echo "ebm_$DATASET") # Name of the callbacks configuration to use
+
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at which to find model checkpoints
 mkdir -p "$CKPT_PATH"
 
@@ -74,6 +76,7 @@ bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_SCRIPT_NAME \
+    callbacks=$CALLBACKS \
     data=$DATASET \
     data.datamodule.batch_size.train=2 \
     data.datamodule.batch_size.val=2 \

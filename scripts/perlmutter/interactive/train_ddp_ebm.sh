@@ -43,6 +43,7 @@ RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not 
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
 TASK_NAME="train_ebm"                     # Name of the task to perform
+CALLBACKS=$([[ "$DATASET" == "joint" ]] && echo "ebm_default" || echo "ebm_$DATASET") # Name of the callbacks configuration to use
 
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at which to find model checkpoints
 mkdir -p "$CKPT_PATH"
@@ -73,12 +74,8 @@ bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
+    callbacks=$CALLBACKS \
     data=$DATASET \
-    data.datamodule.datasets.mp20.proportion=1.0 \
-    data.datamodule.datasets.qm9.proportion=1.0 \
-    data.datamodule.datasets.qmof150.proportion=0.0 \
-    data.datamodule.datasets.omol25.proportion=0.0 \
-    data.datamodule.datasets.geom.proportion=0.0 \
     date=$RUN_DATE \
     ecoder.d_model=$D_MODEL \
     ecoder.num_layers=$NUM_LAYERS \
