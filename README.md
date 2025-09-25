@@ -69,6 +69,18 @@ pre-commit install
 
 > Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. For macOS specifically, make sure to set `e{n}coder.fused_attn=true` and `e{n}coder.jvp_attn=false` as well as `data.datamodule.batch_size.{train,val,test}=128`. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
 
+### `uv`
+
+You can also set up the environment via `uv`. You can find installation instructions [here](https://docs.astral.sh/uv/).
+
+```
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+> Note: To install `zatom` with `uv` on a Windows or macOS-based system, remove the `torch-scatter` installation links in `pyproject.toml` for these platforms before running `uv pip install -e .`.
+
 ### Docker
 
 For sake of reproducibility, one can alternatively build a (CUDA-based) Docker image for `zatom`.
