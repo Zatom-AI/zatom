@@ -79,6 +79,8 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
+> Note: To install `zatom` with `uv` on a Windows or macOS-based system, remove the `torch-scatter` installation links in `pyproject.toml` for these platforms before running `uv pip install -e .`.
+
 ### Docker
 
 For sake of reproducibility, one can alternatively build a (CUDA-based) Docker image for `zatom`.
