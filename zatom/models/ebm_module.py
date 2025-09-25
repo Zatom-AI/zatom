@@ -388,7 +388,7 @@ class EBMLitModule(LightningModule):
             if self.hparams.datasets[dataset].proportion > 0.0
         )
 
-        if self.hparams.ecoder.jvp_attn or self.hparams.ecoder.encoder.jvp_attn:
+        if self.hparams.ecoder.jvp_attn:
             # Find the smallest power of 2 >= max(max_num_nodes, 32)
             min_num_nodes = max(max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()

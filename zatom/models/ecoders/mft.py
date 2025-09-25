@@ -7,7 +7,7 @@ Adapted from:
 """
 
 import math
-from typing import Dict, List, Literal, Tuple, Type, Union
+from typing import Any, Dict, List, Literal, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
@@ -307,29 +307,31 @@ class MultimodalModel(nn.Module):
     @typecheck
     def forward(
         self,
-        x: List[
-            Union[
-                Int["b m"],  # type: ignore - atom_types
-                Float["b m 3"],  # type: ignore - pos
-                Float["b m 3"],  # type: ignore - frac_coords
-                Float["b 1 3"],  # type: ignore - lengths_scaled
-                Float["b 1 3"],  # type: ignore - angles_radians
-            ]
+        x: Tuple[
+            Int["b m"],  # type: ignore - atom_types
+            Float["b m 3"],  # type: ignore - pos
+            Float["b m 3"],  # type: ignore - frac_coords
+            Float["b 1 3"],  # type: ignore - lengths_scaled
+            Float["b 1 3"],  # type: ignore - angles_radians
         ],
-        t: List[
-            Union[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
-            ]
+        t: Tuple[
+            Float[" b"],  # type: ignore - atom_types_t
+            Float[" b"],  # type: ignore - pos_t
+            Float[" b"],  # type: ignore - frac_coords_t
+            Float[" b"],  # type: ignore - lengths_scaled_t
+            Float[" b"],  # type: ignore - angles_radians_t
         ],
         dataset_idx: Int[" b"],  # type: ignore
         spacegroup: Int[" b"],  # type: ignore
         mask: Bool["b m"],  # type: ignore
         seq_idx: Int["b m"] | None = None,  # type: ignore
-    ) -> List[torch.Tensor]:
+    ) -> Tuple[
+        Float["b m v"],  # type: ignore - atom_types
+        Float["b m 3"],  # type: ignore - pos
+        Float["b m 3"],  # type: ignore - frac_coords
+        Float["b 1 3"],  # type: ignore - lengths_scaled
+        Float["b 1 3"],  # type: ignore - angles_radians
+    ]:
         """Forward pass of MultimodalModel.
 
         Args:
@@ -351,16 +353,16 @@ class MultimodalModel(nn.Module):
             seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
 
         Returns:
-            Output velocity fields for each modality as a list.
+            Output velocity fields for each modality as a tuple.
         """
         assert len(x) == 5, "Input list x must contain 5 tensors."
         assert len(t) == 5, "Input list t must contain 5 tensors."
 
-        batch_size, num_tokens, _ = atom_types.shape
-
         # Organize inputs
         atom_types, pos, frac_coords, lengths_scaled, angles_radians = x
         atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t = t
+
+        batch_size, num_tokens = atom_types.shape
 
         modals_t = torch.cat(
             [
@@ -454,13 +456,13 @@ class MultimodalModel(nn.Module):
 
         # Collect predictions
         global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # [B, 1, 1]
-        pred_modals = [
-            self.atom_types_head(x) * mask.unsqueeze(-1),  # [B * S, V]
-            self.pos_head(x) * mask.unsqueeze(-1),  # [B, S, 3]
-            self.frac_coords_head(x) * mask.unsqueeze(-1),  # [B, S, 3]
+        pred_modals = (
+            self.atom_types_head(x) * mask.unsqueeze(-1),  # [B, N, V]
+            self.pos_head(x) * mask.unsqueeze(-1),  # [B, N, 3]
+            self.frac_coords_head(x) * mask.unsqueeze(-1),  # [B, N, 3]
             self.lengths_scaled_head(x.mean(-2, keepdim=True)) * global_mask,  # [B, 1, 3]
             self.angles_radians_head(x.mean(-2, keepdim=True)) * global_mask,  # [B, 1, 3]
-        ]
+        )
 
         return pred_modals
 
@@ -556,6 +558,7 @@ class MFT(nn.Module):
         self.frac_coords_reconstruction_loss_weight = frac_coords_reconstruction_loss_weight
         self.lengths_scaled_reconstruction_loss_weight = lengths_scaled_reconstruction_loss_weight
         self.angles_radians_reconstruction_loss_weight = angles_radians_reconstruction_loss_weight
+        self.jvp_attn = jvp_attn
         self.weighted_rigid_align_pos = weighted_rigid_align_pos
         self.weighted_rigid_align_frac_coords = weighted_rigid_align_frac_coords
 
@@ -738,7 +741,7 @@ class MFT(nn.Module):
         token_is_periodic: Bool["b m"],  # type: ignore
         target_tensors: Dict[str, torch.Tensor],
         epsilon: float = 1e-3,
-        **kwargs: dict,
+        **kwargs: Any,
     ) -> Dict[str, torch.Tensor]:
         """Forward pass of MFT with loss calculation.
 
@@ -775,7 +778,7 @@ class MFT(nn.Module):
             x_0 = target_tensors[modal]  # Clean data
             x_1 = locals()[modal]  # Noised data
 
-            # Sample a time points from a uniform distribution
+            # Sample a time point from a uniform distribution
             t = torch.rand(batch_size, device=device) * (1 - epsilon)
 
             # Sample probability path
@@ -794,27 +797,27 @@ class MFT(nn.Module):
                 raise ValueError(f"Unexpected shape for x_t: {x_t.shape}")
 
             # Collect inputs
-            modal_input_dict[modal] = (dx_t, x_t, t)
+            modal_input_dict[modal] = [dx_t, x_t, t]
 
         # Predict average velocity field for each modality
         logits = self.flow.model(
-            x=[
+            x=(
                 modal_input_dict["atom_types"][-2],  # atom_types
                 modal_input_dict["pos"][-2],  # pos
                 modal_input_dict["frac_coords"][-2],  # frac_coords
                 modal_input_dict["lengths_scaled"][-2],  # lengths_scaled
                 modal_input_dict["angles_radians"][-2],  # angles_radians
-            ],
-            t=[
+            ),
+            t=(
                 modal_input_dict["atom_types"][-1],  # atom_types_t
                 modal_input_dict["pos"][-1],  # pos_t
                 modal_input_dict["frac_coords"][-1],  # frac_coords_t
                 modal_input_dict["lengths_scaled"][-1],  # lengths_scaled_t
                 modal_input_dict["angles_radians"][-1],  # angles_radians_t
-            ],
-            dataset_idx=dataset_idx.float(),
-            spacegroup=spacegroup.float(),
-            mask=mask.float(),
+            ),
+            dataset_idx=dataset_idx,
+            spacegroup=spacegroup,
+            mask=mask,
         )
 
         # Preprocess target tensors if requested
@@ -823,7 +826,7 @@ class MFT(nn.Module):
                 continue
 
             pred_modal = logits[idx]
-            target_modal, input_modal, t = modal_input_dict[modal]
+            target_modal, _, _ = modal_input_dict[modal]
 
             # Align target modality to predicted modality if specified
             modal_input_dict[modal][0] = (
@@ -833,46 +836,50 @@ class MFT(nn.Module):
             )
 
         # Calculate each loss for each modality
-        _, loss_dict = self.flow.training_loss(
-            x_1=[
+        _, training_loss_dict = self.flow.training_loss(
+            x_1=(
                 target_tensors["atom_types"],
                 target_tensors["pos"],
                 target_tensors["frac_coords"],
                 target_tensors["lengths_scaled"],
                 target_tensors["angles_radians"],
-            ],
-            x_t=[
+            ),
+            x_t=(
                 modal_input_dict["atom_types"][-2],
                 modal_input_dict["pos"][-2],
                 modal_input_dict["frac_coords"][-2],
                 modal_input_dict["lengths_scaled"][-2],
                 modal_input_dict["angles_radians"][-2],
-            ],
-            dx_t=[
+            ),
+            dx_t=(
                 modal_input_dict["atom_types"][0],
                 modal_input_dict["pos"][0],
                 modal_input_dict["frac_coords"][0],
                 modal_input_dict["lengths_scaled"][0],
                 modal_input_dict["angles_radians"][0],
-            ],
-            t=[
+            ),
+            t=(
                 modal_input_dict["atom_types"][-1],
                 modal_input_dict["pos"][-1],
                 modal_input_dict["frac_coords"][-1],
                 modal_input_dict["lengths_scaled"][-1],
                 modal_input_dict["angles_radians"][-1],
-            ],
+            ),
             logits=logits,
             detach_loss_dict=False,
         )
 
+        unused_loss = torch.tensor(torch.nan, device=device)
+
         # Mask and aggregate losses
+        loss_dict = {}
         reconstruction_loss_dict = {modal: 0 for modal in self.modals}
+
         for idx, modal in enumerate(self.modals):
-            modal_loss_value = loss_dict[idx]
+            modal_loss_value = training_loss_dict[modal]
 
             pred_modal = logits[idx]
-            target_modal, _, t = modal_input_dict[modal]
+            target_modal = target_tensors[modal]
 
             loss_mask = mask.float()
             loss_token_is_periodic = token_is_periodic.float()
@@ -891,9 +898,6 @@ class MFT(nn.Module):
                     token_is_periodic.any(-1, keepdim=True).unsqueeze(-1).float()
                 )  # NOTE: A periodic sample is one with any periodic atoms
 
-            if modal != "atom_types":
-                modal_loss_value = modal_loss_value.reshape(target_shape)
-
             # Mask loss values
             modal_loss_value = modal_loss_value * loss_mask
 
@@ -908,19 +912,20 @@ class MFT(nn.Module):
 
             reconstruction_loss_dict[modal] += modal_loss_value
 
-            final_reconstruction_loss = modal_loss_value.detach()
+            # Handle atom types specially
             if modal == "atom_types":
                 nll_loss = (
-                    self.nll_loss(
-                        F.log_softmax(pred_modal, dim=-1).reshape(-1, self.vocab_size),
-                        target_modal.reshape(-1),
-                    ).reshape(target_shape[:-1])
+                    F.nll_loss(
+                        input=F.log_softmax(pred_modal, dim=-1).reshape(-1, self.vocab_size),
+                        target=target_modal.reshape(-1),
+                        ignore_index=-100,
+                        reduction="none",
+                    ).reshape(target_shape)
                     * loss_mask
                 )
                 ppl_loss = torch.exp(nll_loss).detach()
 
             # Track relevant loss values
-            initial_loss = modal_loss_value.detach()
             modal_loss = modal_loss_value.detach()
 
             # Collect losses
@@ -929,11 +934,9 @@ class MFT(nn.Module):
             loss_dict.update(
                 {
                     f"{modal}_loss": total_loss.mean(),
-                    f"{modal}_initial_loss": initial_loss.mean(),
-                    f"{modal}_final_step_loss": final_reconstruction_loss.mean(),
-                    f"{modal}_initial_final_pred_energies_gap": torch.tensor(
-                        torch.nan, device=device
-                    ),
+                    f"{modal}_initial_loss": unused_loss,
+                    f"{modal}_final_step_loss": unused_loss,
+                    f"{modal}_initial_final_pred_energies_gap": unused_loss,
                 }
             )
 
