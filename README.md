@@ -61,7 +61,7 @@ pip install --no-build-isolation pyeqeq
 unset DYLD_LIBRARY_PATH
 
 # Install requirements
-pip install -e .[cuda]
+pip install -e '.[cuda]'
 
 # [OPTIONAL] Install pre-commit hooks
 pre-commit install
