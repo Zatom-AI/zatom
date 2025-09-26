@@ -14,7 +14,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.nn.attention import SDPBackend, sdpa_kernel
+from torch.nn.attention import SDPBackend
 from torch.nn.attention.flex_attention import (
     BlockMask,
     flex_attention,
@@ -32,6 +32,14 @@ flex_attention = torch.compile(flex_attention, dynamic=False)
 # Constants
 DEFAULT_ROPE_BASE_FREQUENCY = 10_000
 DEFAULT_ROPE_SCALE_FACTOR = 1.0
+
+SDPA_BACKENDS = [
+    SDPBackend.ERROR,
+    SDPBackend.MATH,
+    SDPBackend.FLASH_ATTENTION,
+    SDPBackend.EFFICIENT_ATTENTION,
+    SDPBackend.CUDNN_ATTENTION,
+]
 
 
 # Helper functions
@@ -68,20 +76,37 @@ def build_attention_mask(
 
 
 @typecheck
-def maybe_add_mask(scores: torch.Tensor, attn_mask: torch.Tensor | None = None) -> torch.Tensor:
-    """Maybe add an attention mask to the scores tensor.
+def safe_softmax(scores: torch.Tensor, mask: torch.Tensor = None, dim: int = -1) -> torch.Tensor:
+    """Safe softmax that avoids NaNs when a row is fully masked.
 
     Args:
-        scores: The attention scores tensor of shape (batch_size,
-            num_heads, seq_len, seq_len).
-        attn_mask: Optional attention mask tensor of shape
-            (batch_size, 1, seq_len, seq_len).
+        scores: Attention logits (float tensor).
+        mask: Floating-point mask to be added to scores.
+              Usually 0 for allowed positions, -inf or large negative for masked.
+              Shape must be broadcastable to scores.
+        dim: Dimension over which to apply softmax.
 
     Returns:
-        The scores tensor with the attention mask added if
-        provided, otherwise returns the original scores.
+        probs: Softmax probabilities with masked positions set to 0.
     """
-    return scores if attn_mask is None else scores + attn_mask.type(scores.dtype)
+    if mask is not None:
+        scores = scores + mask
+
+        # Detect fully masked rows (all entries == -inf)
+        fully_masked = torch.isinf(mask) & (mask < 0)
+        fully_masked = fully_masked.all(dim=dim, keepdim=True)
+
+        # For fully masked rows, replace scores with zeros before softmax
+        # This ensures exp(0) = 1 and denominator != 0
+        scores = torch.where(fully_masked, torch.zeros_like(scores), scores)
+
+    probs = torch.softmax(scores, dim=dim)
+
+    if mask is not None:
+        # Zero out masked positions in probabilities
+        probs = torch.where(torch.isinf(mask) & (mask < 0), torch.zeros_like(probs), probs)
+
+    return probs
 
 
 @typecheck
@@ -535,76 +560,68 @@ class Attention(nn.Module):
             k = self.rotary_emb(k.permute(0, 2, 1, 3), input_pos=pos_ids).permute(0, 2, 1, 3)
 
         # Apply attention variant
-        with sdpa_kernel(SDPBackend.MATH):
-            # NOTE: May need to use this context, as regular SDPA from PyTorch
-            # may not support higher order gradients (e.g., for CUDA devices).
-            # NOTE: May want to turn this off for inference eventually.
+        if self.flex_attn:
+            amp_device_type = self.device.type
+            amp_dtype = get_widest_dtype(q, k, v)
 
-            if self.flex_attn:
-                amp_device_type = self.device.type
-                amp_dtype = get_widest_dtype(q, k, v)
+            @torch.amp.custom_fwd(device_type=amp_device_type, cast_inputs=amp_dtype)
+            def mixed_precision_flex_attention(
+                q: Float["b m c"],  # type: ignore
+                k: Float["b m c"],  # type: ignore
+                v: Float["b m c"],  # type: ignore
+                block_mask: BlockMask | None = None,  # type: ignore
+            ) -> Float["b m c"]:  # type: ignore
+                """Ensure that attention is computed consistently in the widest mixed precision
+                using FlexAttention.
 
-                @torch.amp.custom_fwd(device_type=amp_device_type, cast_inputs=amp_dtype)
-                def mixed_precision_flex_attention(
-                    q: Float["b m c"],  # type: ignore
-                    k: Float["b m c"],  # type: ignore
-                    v: Float["b m c"],  # type: ignore
-                    block_mask: BlockMask | None = None,  # type: ignore
-                ) -> Float["b m c"]:  # type: ignore
-                    """Ensure that attention is computed consistently in the widest mixed precision
-                    using FlexAttention.
+                Args:
+                    q: Query tensor of shape [batch_size, seq_len,
+                        dim].
+                    k: Key tensor of shape [batch_size, seq_len,
+                        dim].
+                    v: Value tensor of shape [batch_size, seq_len,
+                        dim].
+                    block_mask: Optional BlockMask.
 
-                    Args:
-                        q: Query tensor of shape [batch_size, seq_len,
-                            dim].
-                        k: Key tensor of shape [batch_size, seq_len,
-                            dim].
-                        v: Value tensor of shape [batch_size, seq_len,
-                            dim].
-                        block_mask: Optional BlockMask.
+                Returns:
+                    Output tensor of shape [batch_size, seq_len,
+                        dim].
+                """
+                return flex_attention(q, k, v, block_mask=block_mask)
 
-                    Returns:
-                        Output tensor of shape [batch_size, seq_len,
-                            dim].
-                    """
-                    return flex_attention(q, k, v, block_mask=block_mask)
+            x = mixed_precision_flex_attention(
+                q,
+                k,
+                v,
+                block_mask=attn_mask,
+            )
 
-                x = mixed_precision_flex_attention(
-                    q,
-                    k,
-                    v,
-                    block_mask=attn_mask,
-                )
+        elif self.fused_attn:
+            x = F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                attn_mask=attn_mask,
+                dropout_p=self.attn_drop.p if self.training else 0.0,
+            )
 
-            elif self.fused_attn:
-                x = F.scaled_dot_product_attention(
-                    q,
-                    k,
-                    v,
-                    attn_mask=attn_mask,
-                    dropout_p=self.attn_drop.p if self.training else 0.0,
-                )
+        elif self.jvp_attn:
+            from jvp_flash_attention.jvp_attention import attention as jvp_attention
 
-            elif self.jvp_attn:
-                from jvp_flash_attention.jvp_attention import attention as jvp_attention
+            x = jvp_attention(
+                q,
+                k,
+                v,
+                attn_mask=attn_mask,
+                # dropout_p=self.attn_drop.p if self.training else 0.0,  # NOTE: JVP attention dropout is currently unsupported
+            )
 
-                x = jvp_attention(
-                    q,
-                    k,
-                    v,
-                    attn_mask=attn_mask,
-                    # dropout_p=self.attn_drop.p if self.training else 0.0,  # NOTE: JVP attention dropout is currently unsupported
-                )
-
-            else:
-                q = q * self.scale
-                attn = q @ k.transpose(-2, -1)
-                attn = maybe_add_mask(attn, attn_mask=attn_mask)
-                attn = attn.softmax(dim=-1)
-                if attn_mask is not None:
-                    attn = attn.masked_fill(attn_mask.isinf(), 0.0)
-                attn = self.attn_drop(attn)
-                x = attn @ v
+        else:
+            q = q * self.scale
+            attn = q @ k.transpose(-2, -1)
+            attn = safe_softmax(attn, mask=attn_mask, dim=-1)
+            attn = self.attn_drop(attn)
+            x = attn @ v
 
         x = x.transpose(1, 2).reshape(B, M, C)
         x = self.norm(x)

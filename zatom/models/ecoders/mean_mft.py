@@ -19,10 +19,12 @@ from flow_matching.path.scheduler import (
     CondOTScheduler,
     PolynomialConvexScheduler,
 )
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.attention.flex_attention import create_block_mask
 
 from zatom.models.ecoders.ebt import EBTBlock, LabelEmbedder, modulate
 from zatom.models.encoders.custom_transformer import (
+    SDPA_BACKENDS,
     LayerNorm,
     build_attention_mask,
 )
@@ -389,6 +391,7 @@ class MeanMFT(nn.Module):
         spacegroup: Float[" b"],  # type: ignore
         mask: Float["b m"],  # type: ignore
         seq_idx: Float["b m"] | None = None,  # type: ignore
+        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
     ) -> Dict[str, torch.Tensor]:
         """Forward pass of MFT.
 
@@ -412,6 +415,7 @@ class MeanMFT(nn.Module):
             spacegroup: Spacegroup index for each sample (B,).
             mask: True if valid token, False if padding (B, N).
             seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
+            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
 
         Returns:
             Output velocity fields for each modality as a dictionary.
@@ -493,33 +497,34 @@ class MeanMFT(nn.Module):
             if self.jvp_attn:
                 attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
 
-        # Input embeddings: [B, N, C]
-        x_encoding = self.encoder(
-            atom_types,
-            pos,
-            frac_coords,
-            lengths_scaled,
-            angles_radians,
-            token_idx,
-            mask,
-            attn_mask=attn_mask,
-        )
-        x = self.x_embedder(x_encoding)
+        with sdpa_kernel(sdpa_backends):
+            # Input embeddings: [B, N, C]
+            x_encoding = self.encoder(
+                atom_types,
+                pos,
+                frac_coords,
+                lengths_scaled,
+                angles_radians,
+                token_idx,
+                mask,
+                attn_mask=attn_mask,
+            )
+            x = self.x_embedder(x_encoding)
 
-        # Conditioning embeddings
-        h = self.t_embedder(modals_t - modals_r).mean(-2)  # [B, C]
-        t = self.t_embedder(modals_t).mean(-2)  # [B, C]
-        d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
-        s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-        c = h + t + d + s  # [B, C]
+            # Conditioning embeddings
+            h = self.t_embedder(modals_t - modals_r).mean(-2)  # [B, C]
+            t = self.t_embedder(modals_t).mean(-2)  # [B, C]
+            d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
+            s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
+            c = h + t + d + s  # [B, C]
 
-        # Transformer blocks
-        for block in self.blocks:
-            if self.use_pytorch_implementation:  # PyTorch-native Transformer
-                x += pos_emb  # Absolute positional embedding
-                x = block(x, c, ~mask)  # [B, N, C]
-            else:  # Custom Transformer
-                x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
+            # Transformer blocks
+            for block in self.blocks:
+                if self.use_pytorch_implementation:  # PyTorch-native Transformer
+                    x += pos_emb  # Absolute positional embedding
+                    x = block(x, c, ~mask)  # [B, N, C]
+                else:  # Custom Transformer
+                    x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
 
         # Prediction layers
         x = self.final_layer(x, c)  # [B, N, 1]

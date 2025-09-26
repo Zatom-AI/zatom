@@ -223,15 +223,11 @@ class EBTBlock(nn.Module):
             c
         ).chunk(6, dim=1)
         _x = modulate(self.norm1(x), shift_msa, scale_msa)
-        with sdpa_kernel(SDPBackend.MATH):
-            # NOTE: May need to use this context, as regular SDPA from PyTorch
-            # may not support higher order gradients (e.g., for CUDA devices).
-            # NOTE: May want to turn this off for inference eventually.
-            attn_results = (
-                self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
-                if self.use_pytorch_implementation
-                else self.attn(_x, pos_ids=pos_ids, attn_mask=mask)
-            )
+        attn_results = (
+            self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
+            if self.use_pytorch_implementation
+            else self.attn(_x, pos_ids=pos_ids, attn_mask=mask)
+        )
         x = x + gate_msa.unsqueeze(1) * attn_results
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
@@ -661,35 +657,37 @@ class EBT(nn.Module):
             if self.jvp_attn:
                 attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
 
-        # Input embeddings: [B, N, C]
-        x_encoding = self.encoder(
-            atom_types,
-            pos,
-            frac_coords,
-            lengths_scaled,
-            angles_radians,
-            token_idx,
-            mask,
-            attn_mask=attn_mask,
-        )
-        x = self.x_embedder(x_encoding)
+        with sdpa_kernel(SDPBackend.MATH):  # Use math backend for higher order gradients
+            # Input embeddings: [B, N, C]
+            x_encoding = self.encoder(
+                atom_types,
+                pos,
+                frac_coords,
+                lengths_scaled,
+                angles_radians,
+                token_idx,
+                mask,
+                attn_mask=attn_mask,
+            )
+            x = self.x_embedder(x_encoding)
 
-        # Conditioning embeddings
-        step = torch.full_like(
-            input=token_idx[..., 0], fill_value=step_index if self.mcmc_step_index_learnable else 0
-        )
-        d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
-        s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-        lt = self.step_index_embedder(step)
-        c = d + s + lt  # [B, C]
+            # Conditioning embeddings
+            step = torch.full_like(
+                input=token_idx[..., 0],
+                fill_value=step_index if self.mcmc_step_index_learnable else 0,
+            )
+            d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
+            s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
+            lt = self.step_index_embedder(step)
+            c = d + s + lt  # [B, C]
 
-        # Transformer blocks
-        for block in self.blocks:
-            if self.use_pytorch_implementation:  # PyTorch-native Transformer
-                x += pos_emb  # Absolute positional embedding
-                x = block(x, c, ~mask)  # [B, N, C]
-            else:  # Custom Transformer
-                x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
+            # Transformer blocks
+            for block in self.blocks:
+                if self.use_pytorch_implementation:  # PyTorch-native Transformer
+                    x += pos_emb  # Absolute positional embedding
+                    x = block(x, c, ~mask)  # [B, N, C]
+                else:  # Custom Transformer
+                    x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
 
         # Prediction layer
         x = self.final_layer(x, c)  # [B, N, 1]
