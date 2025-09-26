@@ -694,19 +694,19 @@ class MFT(nn.Module):
 
         # Predict each modality in one step
         pred_modals = self.flow.sample(
-            x_init=[
+            x_init=(
                 modal_input_dict["atom_types"][-2],
                 modal_input_dict["pos"][-2],
                 modal_input_dict["frac_coords"][-2],
                 modal_input_dict["lengths_scaled"][-2],
                 modal_input_dict["angles_radians"][-2],
-            ],
+            ),
             time_grid=None,  # Use same time point for all modalities
             device=mask.device,
             steps=steps,
-            dataset_idx=dataset_idx.float(),
-            spacegroup=spacegroup.float(),
-            mask=mask.float(),
+            dataset_idx=dataset_idx,
+            spacegroup=spacegroup,
+            mask=mask,
         )
 
         # Prepare denoised modalities
