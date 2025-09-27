@@ -751,7 +751,7 @@ class MFT(nn.Module):
             modal_input_dict[modal] = [x_t, t]
 
         # Predict average velocity field for each modality
-        logits = self.flow.model(
+        model_output = self.flow.model(
             x=(
                 modal_input_dict["atom_types"][0],  # atom_types
                 modal_input_dict["pos"][0],  # pos
@@ -776,7 +776,7 @@ class MFT(nn.Module):
             if modal not in ("pos", "frac_coords"):
                 continue
 
-            pred_modal = logits[idx]
+            pred_modal = model_output[idx]
             target_modal = target_tensors[modal]
 
             # Align target modality to predicted modality if specified
@@ -787,7 +787,7 @@ class MFT(nn.Module):
             )
 
         # Calculate the loss for each modality
-        _, training_loss_dict = self.flow.training_loss(
+        training_loss, training_loss_dict = self.flow.training_loss(
             x_1=[
                 target_tensors["atom_types"],
                 target_tensors["pos"],
@@ -816,9 +816,10 @@ class MFT(nn.Module):
                 modal_input_dict["lengths_scaled"][1],
                 modal_input_dict["angles_radians"][1],
             ],
-            logits=logits,
+            model_output=model_output,
             detach_loss_dict=False,
         )
+        training_loss.detach_()  # Will manually re-aggregate losses below
 
         unused_loss = torch.tensor(torch.nan, device=device)
 
@@ -829,7 +830,7 @@ class MFT(nn.Module):
         for idx, modal in enumerate(self.modals):
             modal_loss_value = training_loss_dict[modal]
 
-            pred_modal = logits[idx]
+            pred_modal = model_output[idx]
             target_modal = target_tensors[modal]
 
             loss_mask = mask.float()

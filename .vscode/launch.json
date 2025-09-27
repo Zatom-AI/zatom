@@ -67,7 +67,7 @@
                 "data.datamodule.datasets.qmof150.proportion=0.0",
                 "data.datamodule.datasets.omol25.proportion=0.0",
                 "data.datamodule.datasets.geom.proportion=0.0",
-                "date=2025-09-26_18-30-00",
+                "date=2025-09-27_14-30-00",
                 // "ebm_module.augmentations.frac_coords=false",
                 // "ebm_module.augmentations.pos=false",
                 // "ebm_module.compile=false",
@@ -104,8 +104,8 @@
                 "trainer=mps",
                 "trainer.accumulate_grad_batches=4",
                 "trainer.check_val_every_n_epoch=null",
-                "trainer.val_check_interval=500",
-                "trainer.max_epochs=5000",
+                "trainer.val_check_interval=1000",
+                "trainer.max_epochs=25000",
                 "trainer.overfit_batches=1"
             ]
         },
@@ -115,7 +115,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zatom/train_ebm.py",
             "console": "integratedTerminal",
-            "justMyCode": true,
+            "justMyCode": false,
             "env": {
                 "TRITON_INTERPRET": "1",
                 // "TRITON_FRONT_END_DEBUGGING": "1",
@@ -139,7 +139,7 @@
                 "data.datamodule.datasets.qmof150.proportion=0.0",
                 "data.datamodule.datasets.omol25.proportion=0.0",
                 "data.datamodule.datasets.geom.proportion=0.0",
-                "date=2025-09-26_18-00-00",
+                "date=2025-09-27_11-30-00",
                 // "ebm_module.augmentations.frac_coords=false",
                 // "ebm_module.augmentations.pos=false",
                 // "ebm_module.compile=false",
@@ -178,7 +178,7 @@
                 "trainer.check_val_every_n_epoch=null",
                 // "+trainer.detect_anomaly=true",
                 // "trainer.gradient_clip_val=1.0",
-                "trainer.val_check_interval=500",
+                "trainer.val_check_interval=1500",
                 "trainer.max_epochs=30000",
                 "trainer.overfit_batches=1"
             ]
