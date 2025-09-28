@@ -621,7 +621,7 @@ class MFT(nn.Module):
         dataset_idx: Int[" b"],  # type: ignore
         spacegroup: Int[" b"],  # type: ignore
         mask: Bool["b m"],  # type: ignore
-        steps: int = 1000,
+        steps: int = 100,
         modal_input_dict: (
             Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]] | None
         ) = None,
