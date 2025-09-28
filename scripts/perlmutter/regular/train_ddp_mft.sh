@@ -1,16 +1,16 @@
 #!/bin/bash -l
 
 ######################### Batch Headers #########################
-#SBATCH -C gpu&hbm80g                                         # request GPU nodes
+#SBATCH -C gpu&hbm40g                                         # request GPU nodes
 #SBATCH --qos=regular                                         # use specified partition for job
 #SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
 #SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
 #SBATCH --account=m5008                                       # use specified account for billing (e.g., `m5008_g` for AI4Science proposal, `dasrepo` for all else)
-#SBATCH --nodes=2                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
+#SBATCH --nodes=1                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
 #SBATCH --gpus-per-node=4                                     # request A100 GPU resource(s)
 #SBATCH --ntasks-per-node=4                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
 #SBATCH --time=00-22:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=ebm                                        # job name
+#SBATCH --job-name=mft                                        # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
 
@@ -32,19 +32,19 @@ export HF_HOME="/pscratch/sd/${USER:0:1}/$USER/hf_cache"       # high-performanc
 mkdir -p "$TORCH_HOME"
 mkdir -p "$HF_HOME"
 
-# Select model configuration -> EBT-{S/B/L}
+# Select model configuration -> MFT-{S/B/L}
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
-# NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=52 trainer.accumulate_grad_batches=8
+# NOTE: For MFT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=52 trainer.accumulate_grad_batches=8
 
 # Define run details
 DEFAULT_DATASET="qm9_only"                # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
-DEFAULT_RUN_ID="njy1e77v"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-09-22_14-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="zrljc1td"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-09-28_14-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="EBT-B__${DATASET}"              # Name of the model type and dataset configuration
+RUN_NAME="MFT-B__${DATASET}"              # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
@@ -82,10 +82,18 @@ bash -c "
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
     callbacks=$CALLBACKS \
     data=$DATASET \
+    data.datamodule.batch_size.train=768 \
+    data.datamodule.batch_size.val=768 \
+    data.datamodule.batch_size.test=768 \
     date=$RUN_DATE \
+    ecoder=mft \
     ecoder.d_model=$D_MODEL \
     ecoder.num_layers=$NUM_LAYERS \
     ecoder.nhead=$NHEAD \
+    ecoder.fused_attn=true \
+    ecoder.jvp_attn=false \
+    encoder.fused_attn=true \
+    encoder.jvp_attn=false \
     logger=wandb \
     name=$RUN_NAME \
     strategy=optimized_ddp \
