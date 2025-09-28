@@ -490,6 +490,7 @@ class MFT(nn.Module):
         jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
         weighted_rigid_align_pos: Whether to apply weighted rigid alignment between target and predicted atom positions for loss calculation.
         weighted_rigid_align_frac_coords: Whether to apply weighted rigid alignment between target and predicted atom fractional coordinates for loss calculation.
+        continuous_x_1_prediction: Whether the model predicts clean data at t=1 for continuous modalities. If so, weighted rigid alignment can be applied.
         use_pytorch_implementation: Whether to use PyTorch's Transformer implementation.
         add_mask_atom_type: Whether to add a mask token for atom types.
         norm_layer: Normalization layer.
@@ -525,6 +526,7 @@ class MFT(nn.Module):
         jvp_attn: bool = False,
         weighted_rigid_align_pos: bool = True,
         weighted_rigid_align_frac_coords: bool = False,
+        continuous_x_1_prediction: bool = True,
         use_pytorch_implementation: bool = False,
         add_mask_atom_type: bool = True,
         norm_layer: Type[nn.Module] = LayerNorm,
@@ -542,8 +544,6 @@ class MFT(nn.Module):
         self.lengths_scaled_reconstruction_loss_weight = lengths_scaled_reconstruction_loss_weight
         self.angles_radians_reconstruction_loss_weight = angles_radians_reconstruction_loss_weight
         self.jvp_attn = jvp_attn
-        self.weighted_rigid_align_pos = weighted_rigid_align_pos
-        self.weighted_rigid_align_frac_coords = weighted_rigid_align_frac_coords
 
         self.vocab_size = max_num_elements + int(add_mask_atom_type)
         self.modals = ["atom_types", "pos", "frac_coords", "lengths_scaled", "angles_radians"]
@@ -587,28 +587,32 @@ class MFT(nn.Module):
                 "path": AffineProbPath(scheduler=CondOTScheduler()),
                 # loss omitted → Flow will use squared error automatically
                 "weight": self.pos_reconstruction_loss_weight,
+                "x_1_prediction": continuous_x_1_prediction,
             },
             "frac_coords": {
                 "path": AffineProbPath(scheduler=CondOTScheduler()),
                 # loss omitted → Flow will use squared error automatically
                 "weight": self.frac_coords_reconstruction_loss_weight,
+                "x_1_prediction": continuous_x_1_prediction,
             },
             "lengths_scaled": {
                 "path": AffineProbPath(scheduler=CondOTScheduler()),
                 # loss omitted → Flow will use squared error automatically
                 "weight": self.lengths_scaled_reconstruction_loss_weight,
+                "x_1_prediction": continuous_x_1_prediction,
             },
             "angles_radians": {
                 "path": AffineProbPath(scheduler=CondOTScheduler()),
                 # loss omitted → Flow will use squared error automatically
                 "weight": self.angles_radians_reconstruction_loss_weight,
+                "x_1_prediction": continuous_x_1_prediction,
             },
         }
         self.flow = Flow(model=model, modalities=modalities)
 
         self.should_rigid_align = {
-            "pos": self.weighted_rigid_align_pos,
-            "frac_coords": self.weighted_rigid_align_frac_coords,
+            "pos": weighted_rigid_align_pos and continuous_x_1_prediction,
+            "frac_coords": weighted_rigid_align_frac_coords and continuous_x_1_prediction,
         }
 
     @typecheck
@@ -736,6 +740,7 @@ class MFT(nn.Module):
             # Sample probability path
             path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
             x_t = path_sample.x_t
+            dx_t = getattr(path_sample, "dx_t", None)
 
             # Apply mask
             if x_t.shape == (batch_size, num_tokens):  # [B, N]
@@ -748,7 +753,7 @@ class MFT(nn.Module):
                 raise ValueError(f"Unexpected shape for x_t: {x_t.shape}")
 
             # Collect inputs
-            modal_input_dict[modal] = [x_t, t]
+            modal_input_dict[modal] = [x_t, t, dx_t]
 
         # Predict average velocity field for each modality
         model_output = self.flow.model(
@@ -803,11 +808,11 @@ class MFT(nn.Module):
                 modal_input_dict["angles_radians"][0],
             ],
             dx_t=[
-                target_tensors["atom_types"],
-                target_tensors["pos"],
-                target_tensors["frac_coords"],
-                target_tensors["lengths_scaled"],
-                target_tensors["angles_radians"],
+                modal_input_dict["atom_types"][2],
+                modal_input_dict["pos"][2],
+                modal_input_dict["frac_coords"][2],
+                modal_input_dict["lengths_scaled"][2],
+                modal_input_dict["angles_radians"][2],
             ],
             t=[
                 modal_input_dict["atom_types"][1],

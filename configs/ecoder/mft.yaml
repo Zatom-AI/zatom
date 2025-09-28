@@ -28,6 +28,7 @@ fused_attn: false
 jvp_attn: true
 weighted_rigid_align_pos: true
 weighted_rigid_align_frac_coords: false
+continuous_x_1_prediction: true
 use_pytorch_implementation: false
 add_mask_atom_type: ${ebm_module.interpolant.corrupt}
 norm_layer: ${resolve_variable:zatom.models.encoders.custom_transformer.LayerNorm}
