@@ -794,7 +794,7 @@ class MFT(nn.Module):
         # Calculate the loss for each modality
         training_loss, training_loss_dict = self.flow.training_loss(
             x_1=[
-                target_tensors["atom_types"],
+                target_tensors["atom_types"] * mask,  # Mask out -100 padding
                 target_tensors["pos"],
                 target_tensors["frac_coords"],
                 target_tensors["lengths_scaled"],
