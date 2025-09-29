@@ -482,7 +482,7 @@ class Attention(nn.Module):
     ) -> None:
         super().__init__()
 
-        assert dim % num_heads == 0, "dim should be divisible by num_heads"
+        assert dim % num_heads == 0, f"dim ({dim}) should be divisible by num_heads ({num_heads})"
         assert (
             sum([flex_attn, fused_attn, jvp_attn]) <= 1
         ), "Only one of flex_attn, fused_attn, or jvp_attn can be True."

@@ -9,7 +9,7 @@
 #        --gpus-per-node=2 \
 #        --ntasks-per-node=2 \
 #        --time=04:00:00 \
-#        --job-name=mft
+#        --job-name=mft-b
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -30,7 +30,7 @@ mkdir -p "$HF_HOME"
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
-# NOTE: For MFT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=52 trainer.accumulate_grad_batches=8
+# NOTE: For MFT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=720 trainer.accumulate_grad_batches=3
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
