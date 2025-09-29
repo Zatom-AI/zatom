@@ -34,11 +34,11 @@ NHEAD=12  # 6, 12, 16
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
-DEFAULT_RUN_ID="4jx5s9n2"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-09-28_14-01-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="2ekwx5iy"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-09-29_12-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="MFT-B__${DATASET}_subset_debugging"       # Name of the model type and dataset configuration
+RUN_NAME="MFT-B__${DATASET}"              # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
@@ -94,11 +94,8 @@ bash -c "
     task_name=$TASK_NAME \
     trainer=ddp \
     trainer.accumulate_grad_batches=1 \
-    trainer.check_val_every_n_epoch=500 \
-    trainer.log_every_n_steps=25 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.overfit_batches=1 \
     ckpt_path=$CKPT_PATH
 "
 
