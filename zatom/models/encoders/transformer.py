@@ -8,7 +8,6 @@ from typing import Type
 
 import torch
 from torch import nn
-from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.attention.flex_attention import create_block_mask
 
 from zatom.models.encoders.custom_transformer import (
@@ -236,7 +235,10 @@ class TransformerEncoder(nn.Module):
         x += self.angles_radians_embedder(angles_radians)
 
         # Token index positional embedding
-        token_idx_emb = get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
+        if self.use_pytorch_implementation:
+            token_idx_emb = get_index_embedding(
+                token_idx, self.d_model, max_len=self.context_length
+            )
 
         # Create the attention mask
         if attn_mask is None and not self.use_pytorch_implementation:
@@ -280,16 +282,11 @@ class TransformerEncoder(nn.Module):
                 attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
 
         # Transformer blocks
-        with sdpa_kernel(SDPBackend.MATH):
-            # NOTE: May need to use this context, as regular SDPA from PyTorch
-            # may not support higher order gradients (e.g., for CUDA devices).
-            # NOTE: May want to turn this off for inference eventually.
-
-            if self.use_pytorch_implementation:  # PyTorch-native Transformer
-                x += token_idx_emb  # Absolute positional embedding
-                x = self.transformer.forward(x, src_key_padding_mask=(~mask))  # [B, M, D]
-            else:
-                for block in self.transformer:  # Custom Transformer
-                    x = block(x, pos_ids=token_idx, attn_mask=attn_mask)  # [B, M, D]
+        if self.use_pytorch_implementation:  # PyTorch-native Transformer
+            x += token_idx_emb  # Absolute positional embedding
+            x = self.transformer.forward(x, src_key_padding_mask=(~mask))  # [B, M, D]
+        else:
+            for block in self.transformer:  # Custom Transformer
+                x = block(x, pos_ids=token_idx, attn_mask=attn_mask)  # [B, M, D]
 
         return x

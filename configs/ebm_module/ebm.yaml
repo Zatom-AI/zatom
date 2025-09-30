@@ -20,7 +20,7 @@ sampling:
   num_samples: 1000
   batch_size: 100
   atom_types_temperature: 1.0 # NOTE: if `atom_types_top_p` is `null`, this will be ignored
-  atom_types_top_p: 0.9 # NOTE: if `null`, argmax-decoding will instead be applied
+  atom_types_top_p: null # NOTE: if `null`, argmax-decoding will instead be applied
   data_dir: ${paths.data_dir}
   visualize: true
   save_dir: ${paths.viz_dir}

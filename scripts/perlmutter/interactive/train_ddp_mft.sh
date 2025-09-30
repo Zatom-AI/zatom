@@ -1,21 +1,15 @@
 #!/bin/bash -l
 
-######################### Batch Headers #########################
-#SBATCH -C gpu&hbm80g                                         # request GPU nodes
-#SBATCH --qos=regular                                         # use specified partition for job
-#SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
-#SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
-#SBATCH --account=m5008                                       # use specified account for billing (e.g., `m5008_g` for AI4Science proposal, `dasrepo` for all else)
-#SBATCH --nodes=2                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
-#SBATCH --gpus-per-node=4                                     # request A100 GPU resource(s)
-#SBATCH --ntasks-per-node=4                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
-#SBATCH --time=00-22:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=ebt-b                                      # job name
-#SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
-#SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
-
-# Wait for 5-10 seconds randomly to avoid race condition
-sleep $((RANDOM % 6 + 5))
+# salloc -C "gpu&hbm80g" \
+#        --qos=shared_interactive \
+#        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
+#        --module=gpu,nccl-plugin \
+#        --account=m5008 \
+#        --nodes=1 \
+#        --gpus-per-node=2 \
+#        --ntasks-per-node=2 \
+#        --time=04:00:00 \
+#        --job-name=mft-b
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -32,19 +26,19 @@ export HF_HOME="/pscratch/sd/${USER:0:1}/$USER/hf_cache"       # high-performanc
 mkdir -p "$TORCH_HOME"
 mkdir -p "$HF_HOME"
 
-# Select model configuration -> EBT-{S/B/L}
+# Select model configuration -> MFT-{S/B/L}
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
-# NOTE: For EBT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=52 trainer.accumulate_grad_batches=8
+# NOTE: For MFT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=720 trainer.accumulate_grad_batches=3
 
 # Define run details
-DEFAULT_DATASET="qm9_only"                # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
-DEFAULT_RUN_ID="njy1e77v"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-09-22_14-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
+DEFAULT_RUN_ID="dgc1kh7c"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-09-29_17-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="EBT-B__${DATASET}"              # Name of the model type and dataset configuration
+RUN_NAME="MFT-B__${DATASET}"              # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
@@ -55,7 +49,7 @@ CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at 
 mkdir -p "$CKPT_PATH"
 
 # Inform user of job details
-echo -e "Job details:\n==================\n"
+echo -e "Job details:\n========================================================================\n"
 
 echo "Run name: $RUN_NAME"
 echo "Run ID: $RUN_ID"
@@ -73,7 +67,7 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script $TASK_NAME.py:\n==================\n"
+echo -e "\nExecuting script $TASK_NAME.py:\n========================================================================\n"
 
 # Run script
 bash -c "
@@ -81,17 +75,27 @@ bash -c "
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
     callbacks=$CALLBACKS \
+    callbacks.last_model_checkpoint.every_n_train_steps=1500 \
     data=$DATASET \
+    data.datamodule.batch_size.train=1920 \
+    data.datamodule.batch_size.val=1920 \
+    data.datamodule.batch_size.test=1920 \
     date=$RUN_DATE \
+    ecoder=mft \
     ecoder.d_model=$D_MODEL \
     ecoder.num_layers=$NUM_LAYERS \
     ecoder.nhead=$NHEAD \
+    ecoder.fused_attn=true \
+    ecoder.jvp_attn=false \
+    encoder.fused_attn=true \
+    encoder.jvp_attn=false \
     logger=wandb \
     name=$RUN_NAME \
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
-    trainer.accumulate_grad_batches=1 \
+    trainer.accumulate_grad_batches=2 \
+    trainer.log_every_n_steps=25 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
     ckpt_path=$CKPT_PATH

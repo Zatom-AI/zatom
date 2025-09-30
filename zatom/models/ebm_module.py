@@ -388,7 +388,7 @@ class EBMLitModule(LightningModule):
             if self.hparams.datasets[dataset].proportion > 0.0
         )
 
-        if self.hparams.ecoder.jvp_attn or self.hparams.ecoder.encoder.jvp_attn:
+        if self.hparams.ecoder.jvp_attn:
             # Find the smallest power of 2 >= max(max_num_nodes, 32)
             min_num_nodes = max(max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()
@@ -544,7 +544,7 @@ class EBMLitModule(LightningModule):
         # Log metadata metrics
         self.log(
             "global_step",
-            torch.tensor(self.global_step, device=self.device, dtype=torch.float),
+            torch.tensor(self.global_step, device=self.device, dtype=torch.float32),
             on_step=True,
             on_epoch=False,
             sync_dist=True,
@@ -553,7 +553,7 @@ class EBMLitModule(LightningModule):
         # Log throughput metrics
         step_time = time.time() - t_start
         examples_per_second = torch.tensor(
-            batch.batch_size / step_time, device=self.device, dtype=torch.float
+            batch.batch_size / step_time, device=self.device, dtype=torch.float32
         )
         example_length = torch.bincount(batch.batch).float().mean()
 
@@ -844,14 +844,14 @@ class EBMLitModule(LightningModule):
 
         # Use MCMC-based forward pass of EBM to denoise (generate) sample modalities
         denoised_modals_list, _ = self.ecoder.forward(
-            noisy_dense_batch["atom_types"],
-            noisy_dense_batch["pos"],
-            noisy_dense_batch["frac_coords"],
-            noisy_dense_batch["lengths_scaled"],
-            noisy_dense_batch["angles_radians"],
-            dataset_idx,
-            spacegroup,
-            token_mask,
+            atom_types=noisy_dense_batch["atom_types"],
+            pos=noisy_dense_batch["pos"],
+            frac_coords=noisy_dense_batch["frac_coords"],
+            lengths_scaled=noisy_dense_batch["lengths_scaled"],
+            angles_radians=noisy_dense_batch["angles_radians"],
+            dataset_idx=dataset_idx,
+            spacegroup=spacegroup,
+            mask=token_mask,
             training=False,
             no_randomness=True,
             return_raw_discrete_logits=True,
@@ -868,7 +868,9 @@ class EBMLitModule(LightningModule):
                 atom_types_probs, self.hparams.sampling.atom_types_top_p
             ).squeeze(-1)
         else:
-            atom_types = atom_types_logits.argmax(-1)
+            atom_types = (
+                atom_types_logits.argmax(-1) if atom_types_logits.ndim == 2 else atom_types_logits
+            )
 
         # Collect final sample modalities and remove padding (to convert to PyG format)
         out = {
@@ -968,16 +970,19 @@ class EBMLitModule(LightningModule):
         optimizer_parameters = [
             {
                 **self.hparams.optimizer.keywords,
-                "params": alpha_params,
-                "weight_decay": 0.0,  # No weight decay for `alpha`, but maybe for other parameters
-                "lr": self.hparams.optimizer.keywords["lr"]
-                * self.hparams.ecoder.mcmc_step_size_lr_multiplier,
-            },
-            {
-                **self.hparams.optimizer.keywords,
                 "params": other_params,
-            },
+            }
         ]
+        if alpha_params:
+            optimizer_parameters.append(
+                {
+                    **self.hparams.optimizer.keywords,
+                    "params": alpha_params,
+                    "weight_decay": 0.0,  # No weight decay for `alpha`, but maybe for other parameters
+                    "lr": self.hparams.optimizer.keywords["lr"]
+                    * self.hparams.ecoder.mcmc_step_size_lr_multiplier,
+                }
+            )
 
         try:
             optimizer = self.hparams.optimizer(params=optimizer_parameters)

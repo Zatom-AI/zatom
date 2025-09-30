@@ -1,7 +1,7 @@
 _target_: zatom.models.encoders.transformer.TransformerEncoder
 
 d_model: ${ebm_module.ecoder.d_model}
-nhead: 12
+nhead: ${ebm_module.ecoder.nhead}
 dim_feedforward: 2048 # Argument for PyTorch implementation only
 num_layers: 8
 context_length: 2048

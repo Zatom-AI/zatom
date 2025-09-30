@@ -16,7 +16,7 @@
 
 ## Description
 
-Official repository of Zatom, a multimodal energy-based all-atom transformer
+Official repository of Zatom, a multimodal all-atom generative model
 
 ## Installation
 
@@ -61,7 +61,7 @@ pip install --no-build-isolation pyeqeq
 unset DYLD_LIBRARY_PATH
 
 # Install requirements
-pip install -e .[cuda]
+pip install -e '.[cuda]'
 
 # [OPTIONAL] Install pre-commit hooks
 pre-commit install

@@ -126,7 +126,7 @@ class GEOM(InMemoryDataset):
 
                 # 3D coordinates
                 pos = mol.GetConformer().GetPositions()
-                pos = torch.tensor(pos, dtype=torch.float)
+                pos = torch.tensor(pos, dtype=torch.float32)
 
                 # Atom types
                 atomic_number = []

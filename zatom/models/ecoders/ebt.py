@@ -223,15 +223,11 @@ class EBTBlock(nn.Module):
             c
         ).chunk(6, dim=1)
         _x = modulate(self.norm1(x), shift_msa, scale_msa)
-        with sdpa_kernel(SDPBackend.MATH):
-            # NOTE: May need to use this context, as regular SDPA from PyTorch
-            # may not support higher order gradients (e.g., for CUDA devices).
-            # NOTE: May want to turn this off for inference eventually.
-            attn_results = (
-                self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
-                if self.use_pytorch_implementation
-                else self.attn(_x, pos_ids=pos_ids, attn_mask=mask)
-            )
+        attn_results = (
+            self.attn(_x, _x, _x, key_padding_mask=mask, need_weights=False)[0]
+            if self.use_pytorch_implementation
+            else self.attn(_x, pos_ids=pos_ids, attn_mask=mask)
+        )
         x = x + gate_msa.unsqueeze(1) * attn_results
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
@@ -529,6 +525,25 @@ class EBT(nn.Module):
         self.nll_loss = nn.NLLLoss(ignore_index=-100, reduction="none")
         self.mse_loss = nn.MSELoss(reduction="none")
 
+        self.modal_loss_fn_dict = {
+            "atom_types": self.nll_loss,
+            "pos": self.mse_loss,
+            "frac_coords": self.mse_loss,
+            "lengths_scaled": self.mse_loss,
+            "angles_radians": self.mse_loss,
+        }
+        self.reconstruction_loss_weight_dict = {
+            "atom_types": self.atom_types_reconstruction_loss_weight,
+            "pos": self.pos_reconstruction_loss_weight,
+            "frac_coords": self.frac_coords_reconstruction_loss_weight,
+            "lengths_scaled": self.lengths_scaled_reconstruction_loss_weight,
+            "angles_radians": self.angles_radians_reconstruction_loss_weight,
+        }
+        self.should_rigid_align = {
+            "pos": self.weighted_rigid_align_pos,
+            "frac_coords": self.weighted_rigid_align_frac_coords,
+        }
+
     @typecheck
     def initialize_weights(self):
         """Initialize transformer layers."""
@@ -596,7 +611,9 @@ class EBT(nn.Module):
 
         # Positional embedding
         token_idx = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
-        pos_emb = get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
+
+        if self.use_pytorch_implementation:
+            pos_emb = get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
 
         # Create the attention mask
         attn_mask = None
@@ -640,35 +657,37 @@ class EBT(nn.Module):
             if self.jvp_attn:
                 attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
 
-        # Input embeddings: [B, N, C]
-        x_encoding = self.encoder(
-            atom_types,
-            pos,
-            frac_coords,
-            lengths_scaled,
-            angles_radians,
-            token_idx,
-            mask,
-            attn_mask=attn_mask,
-        )
-        x = self.x_embedder(x_encoding)
+        with sdpa_kernel(SDPBackend.MATH):  # Use math backend for higher order gradients
+            # Input embeddings: [B, N, C]
+            x_encoding = self.encoder(
+                atom_types,
+                pos,
+                frac_coords,
+                lengths_scaled,
+                angles_radians,
+                token_idx,
+                mask,
+                attn_mask=attn_mask,
+            )
+            x = self.x_embedder(x_encoding)
 
-        # Conditioning embeddings
-        step = torch.full_like(
-            input=token_idx[..., 0], fill_value=step_index if self.mcmc_step_index_learnable else 0
-        )
-        d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
-        s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-        lt = self.step_index_embedder(step)
-        c = d + s + lt  # [B, C]
+            # Conditioning embeddings
+            step = torch.full_like(
+                input=token_idx[..., 0],
+                fill_value=step_index if self.mcmc_step_index_learnable else 0,
+            )
+            d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
+            s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
+            lt = self.step_index_embedder(step)
+            c = d + s + lt  # [B, C]
 
-        # Transformer blocks
-        for block in self.blocks:
-            if self.use_pytorch_implementation:  # PyTorch-native Transformer
-                x += pos_emb  # Absolute positional embedding
-                x = block(x, c, ~mask)  # [B, N, C]
-            else:  # Custom Transformer
-                x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
+            # Transformer blocks
+            for block in self.blocks:
+                if self.use_pytorch_implementation:  # PyTorch-native Transformer
+                    x += pos_emb  # Absolute positional embedding
+                    x = block(x, c, ~mask)  # [B, N, C]
+                else:  # Custom Transformer
+                    x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
 
         # Prediction layer
         x = self.final_layer(x, c)  # [B, N, 1]
@@ -1098,38 +1117,17 @@ class EBT(nn.Module):
 
         # Calculate each loss for each modality
         loss_dict = {}
-
         reconstruction_loss_dict = {modal: 0 for modal in target_tensors}
-        modal_loss_fn_dict = {
-            "atom_types": self.nll_loss,
-            "pos": self.mse_loss,
-            "frac_coords": self.mse_loss,
-            "lengths_scaled": self.mse_loss,
-            "angles_radians": self.mse_loss,
-        }
 
-        reconstruction_loss_weight_dict = {
-            "atom_types": self.atom_types_reconstruction_loss_weight,
-            "pos": self.pos_reconstruction_loss_weight,
-            "frac_coords": self.frac_coords_reconstruction_loss_weight,
-            "lengths_scaled": self.lengths_scaled_reconstruction_loss_weight,
-            "angles_radians": self.angles_radians_reconstruction_loss_weight,
-        }
         total_mcmc_steps = len(pred_energies_list)
-
-        should_rigid_align = {
-            "pos": self.weighted_rigid_align_pos,
-            "frac_coords": self.weighted_rigid_align_frac_coords,
-        }
-
         for modal in target_tensors:
             for mcmc_step, (denoised_modals, pred_energies) in enumerate(
                 zip(denoised_modals_list, pred_energies_list)
             ):
                 pred_modal = denoised_modals[modal]
                 target_modal = target_tensors[modal]
-                modal_loss_fn = modal_loss_fn_dict[modal]
-                reconstruction_loss_weight = reconstruction_loss_weight_dict[modal]
+                modal_loss_fn = self.modal_loss_fn_dict[modal]
+                reconstruction_loss_weight = self.reconstruction_loss_weight_dict[modal]
 
                 loss_mask = mask.float()
                 loss_token_is_periodic = token_is_periodic.float()
@@ -1143,14 +1141,14 @@ class EBT(nn.Module):
                 elif modal in ("pos", "frac_coords"):
                     target_modal = (
                         weighted_rigid_align(pred_modal, target_modal, mask=mask)
-                        if should_rigid_align[modal]
+                        if self.should_rigid_align[modal]
                         else target_modal
                     )
                     loss_mask = mask.unsqueeze(-1).float()
                     loss_token_is_periodic = token_is_periodic.unsqueeze(-1).float()
                 elif modal in ("lengths_scaled", "angles_radians"):
                     loss_mask = torch.ones(
-                        target_shape, dtype=torch.float, device=target_modal.device
+                        target_shape, dtype=torch.float32, device=target_modal.device
                     )
                     loss_token_is_periodic = (
                         token_is_periodic.any(-1, keepdim=True).unsqueeze(-1).float()
