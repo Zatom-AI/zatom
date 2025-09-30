@@ -129,6 +129,7 @@ Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?ite
 
 - [all-atom-diffusion-transformer](https://github.com/facebookresearch/all-atom-diffusion-transformer)
 - [EBT](https://github.com/alexiglad/EBT)
+- [flow_matching](https://github.com/facebookresearch/flow_matching)
 - [jvp_flash_attention](https://github.com/amorehead/jvp_flash_attention)
 - [lightning-hydra-template](https://github.com/ashleve/lightning-hydra-template)
 - [ProteinWorkshop](https://github.com/a-r-j/ProteinWorkshop)
