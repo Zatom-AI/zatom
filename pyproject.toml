@@ -1,7 +1,7 @@
 [project]
 name = "zatom"
 version = "0.0.1"
-description = "Official repository of Zatom, a multimodal energy-based all-atom transformer"
+description = "Official repository of Zatom, a multimodal all-atom generative model"
 authors = [
     { name = "Alex Morehead", email = "alex.morehead@gmail.edu" }
 ]

@@ -16,7 +16,7 @@
 
 ## Description
 
-Official repository of Zatom, a multimodal energy-based all-atom transformer
+Official repository of Zatom, a multimodal all-atom generative model
 
 ## Installation
 
