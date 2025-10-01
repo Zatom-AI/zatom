@@ -104,6 +104,7 @@
                 // "ebm_module.interpolant.min_t=1.0",
                 // "ebm_module.interpolant.max_t=1.0",
                 "ebm_module.log_grads_every_n_steps=100",
+                // "ebm_module.sampling.cfg_scale=1.0",
                 "ebm_module.sampling.num_samples=10",
                 "ebm_module.sampling.batch_size=10",
                 "ecoder=mft",

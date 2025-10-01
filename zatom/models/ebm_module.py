@@ -687,6 +687,7 @@ class EBMLitModule(LightningModule):
                     num_nodes_bincount=self.num_nodes_bincount[dataset],
                     spacegroups_bincount=self.spacegroups_bincount[dataset],
                     batch_size=self.hparams.sampling.batch_size,
+                    cfg_scale=self.hparams.sampling.cfg_scale,
                     dataset_idx=DATASET_TO_IDX[dataset],
                     steps=self.hparams.sampling.get("steps", 100),
                 )
@@ -761,6 +762,7 @@ class EBMLitModule(LightningModule):
         num_nodes_bincount: torch.Tensor,
         spacegroups_bincount: torch.Tensor | None,
         batch_size: int,
+        cfg_scale: float = 2.0,
         dataset_idx: int = 0,
         steps: int = 100,
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
@@ -856,6 +858,7 @@ class EBMLitModule(LightningModule):
             spacegroup=spacegroup,
             mask=token_mask,
             steps=steps,
+            cfg_scale=cfg_scale,
             training=False,
             no_randomness=True,
             return_raw_discrete_logits=True,

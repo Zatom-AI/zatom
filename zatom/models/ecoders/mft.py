@@ -453,6 +453,91 @@ class MultimodalModel(nn.Module):
 
         return pred_modals
 
+    @typecheck
+    def forward_with_cfg(
+        self,
+        x: (
+            Tuple[
+                Int["b m"],  # type: ignore - atom_types
+                Float["b m 3"],  # type: ignore - pos
+                Float["b m 3"],  # type: ignore - frac_coords
+                Float["b 1 3"],  # type: ignore - lengths_scaled
+                Float["b 1 3"],  # type: ignore - angles_radians
+            ]
+            | List[torch.Tensor]
+        ),
+        t: (
+            Tuple[
+                Float[" b"],  # type: ignore - atom_types_t
+                Float[" b"],  # type: ignore - pos_t
+                Float[" b"],  # type: ignore - frac_coords_t
+                Float[" b"],  # type: ignore - lengths_scaled_t
+                Float[" b"],  # type: ignore - angles_radians_t
+            ]
+            | List[torch.Tensor]
+        ),
+        dataset_idx: Int[" b"],  # type: ignore
+        spacegroup: Int[" b"],  # type: ignore
+        mask: Bool["b m"],  # type: ignore
+        cfg_scale: float,
+        seq_idx: Int["b m"] | None = None,  # type: ignore
+        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
+    ) -> Tuple[
+        Float["b m v"],  # type: ignore - atom_types
+        Float["b m 3"],  # type: ignore - pos
+        Float["b m 3"],  # type: ignore - frac_coords
+        Float["b 1 3"],  # type: ignore - lengths_scaled
+        Float["b 1 3"],  # type: ignore - angles_radians
+    ]:
+        """Forward pass of MultimodalModel, but also batches the unconditional forward pass for
+        classifier-free guidance.
+
+        NOTE: Assumes batch x's and class labels are ordered such that the first half are the conditional
+        samples and the second half are the unconditional samples.
+
+        Args:
+            x: Tuple or list of input tensors for each modality:
+                atom_types: Atom types tensor (B, N).
+                pos: Atom positions tensor (B, N, 3).
+                frac_coords: Fractional coordinates tensor (B, N, 3).
+                lengths_scaled: Scaled lengths tensor (B, 1, 3).
+                angles_radians: Angles in radians tensor (B, 1, 3).
+            t: Tuple or list of time tensors for each modality:
+                atom_types_t: Time t for atom types (B,).
+                pos_t: Time t for positions (B,).
+                frac_coords_t: Time t for fractional coordinates (B,).
+                lengths_scaled_t: Time t for lengths (B,).
+                angles_radians_t: Time t for angles (B,).
+            dataset_idx: Dataset index for each sample (B,).
+            spacegroup: Spacegroup index for each sample (B,).
+            mask: True if valid token, False if padding (B, N).
+            cfg_scale: Classifier-free guidance scale.
+            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
+            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
+
+        Returns:
+            Output velocity fields for each modality as a tuple.
+        """
+        half_x = tuple(x_[: len(x_) // 2] for x_ in x)
+        combined_x = tuple(torch.cat([half_x_, half_x_], dim=0) for half_x_ in half_x)
+        model_out = self.forward(
+            combined_x,
+            t,
+            dataset_idx,
+            spacegroup,
+            mask,
+            seq_idx=seq_idx,
+            sdpa_backends=sdpa_backends,
+        )
+
+        eps = []
+        for modal in model_out:
+            cond_eps, uncond_eps = torch.split(modal, len(modal) // 2, dim=0)
+            half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
+            eps.append(torch.cat([half_eps, half_eps], dim=0))
+
+        return tuple(eps)
+
 
 class MFT(nn.Module):
     """Multimodal flow model with a Transformer encoder/decoder (i.e., an E-coder or `ecoder`).
@@ -608,7 +693,11 @@ class MFT(nn.Module):
                 "x_1_prediction": continuous_x_1_prediction,
             },
         }
-        self.flow = Flow(model=model, modalities=modalities)
+        self.flow = Flow(
+            model=model,
+            modalities=modalities,
+            model_sampling_fn="forward_with_cfg",
+        )
 
         self.should_rigid_align = {
             "pos": weighted_rigid_align_pos and continuous_x_1_prediction,
@@ -622,18 +711,20 @@ class MFT(nn.Module):
         spacegroup: Int[" b"],  # type: ignore
         mask: Bool["b m"],  # type: ignore
         steps: int = 100,
+        cfg_scale: float = 2.0,
         modal_input_dict: (
             Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]] | None
         ) = None,
         **kwargs,
     ) -> Tuple[List[Dict[str, torch.Tensor]], None]:
-        """ODE-driven forward pass of MFT.
+        """ODE-driven forward pass of MFT with classifier-free guidance.
 
         Args:
             dataset_idx: Dataset index for each sample.
             spacegroup: Spacegroup index for each sample.
             mask: True if valid token, False if padding.
             steps: Number of integration steps for the multimodal ODE solver.
+            cfg_scale: Classifier-free guidance scale.
             modal_input_dict: If not None, a dictionary specifying input modalities to use and their input metadata.
                 The keys should be a subset of `["atom_types", "pos", "frac_coords", "lengths_scaled", "angles_radians"]`,
                 and the values should be tuples of (x_t, t).
@@ -650,7 +741,19 @@ class MFT(nn.Module):
             for modal in self.modals:
                 assert modal in kwargs, f"Missing required modality input: {modal}"
                 t = torch.ones(batch_size, device=BEST_DEVICE)
+
+                # Set up modality inputs for classifier-free guidance
+                kwargs[modal] = torch.cat([kwargs[modal], kwargs[modal]], dim=0)  # [2B, N, C]
+                t = torch.cat([t, t], dim=0)  # [2B]
+
                 modal_input_dict[modal] = (kwargs[modal], t)
+
+        # Set up conditioning inputs for classifier-free guidance
+        dataset_idx_null = torch.zeros_like(dataset_idx)
+        dataset_idx = torch.cat([dataset_idx, dataset_idx_null], dim=0)  # [2B]
+        spacegroup_null = torch.zeros_like(spacegroup)
+        spacegroup = torch.cat([spacegroup, spacegroup_null], dim=0)  # [2B]
+        mask = torch.cat([mask, mask], dim=0)  # [2B, N]
 
         # Predict each modality in one step
         pred_modals = self.flow.sample(
@@ -667,15 +770,20 @@ class MFT(nn.Module):
             dataset_idx=dataset_idx,
             spacegroup=spacegroup,
             mask=mask,
+            cfg_scale=cfg_scale,
         )
 
-        # Prepare denoised modalities
+        # Prepare denoised modalities and remove null class samples
         denoised_modals_list = [
             {
                 modal: (
-                    pred_modals[modal_idx].detach().reshape(batch_size * num_tokens)
+                    # Take the first half of the batch
+                    pred_modals[modal_idx]
+                    .detach()
+                    .chunk(2, dim=0)[0]
+                    .reshape(batch_size * num_tokens)
                     if modal == "atom_types"
-                    else pred_modals[modal_idx].detach()
+                    else pred_modals[modal_idx].detach().chunk(2, dim=0)[0]
                 )
                 for modal_idx, modal in enumerate(self.modals)
             }

@@ -17,6 +17,7 @@ augmentations:
   pos: true
 
 sampling:
+  cfg_scale: 2.0 # classifier-free guidance scale (only used if `ecoder=mft`)
   num_samples: 1000
   batch_size: 100
   steps: 100 # number of ODE steps (only used if `ecoder=mft`)
