@@ -731,8 +731,8 @@ class MFT(nn.Module):
         for modal in self.modals:
             path = self.flow.paths[modal]
 
-            x_0 = target_tensors[modal]  # Clean data
-            x_1 = locals()[modal]  # Noised data
+            x_0 = locals()[modal]  # Noised data
+            x_1 = target_tensors[modal]  # Clean data
 
             # Sample a time point from a uniform distribution
             t = torch.rand(batch_size, device=device) * (1 - epsilon)
