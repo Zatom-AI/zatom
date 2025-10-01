@@ -581,10 +581,10 @@ class MeanMFT(nn.Module):
                 r = torch.zeros(batch_size, device=BEST_DEVICE)
                 t = torch.ones(batch_size, device=BEST_DEVICE)
 
-                # Sample initial condition x_1
+                # Sample initial condition x_0
                 if modal == "atom_types":
                     # NOTE: Assumes that `ebm_module.disc_interpolant_type == "masking"`
-                    x_1 = F.one_hot(
+                    x_0 = F.one_hot(
                         torch.full(
                             (batch_size, num_tokens),
                             self.vocab_size - 1,  # Mask token
@@ -595,15 +595,15 @@ class MeanMFT(nn.Module):
                         num_classes=self.vocab_size,
                     ).float()
                 elif modal in ["pos", "frac_coords"]:
-                    x_1 = torch.randn(
+                    x_0 = torch.randn(
                         (batch_size, num_tokens, 3), device=BEST_DEVICE
                     ) * mask.unsqueeze(-1)
-                    x_1 -= x_1.mean(dim=1, keepdim=True)  # Center
+                    x_0 -= x_0.mean(dim=1, keepdim=True)  # Center
                 else:  # Global modalities
-                    x_1 = torch.zeros((batch_size, 1, 3), device=BEST_DEVICE)
+                    x_0 = torch.zeros((batch_size, 1, 3), device=BEST_DEVICE)
 
                 # Sample probability path
-                modal_input_dict[modal] = (None, x_1, r, t)
+                modal_input_dict[modal] = (None, x_0, r, t)
 
         # Predict each modality in one step
         pred_modals_dict = self._forward(
@@ -692,8 +692,8 @@ class MeanMFT(nn.Module):
             modal_type = self.modal_type_dict[modal]
             path = self.modal_type_path_dict[modal_type]
 
-            x_0 = target_tensors[modal]  # Clean data
-            x_1 = locals()[modal]  # Noised data
+            x_0 = locals()[modal]  # Noised data
+            x_1 = target_tensors[modal]  # Clean data
 
             # Sample two time points from a logit-normal distribution
             r = torch.sigmoid(torch.randn(batch_size, device=device) - 0.4)
@@ -726,7 +726,7 @@ class MeanMFT(nn.Module):
             if modal == "atom_types":
                 x_t = F.one_hot(x_t, self.vocab_size).float()
                 dx_t = F.one_hot(
-                    path_sample.x_0, self.vocab_size
+                    path_sample.x_1, self.vocab_size
                 ).float()  # TODO: DERIVE THIS PROPERLY
 
             # Collect inputs
