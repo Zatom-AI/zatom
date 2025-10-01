@@ -127,7 +127,7 @@
                 "encoder.jvp_attn=false",
                 // "encoder.use_pytorch_implementation=false",
                 "logger=wandb",
-                "name='MFT-B__ecoder@768_joint_overfitting_molecule-and-material_frac-coords-aug_fixed-x0-x1-ordering'",
+                "name='MFT-B__ecoder@768_joint_overfitting_molecule-and-material_add-cfg'",
                 "seed=42",
                 // "strategy=optimized_ddp",
                 "task_name=overfit_ebm",
