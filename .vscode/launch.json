@@ -46,11 +46,11 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "ckpt_path=logs/train_ebm/runs/MFT-B__joint_2025-09-29_17-30-00/checkpoints/ebm-epoch@799-step@13600-val_qm9_valid_rate@0.0090-val_mp20_valid_rate@0.0915.ckpt",
+                "ckpt_path=logs/train_ebm/runs/MFT-B__joint_2025-10-01_15-00-00/checkpoints/ebm-epoch@49-step@850-val_qm9_valid_rate@0.0995-val_mp20_valid_rate@0.0465.ckpt",
                 "data.datamodule.num_workers.train=1",
                 "data.datamodule.num_workers.val=1",
                 "data.datamodule.num_workers.test=1",
-                "date=2025-10-01_11-15-00",
+                "date=2025-10-01_17-00-00",
                 "ebm_module.sampling.num_samples=100",
                 "ebm_module.sampling.batch_size=100",
                 "ebm_module.sampling.steps=100",
