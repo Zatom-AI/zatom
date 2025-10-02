@@ -90,10 +90,6 @@ bash -c "
     ecoder.d_model=$D_MODEL \
     ecoder.num_layers=$NUM_LAYERS \
     ecoder.nhead=$NHEAD \
-    ecoder.fused_attn=true \
-    ecoder.jvp_attn=false \
-    encoder.fused_attn=true \
-    encoder.jvp_attn=false \
     logger=wandb \
     name=$RUN_NAME \
     strategy=optimized_ddp \

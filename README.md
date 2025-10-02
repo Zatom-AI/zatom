@@ -67,7 +67,7 @@ pip install -e '.[cuda]'
 pre-commit install
 ```
 
-> Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. For macOS specifically, make sure to set `e{n}coder.fused_attn=true` and `e{n}coder.jvp_attn=false` as well as `data.datamodule.batch_size.{train,val,test}=128`. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
+> Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
 
 ### `uv`
 

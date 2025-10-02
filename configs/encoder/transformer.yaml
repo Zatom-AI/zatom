@@ -19,8 +19,8 @@ scale_attn_norm: false
 scale_mlp_norm: false
 proj_bias: false
 flex_attn: false
-fused_attn: false
-jvp_attn: true
+fused_attn: true
+jvp_attn: false
 checkpoint_activations: false
 use_pytorch_implementation: false
 act_layer: ${resolve_variable:torch.nn.GELU}

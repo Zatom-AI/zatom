@@ -18,9 +18,6 @@ parameters:
   date:
     value: "2025-08-31_14-00-00"
 
-  ebm_module:
-    value: ebm
-
   ecoder.mcmc_num_steps:
     values: [2, 3]
 
