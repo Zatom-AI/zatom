@@ -36,8 +36,8 @@ qk_norm: true
 scale_attn_norm: false
 proj_bias: false
 flex_attn: false
-fused_attn: false
-jvp_attn: true
+fused_attn: true
+jvp_attn: false
 truncate_mcmc: false
 clamp_futures_grad: false
 no_mcmc_detach: false
