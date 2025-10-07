@@ -1,9 +1,5 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
-
 """Module for visualizing atomic configurations."""
+
 from zatom.tools.ase_notebook.backend.svg import (  # noqa: F401
     concatenate_svgs,
     svg_to_pdf,

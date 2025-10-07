@@ -7,7 +7,7 @@ Adapted from:
 """
 
 import math
-from typing import Any, Dict, List, Literal, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import torch
 import torch.nn as nn
@@ -17,7 +17,6 @@ from flow_matching.path.scheduler import (
     CondOTScheduler,
     PolynomialConvexScheduler,
 )
-from flow_matching.utils.multimodal import Flow
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.attention.flex_attention import create_block_mask
 
@@ -29,6 +28,7 @@ from zatom.models.encoders.custom_transformer import (
 )
 from zatom.models.encoders.transformer import get_index_embedding
 from zatom.utils import pylogger
+from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
     BEST_DEVICE,
     weighted_rigid_align,
