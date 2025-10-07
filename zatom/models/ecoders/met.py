@@ -13,11 +13,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from flow_matching.path import AffineProbPath, MixtureDiscreteProbPath
-from flow_matching.path.scheduler import PolynomialConvexScheduler
 
 from zatom.models.ecoders.mft import MultimodalModel
 from zatom.models.encoders.custom_transformer import LayerNorm
-from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
+from zatom.scheduler.scheduler import (
+    EquilibriumCondOTScheduler,
+    EquilibriumPolynomialConvexScheduler,
+)
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
@@ -169,7 +171,9 @@ class MET(nn.Module):
         # Instantiate paths and losses for Flow
         modalities = {
             "atom_types": {
-                "path": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=2.0)),
+                "path": MixtureDiscreteProbPath(
+                    scheduler=EquilibriumPolynomialConvexScheduler(n=1.0)
+                ),
                 # loss omitted → Flow will use MixturePathGeneralizedKL automatically
                 "weight": self.atom_types_reconstruction_loss_weight,
             },
