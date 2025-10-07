@@ -1,12 +1,12 @@
-"""Multimodal flow transformer (MFT).
+"""Multimodal equilibrium transformer (MET).
 
 Adapted from:
+    - https://github.com/raywang4/EqM
     - https://github.com/alexiglad/EBT
     - https://github.com/facebookresearch/flow_matching
     - https://github.com/facebookresearch/all-atom-diffusion-transformer
 """
 
-import math
 from typing import Any, Dict, List, Tuple, Type
 
 import torch
@@ -17,16 +17,9 @@ from flow_matching.path.scheduler import (
     CondOTScheduler,
     PolynomialConvexScheduler,
 )
-from torch.nn.attention import SDPBackend, sdpa_kernel
-from torch.nn.attention.flex_attention import create_block_mask
 
-from zatom.models.ecoders.ebt import EBTBlock, LabelEmbedder, modulate
-from zatom.models.encoders.custom_transformer import (
-    SDPA_BACKENDS,
-    LayerNorm,
-    build_attention_mask,
-)
-from zatom.models.encoders.transformer import get_index_embedding
+from zatom.models.ecoders.mft import MultimodalModel
+from zatom.models.encoders.custom_transformer import LayerNorm
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
@@ -37,516 +30,13 @@ from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
 log = pylogger.RankedLogger(__name__)
 
-#################################################################################
-#                             Embedding Layers                                  #
-#################################################################################
 
-
-class TimestepEmbedder(nn.Module):
-    """Embed scalar timesteps into vector representations.
-
-    Args:
-        hidden_dim: The dimensionality of the hidden representations.
-        frequency_embedding_dim: The dimensionality of the frequency embeddings.
-    """
-
-    def __init__(self, hidden_dim: int, frequency_embedding_dim: int = 256):
-        super().__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(frequency_embedding_dim, hidden_dim, bias=True),
-            nn.SiLU(),
-            nn.Linear(hidden_dim, hidden_dim, bias=True),
-        )
-        self.frequency_embedding_dim = frequency_embedding_dim
-
-    @staticmethod
-    def timestep_embedding(t: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
-        """Create sinusoidal timestep embeddings.
-
-        Args:
-            t: The input tensor.
-            dim: The dimensionality of the output embeddings.
-            max_period: The maximum period for the sinusoidal functions.
-
-        Returns:
-            The sinusoidal timestep embeddings.
-        """
-        half = dim // 2
-        freqs = torch.exp(
-            -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
-        ).to(device=t.device)
-        args = t[..., None].float() * freqs[None]
-        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-        if dim % 2:
-            embedding = torch.cat([embedding, torch.zeros_like(embedding[..., :1])], dim=-1)
-        return embedding
-
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the timestep embedder.
-
-        Args:
-            t: The input tensor.
-
-        Returns:
-            The output tensor.
-        """
-        t_freq = self.timestep_embedding(t, self.frequency_embedding_dim)
-        t_emb = self.mlp(t_freq)
-        return t_emb
-
-
-#################################################################################
-#                                 Core MFT Model                                #
-#################################################################################
-
-
-class FinalLayer(nn.Module):
-    """The final layer of MFT.
-
-    Args:
-        hidden_dim: The dimensionality of the hidden representations.
-        out_dim: The dimensionality of the output representations.
-    """
-
-    def __init__(self, hidden_dim: int, out_dim: int):
-        super().__init__()
-        self.norm_final = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(hidden_dim, out_dim, bias=True)
-        self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(), nn.Linear(hidden_dim, 2 * hidden_dim, bias=True)
-        )
-
-    @typecheck
-    def forward(self, x: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the final MFT layer.
-
-        Args:
-            x: The input tensor.
-            c: The context tensor.
-
-        Returns:
-            The output tensor.
-        """
-        shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
-        x = modulate(self.norm_final(x), shift, scale)
-        x = self.linear(x)
-        return x
-
-
-class MultimodalModel(nn.Module):
-    """Multimodal model with a Transformer encoder/decoder.
-
-    Args:
-        encoder: The encoder module.
-        d_x: Input dimension.
-        d_model: Model dimension.
-        num_layers: Number of Transformer layers.
-        nhead: Number of attention heads.
-        num_datasets: Number of datasets for context conditioning.
-        num_spacegroups: Number of spacegroups for context conditioning.
-        max_num_elements: Maximum number of elements in the dataset.
-        context_length: Context length for the attention mechanism.
-        rope_base: Base frequency for rotary positional encoding.
-        mlp_ratio: Ratio of hidden to input dimension in MLP.
-        proj_drop: Dropout probability for the projection layer.
-        attn_drop: Dropout probability for the attention layer.
-        class_dropout_prob: Probability of dropping class labels for context conditioning.
-        qkv_bias: If True, add a learnable bias to query, key, value.
-        qk_norm: If True, apply normalization to query and key.
-        scale_attn_norm: If True, apply scaling to attention
-            normalization.
-        proj_bias: If True, add bias to output projection.
-        flex_attn: Whether to use PyTorch's FlexAttention.
-        fused_attn: Whether to use PyTorch's `scaled_dot_product_attention`.
-        jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
-        use_pytorch_implementation: Whether to use PyTorch's Transformer implementation.
-        remove_t_conditioning: Whether to remove timestep conditioning for each modality.
-        add_mask_atom_type: Whether to add a mask token for atom types.
-        norm_layer: Normalization layer.
-    """
-
-    def __init__(
-        self,
-        encoder: nn.Module,
-        d_x: int = 512,
-        d_model: int = 768,
-        num_layers: int = 12,
-        nhead: int = 12,
-        num_datasets: int = 2,  # Context conditioning input
-        num_spacegroups: int = 230,  # Context conditioning input
-        max_num_elements: int = 100,
-        context_length: int | None = 2048,
-        rope_base: int | None = 10_000,
-        mlp_ratio: float = 4.0,
-        proj_drop: float = 0.1,
-        attn_drop: float = 0.0,
-        class_dropout_prob: float = 0.1,
-        qkv_bias: bool = False,
-        qk_norm: bool = True,
-        scale_attn_norm: bool = False,
-        proj_bias: bool = False,
-        flex_attn: bool = False,
-        fused_attn: bool = True,
-        jvp_attn: bool = False,
-        use_pytorch_implementation: bool = False,
-        remove_t_conditioning: bool = False,
-        add_mask_atom_type: bool = True,
-        norm_layer: Type[nn.Module] = LayerNorm,
-    ):
-        super().__init__()
-
-        assert (
-            sum([flex_attn, fused_attn, jvp_attn]) <= 1
-        ), "Only one of flex_attn, fused_attn, or jvp_attn can be True."
-
-        self.encoder = encoder
-        self.d_model = d_model
-        self.nhead = nhead
-        self.context_length = context_length
-        self.flex_attn = flex_attn
-        self.jvp_attn = jvp_attn
-        self.use_pytorch_implementation = use_pytorch_implementation
-        self.remove_t_conditioning = remove_t_conditioning
-
-        self.vocab_size = max_num_elements + int(add_mask_atom_type)
-        self.atom_type_embedder = nn.Embedding(self.vocab_size, d_model * 2)
-
-        self.x_embedder = nn.Linear(d_x, d_model, bias=True)
-        self.t_embedder = TimestepEmbedder(d_model)
-        self.dataset_embedder = LabelEmbedder(num_datasets, d_model, class_dropout_prob)
-        self.spacegroup_embedder = LabelEmbedder(num_spacegroups, d_model, class_dropout_prob)
-
-        self.blocks = nn.ModuleList(
-            [
-                EBTBlock(
-                    d_model,
-                    nhead,
-                    context_length=context_length,
-                    rope_base=rope_base,
-                    mlp_ratio=mlp_ratio,
-                    attn_drop=attn_drop,
-                    proj_drop=proj_drop,
-                    qkv_bias=qkv_bias,
-                    qk_norm=qk_norm,
-                    scale_attn_norm=scale_attn_norm,
-                    proj_bias=proj_bias,
-                    flex_attn=flex_attn,
-                    fused_attn=fused_attn,
-                    jvp_attn=jvp_attn,
-                    use_pytorch_implementation=use_pytorch_implementation,
-                    norm_layer=norm_layer,
-                )
-                for _ in range(num_layers)
-            ]
-        )
-        self.final_layer = FinalLayer(d_model, d_x)
-
-        self.atom_types_head = nn.Linear(d_model, self.vocab_size, bias=True)
-        self.pos_head = nn.Linear(d_model, 3, bias=False)
-        self.frac_coords_head = nn.Linear(d_model, 3, bias=False)
-        self.lengths_scaled_head = nn.Linear(d_model, 3, bias=True)
-        self.angles_radians_head = nn.Linear(d_model, 3, bias=True)
-
-        self.initialize_weights()
-
-    @typecheck
-    def initialize_weights(self):
-        """Initialize transformer layers."""
-
-        def _basic_init(module):
-            if isinstance(module, nn.Linear):
-                torch.nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.constant_(module.bias, 0)
-
-        self.apply(_basic_init)
-
-        # Initialize label embedding table
-        nn.init.normal_(self.dataset_embedder.embedding_table.weight, std=0.02)
-        nn.init.normal_(self.spacegroup_embedder.embedding_table.weight, std=0.02)
-
-        # Initialize timestep embedding MLP:
-        nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
-        nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
-
-        # Zero-out adaLN modulation layers in MFT blocks
-        for block in self.blocks:
-            nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
-            nn.init.constant_(block.adaLN_modulation[-1].bias, 0)
-
-        # Zero-out final layers
-        nn.init.constant_(self.final_layer.adaLN_modulation[-1].weight, 0)
-        nn.init.constant_(self.final_layer.adaLN_modulation[-1].bias, 0)
-        nn.init.constant_(self.final_layer.linear.weight, 0)
-        nn.init.constant_(self.final_layer.linear.bias, 0)
-
-    @property
-    def device(self) -> torch.device:
-        """Return the device of the model."""
-        return next(self.parameters()).device
-
-    @typecheck
-    def forward(
-        self,
-        x: (
-            Tuple[
-                Int["b m"],  # type: ignore - atom_types
-                Float["b m 3"],  # type: ignore - pos
-                Float["b m 3"],  # type: ignore - frac_coords
-                Float["b 1 3"],  # type: ignore - lengths_scaled
-                Float["b 1 3"],  # type: ignore - angles_radians
-            ]
-            | List[torch.Tensor]
-        ),
-        t: (
-            Tuple[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
-            ]
-            | List[torch.Tensor]
-        ),
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        mask: Bool["b m"],  # type: ignore
-        seq_idx: Int["b m"] | None = None,  # type: ignore
-        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
-    ) -> Tuple[
-        Float["b m v"],  # type: ignore - atom_types
-        Float["b m 3"],  # type: ignore - pos
-        Float["b m 3"],  # type: ignore - frac_coords
-        Float["b 1 3"],  # type: ignore - lengths_scaled
-        Float["b 1 3"],  # type: ignore - angles_radians
-    ]:
-        """Forward pass of MultimodalModel.
-
-        Args:
-            x: Tuple or list of input tensors for each modality:
-                atom_types: Atom types tensor (B, N).
-                pos: Atom positions tensor (B, N, 3).
-                frac_coords: Fractional coordinates tensor (B, N, 3).
-                lengths_scaled: Scaled lengths tensor (B, 1, 3).
-                angles_radians: Angles in radians tensor (B, 1, 3).
-            t: Tuple or list of time tensors for each modality:
-                atom_types_t: Time t for atom types (B,).
-                pos_t: Time t for positions (B,).
-                frac_coords_t: Time t for fractional coordinates (B,).
-                lengths_scaled_t: Time t for lengths (B,).
-                angles_radians_t: Time t for angles (B,).
-            dataset_idx: Dataset index for each sample (B,).
-            spacegroup: Spacegroup index for each sample (B,).
-            mask: True if valid token, False if padding (B, N).
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
-            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
-
-        Returns:
-            Output velocity fields for each modality as a tuple.
-        """
-        assert len(x) == 5, "Input list x must contain 5 tensors."
-        assert len(t) == 5, "Input list t must contain 5 tensors."
-
-        # Organize inputs
-        atom_types, pos, frac_coords, lengths_scaled, angles_radians = x
-        atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t = t
-
-        batch_size, num_tokens = atom_types.shape
-
-        modals_t = torch.cat(
-            [
-                t.unsqueeze(-1) * 0 if self.remove_t_conditioning else t.unsqueeze(-1)
-                for t in [atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t]
-            ],
-            dim=-1,
-        )
-
-        # Atom type embedding
-        atom_types = self.atom_type_embedder(atom_types)
-
-        # Positional embedding
-        token_idx = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
-
-        if self.use_pytorch_implementation:
-            pos_emb = get_index_embedding(token_idx, self.d_model, max_len=self.context_length)
-
-        # Create the attention mask
-        attn_mask = None
-        if not self.use_pytorch_implementation:
-            if seq_idx is None:
-                seq_idx = torch.ones_like(token_idx)
-
-            def padded_document_mask_mod(
-                b: torch.Tensor, h: torch.Tensor, q_idx: torch.Tensor, kv_idx: torch.Tensor
-            ) -> torch.Tensor:
-                """Create a padded document mask for the attention mechanism.
-
-                Args:
-                    b: Batch index.
-                    h: Head index (not used in this implementation).
-                    q_idx: Index of the query token.
-                    kv_idx: Index of the key-value tokens.
-
-                Returns:
-                    A boolean tensor value.
-                """
-                seq_ids = seq_idx
-                non_padding_mask = (seq_ids[b, q_idx] != 0) & (seq_ids[b, kv_idx] != 0)
-                document_mask = seq_ids[b, q_idx] == seq_ids[b, kv_idx]
-                return non_padding_mask & document_mask
-
-            attn_mask = (
-                create_block_mask(
-                    mask_mod=padded_document_mask_mod,
-                    B=batch_size,
-                    H=None,
-                    Q_LEN=num_tokens,
-                    KV_LEN=num_tokens,
-                    device=self.device,
-                )
-                if self.flex_attn
-                else build_attention_mask(
-                    mask, seq_idx, dtype=torch.bool if self.jvp_attn else pos.dtype
-                )
-            )
-            if self.jvp_attn:
-                attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
-
-        with sdpa_kernel(sdpa_backends):
-            # Input embeddings: [B, N, C]
-            x_encoding = self.encoder(
-                atom_types,
-                pos,
-                frac_coords,
-                lengths_scaled,
-                angles_radians,
-                token_idx,
-                mask,
-                attn_mask=attn_mask,
-            )
-            x = self.x_embedder(x_encoding)
-
-            # Conditioning embeddings
-            t = self.t_embedder(modals_t).mean(-2)  # [B, C]
-            d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
-            s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-            c = t + d + s  # [B, C]
-
-            # Transformer blocks
-            for block in self.blocks:
-                if self.use_pytorch_implementation:  # PyTorch-native Transformer
-                    x += pos_emb  # Absolute positional embedding
-                    x = block(x, c, ~mask)  # [B, N, C]
-                else:  # Custom Transformer
-                    x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
-
-        # Prediction layers
-        x = self.final_layer(x, c)  # [B, N, 1]
-        x = x * mask.unsqueeze(-1)  # Mask out padding tokens
-
-        # Collect predictions
-        global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # [B, 1, 1]
-        pred_modals = (
-            self.atom_types_head(x) * mask.unsqueeze(-1),  # [B, N, V]
-            self.pos_head(x) * mask.unsqueeze(-1),  # [B, N, 3]
-            self.frac_coords_head(x) * mask.unsqueeze(-1),  # [B, N, 3]
-            self.lengths_scaled_head(x.mean(-2, keepdim=True)) * global_mask,  # [B, 1, 3]
-            self.angles_radians_head(x.mean(-2, keepdim=True)) * global_mask,  # [B, 1, 3]
-        )
-
-        return pred_modals
-
-    @typecheck
-    def forward_with_cfg(
-        self,
-        x: (
-            Tuple[
-                Int["b m"],  # type: ignore - atom_types
-                Float["b m 3"],  # type: ignore - pos
-                Float["b m 3"],  # type: ignore - frac_coords
-                Float["b 1 3"],  # type: ignore - lengths_scaled
-                Float["b 1 3"],  # type: ignore - angles_radians
-            ]
-            | List[torch.Tensor]
-        ),
-        t: (
-            Tuple[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
-            ]
-            | List[torch.Tensor]
-        ),
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        mask: Bool["b m"],  # type: ignore
-        cfg_scale: float,
-        seq_idx: Int["b m"] | None = None,  # type: ignore
-        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
-    ) -> Tuple[
-        Float["b m v"],  # type: ignore - atom_types
-        Float["b m 3"],  # type: ignore - pos
-        Float["b m 3"],  # type: ignore - frac_coords
-        Float["b 1 3"],  # type: ignore - lengths_scaled
-        Float["b 1 3"],  # type: ignore - angles_radians
-    ]:
-        """Forward pass of MultimodalModel, but also batches the unconditional forward pass for
-        classifier-free guidance.
-
-        NOTE: Assumes batch x's and class labels are ordered such that the first half are the conditional
-        samples and the second half are the unconditional samples.
-
-        Args:
-            x: Tuple or list of input tensors for each modality:
-                atom_types: Atom types tensor (B, N).
-                pos: Atom positions tensor (B, N, 3).
-                frac_coords: Fractional coordinates tensor (B, N, 3).
-                lengths_scaled: Scaled lengths tensor (B, 1, 3).
-                angles_radians: Angles in radians tensor (B, 1, 3).
-            t: Tuple or list of time tensors for each modality:
-                atom_types_t: Time t for atom types (B,).
-                pos_t: Time t for positions (B,).
-                frac_coords_t: Time t for fractional coordinates (B,).
-                lengths_scaled_t: Time t for lengths (B,).
-                angles_radians_t: Time t for angles (B,).
-            dataset_idx: Dataset index for each sample (B,).
-            spacegroup: Spacegroup index for each sample (B,).
-            mask: True if valid token, False if padding (B, N).
-            cfg_scale: Classifier-free guidance scale.
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
-            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
-
-        Returns:
-            Output velocity fields for each modality as a tuple.
-        """
-        half_x = tuple(x_[: len(x_) // 2] for x_ in x)
-        combined_x = tuple(torch.cat([half_x_, half_x_], dim=0) for half_x_ in half_x)
-        model_out = self.forward(
-            combined_x,
-            t,
-            dataset_idx,
-            spacegroup,
-            mask,
-            seq_idx=seq_idx,
-            sdpa_backends=sdpa_backends,
-        )
-
-        eps = []
-        for modal in model_out:
-            cond_eps, uncond_eps = torch.split(modal, len(modal) // 2, dim=0)
-            half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
-            eps.append(torch.cat([half_eps, half_eps], dim=0))
-
-        return tuple(eps)
-
-
-class MFT(nn.Module):
-    """Multimodal flow model with a Transformer encoder/decoder (i.e., an E-coder or `ecoder`).
+class MET(nn.Module):
+    """Multimodal equilibrium matching model with a Transformer encoder/decoder (i.e., an E-coder
+    or `ecoder`).
 
     NOTE: The `_forward` pass of this model is conceptually similar to that of All-atom Diffusion Transformers (ADiTs)
-    except that there is no self conditioning and the model learns flows for each modality.
+    except that there is no self (and maybe time) conditioning and the model learns equilibrium transport for each modality.
 
     Args:
         encoder: The encoder module.
@@ -580,6 +70,7 @@ class MFT(nn.Module):
         weighted_rigid_align_frac_coords: Whether to apply weighted rigid alignment between target and predicted atom fractional coordinates for loss calculation.
         continuous_x_1_prediction: Whether the model predicts clean data at t=1 for continuous modalities. If so, weighted rigid alignment can be applied.
         use_pytorch_implementation: Whether to use PyTorch's Transformer implementation.
+        remove_t_conditioning: Whether to remove timestep conditioning for each modality.
         add_mask_atom_type: Whether to add a mask token for atom types.
         norm_layer: Normalization layer.
     """
@@ -616,6 +107,7 @@ class MFT(nn.Module):
         weighted_rigid_align_frac_coords: bool = False,
         continuous_x_1_prediction: bool = True,
         use_pytorch_implementation: bool = False,
+        remove_t_conditioning: bool = True,
         add_mask_atom_type: bool = True,
         norm_layer: Type[nn.Module] = LayerNorm,
     ):
@@ -660,6 +152,7 @@ class MFT(nn.Module):
             fused_attn=fused_attn,
             jvp_attn=jvp_attn,
             use_pytorch_implementation=use_pytorch_implementation,
+            remove_t_conditioning=remove_t_conditioning,
             add_mask_atom_type=add_mask_atom_type,
             norm_layer=norm_layer,
         )
@@ -720,7 +213,7 @@ class MFT(nn.Module):
         ) = None,
         **kwargs,
     ) -> Tuple[List[Dict[str, torch.Tensor]], None]:
-        """ODE-driven forward pass of MFT with classifier-free guidance.
+        """Forward pass of MET with classifier-free guidance.
 
         Args:
             dataset_idx: Dataset index for each sample.
@@ -810,7 +303,7 @@ class MFT(nn.Module):
         epsilon: float = 1e-3,
         **kwargs: Any,
     ) -> Dict[str, torch.Tensor]:
-        """Forward pass of MFT with loss calculation.
+        """Forward pass of MET with loss calculation.
 
         Args:
             atom_types: Atom types tensor.
