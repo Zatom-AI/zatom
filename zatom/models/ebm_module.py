@@ -388,7 +388,7 @@ class EBMLitModule(LightningModule):
             if self.hparams.datasets[dataset].proportion > 0.0
         )
 
-        if self.hparams.ecoder.jvp_attn:
+        if self.ecoder.jvp_attn:
             # Find the smallest power of 2 >= max(max_num_nodes, 32)
             min_num_nodes = max(max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()
@@ -987,7 +987,7 @@ class EBMLitModule(LightningModule):
                     "params": alpha_params,
                     "weight_decay": 0.0,  # No weight decay for `alpha`, but maybe for other parameters
                     "lr": self.hparams.optimizer.keywords["lr"]
-                    * self.hparams.ecoder.mcmc_step_size_lr_multiplier,
+                    * self.ecoder.mcmc_step_size_lr_multiplier,
                 }
             )
 
