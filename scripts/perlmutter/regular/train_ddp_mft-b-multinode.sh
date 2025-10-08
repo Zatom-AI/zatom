@@ -1,15 +1,21 @@
 #!/bin/bash -l
 
-# salloc -C "gpu&hbm40g" \
-#        --qos=shared_interactive \
-#        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
-#        --module=gpu,nccl-plugin \
-#        --account=m5008 \
-#        --nodes=1 \
-#        --gpus-per-node=1 \
-#        --ntasks-per-node=1 \
-#        --time=04:00:00 \
-#        --job-name=mft-b
+######################### Batch Headers #########################
+#SBATCH -C gpu&hbm40g                                         # request GPU nodes
+#SBATCH --qos=regular                                         # use specified partition for job
+#SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
+#SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
+#SBATCH --account=m5008                                       # use specified account for billing (e.g., `m5008_g` for AI4Science proposal, `dasrepo` for all else)
+#SBATCH --nodes=4                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
+#SBATCH --gpus-per-node=4                                     # request A100 GPU resource(s)
+#SBATCH --ntasks-per-node=4                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
+#SBATCH --time=00-14:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
+#SBATCH --job-name=mft-b-mn                                   # job name
+#SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
+#SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
+
+# Wait for 5-10 seconds randomly to avoid race condition
+sleep $((RANDOM % 6 + 5))
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -30,15 +36,15 @@ mkdir -p "$HF_HOME"
 D_MODEL=768  # 384, 768, 1024
 NUM_LAYERS=12  # 12, 12, 24
 NHEAD=12  # 6, 12, 16
-# NOTE: For MFT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=720 trainer.accumulate_grad_batches=3
+# NOTE: For MFT-L, append the following options to your `python train.py` command: data.datamodule.batch_size.train=335 trainer.accumulate_grad_batches=3
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
-DEFAULT_RUN_ID="terd6h16"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-10-08_11-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="szimp13s"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-10-08_13-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
-RUN_NAME="MFT-B__${DATASET}_subset_overfitting"       # Name of the model type and dataset configuration
+RUN_NAME="MFT-B__${DATASET}_multinode"    # Name of the model type and dataset configuration
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # First argument or default ID if not provided
 RUN_DATE=${3:-$DEFAULT_RUN_DATE}          # Second argument or default date if not provided
 
@@ -49,7 +55,7 @@ CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at 
 mkdir -p "$CKPT_PATH"
 
 # Inform user of job details
-echo -e "Job details:\n========================================================================\n"
+echo -e "Job details:\n==================\n"
 
 echo "Run name: $RUN_NAME"
 echo "Run ID: $RUN_ID"
@@ -67,7 +73,7 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script $TASK_NAME.py:\n========================================================================\n"
+echo -e "\nExecuting script $TASK_NAME.py:\n==================\n"
 
 # Run script
 bash -c "
@@ -90,10 +96,8 @@ bash -c "
     task_name=$TASK_NAME \
     trainer=ddp \
     trainer.accumulate_grad_batches=1 \
-    trainer.check_val_every_n_epoch=500 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.overfit_batches=1 \
     ckpt_path=$CKPT_PATH
 "
 

@@ -3,9 +3,9 @@ _target_: lightning.pytorch.trainer.Trainer
 default_root_dir: ${paths.output_dir}
 
 min_epochs: 1 # prevents early stopping
-max_epochs: 5000
+max_epochs: 10000
 
-max_time: "10:00:00:00" # max training time in D:H:M:S format
+max_time: "20:00:00:00" # max training time in D:H:M:S format
 
 accelerator: cpu
 devices: 1
