@@ -31,7 +31,7 @@ flex_attn: false
 fused_attn: true
 jvp_attn: false
 weighted_rigid_align_pos: true
-weighted_rigid_align_frac_coords: false
+weighted_rigid_align_frac_coords: true # NOTE: when predicting velocities directly, set to true
 use_pytorch_implementation: false
 remove_t_conditioning: true
 add_mask_atom_type: ${ebm_module.interpolant.corrupt}

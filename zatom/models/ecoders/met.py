@@ -118,7 +118,7 @@ class MET(nn.Module):
         fused_attn: bool = True,
         jvp_attn: bool = False,
         weighted_rigid_align_pos: bool = True,
-        weighted_rigid_align_frac_coords: bool = False,
+        weighted_rigid_align_frac_coords: bool = True,
         use_pytorch_implementation: bool = False,
         remove_t_conditioning: bool = True,
         add_mask_atom_type: bool = True,
@@ -422,10 +422,10 @@ class MET(nn.Module):
                 continue
 
             pred_modal = model_output[idx]
-            target_modal = target_tensors[modal]
+            target_modal = modal_input_dict[modal][2]
 
             # Align target modality to predicted modality if specified
-            target_tensors[modal] = (
+            modal_input_dict[modal][2] = (
                 weighted_rigid_align(pred_modal, target_modal, mask=mask)
                 if self.should_rigid_align[modal]
                 else target_modal
