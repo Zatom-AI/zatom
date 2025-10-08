@@ -108,7 +108,7 @@ class MET(nn.Module):
         angles_radians_reconstruction_loss_weight: float = 10.0,
         grad_decay_a: float = 0.8,
         grad_decay_b: float = 0.8,
-        grad_mul: float = 4.0,
+        grad_mul: float = 1.0,
         early_stopping_grad_norm: float | None = None,
         qkv_bias: bool = False,
         qk_norm: bool = True,
@@ -117,13 +117,13 @@ class MET(nn.Module):
         flex_attn: bool = False,
         fused_attn: bool = True,
         jvp_attn: bool = False,
-        weighted_rigid_align_pos: bool = True,
-        weighted_rigid_align_frac_coords: bool = True,
+        weighted_rigid_align_pos: bool = False,
+        weighted_rigid_align_frac_coords: bool = False,
         use_pytorch_implementation: bool = False,
         remove_t_conditioning: bool = True,
         add_mask_atom_type: bool = True,
         norm_layer: Type[nn.Module] = LayerNorm,
-        grad_decay_method: GRAD_DECAY_METHODS = "truncated_decay",
+        grad_decay_method: GRAD_DECAY_METHODS = "linear_decay",
     ):
         super().__init__()
 

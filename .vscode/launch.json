@@ -92,7 +92,7 @@
                 "data.datamodule.datasets.qmof150.proportion=0.0",
                 "data.datamodule.datasets.omol25.proportion=0.0",
                 "data.datamodule.datasets.geom.proportion=0.0",
-                "date=2025-10-07_20-00-00",
+                "date=2025-10-08_13-30-00",
                 // "ebm_module.augmentations.frac_coords=true",
                 // "ebm_module.augmentations.pos=false",
                 // "ebm_module.compile=false",
