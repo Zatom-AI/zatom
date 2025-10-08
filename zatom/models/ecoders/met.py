@@ -13,13 +13,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from flow_matching.path import AffineProbPath, MixtureDiscreteProbPath
+from flow_matching.path.scheduler import PolynomialConvexScheduler
+from flow_matching.utils import expand_tensor_like
 
 from zatom.models.ecoders.mft import MultimodalModel
 from zatom.models.encoders.custom_transformer import LayerNorm
-from zatom.scheduler.scheduler import (
-    EquilibriumCondOTScheduler,
-    EquilibriumPolynomialConvexScheduler,
-)
+from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
@@ -63,6 +62,11 @@ class MET(nn.Module):
         grad_decay_a: Parameter `a` for gradient decay functions.
         grad_decay_b: Parameter `b` for gradient decay functions.
         grad_mul: Global multiplier for the target gradient magnitude.
+        early_stopping_grad_norm (Optional[float], optional): If specified,
+            sampling will stop early if the model output velocity (or gradient)
+            norm with respect to each modality falls below this value. This
+            effectively enables adaptive compute for sampling. Defaults to
+            ``None``.
         qkv_bias: If True, add a learnable bias to query, key, value.
         qk_norm: If True, apply normalization to query and key.
         scale_attn_norm: If True, apply scaling to attention
@@ -105,6 +109,7 @@ class MET(nn.Module):
         grad_decay_a: float = 0.8,
         grad_decay_b: float = 0.8,
         grad_mul: float = 4.0,
+        early_stopping_grad_norm: float | None = None,
         qkv_bias: bool = False,
         qk_norm: bool = True,
         scale_attn_norm: bool = False,
@@ -171,9 +176,7 @@ class MET(nn.Module):
         # Instantiate paths and losses for Flow
         modalities = {
             "atom_types": {
-                "path": MixtureDiscreteProbPath(
-                    scheduler=EquilibriumPolynomialConvexScheduler(n=1.0)
-                ),
+                "path": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=1.0)),
                 # loss omitted → Flow will use MixturePathGeneralizedKL automatically
                 "weight": self.atom_types_reconstruction_loss_weight,
             },
@@ -202,6 +205,7 @@ class MET(nn.Module):
             model=model,
             modalities=modalities,
             model_sampling_fn="forward_with_cfg",
+            early_stopping_grad_norm=early_stopping_grad_norm,
         )
 
         self.should_rigid_align = {
@@ -212,9 +216,11 @@ class MET(nn.Module):
         self.a, self.b = grad_decay_a, grad_decay_b
         self.c = {
             "linear_decay": lambda t: 1 - t,
-            "truncated_decay": lambda t: 1 if t <= self.a else (1 - t) / (1 - self.a),
-            "piecewise_decay": lambda t: (
-                self.b - ((self.b - 1) / self.a) * t if t <= self.a else (1 - t) / (1 - self.a)
+            "truncated_decay": lambda t: torch.where(
+                t <= self.a, torch.ones_like(t), (1 - t) / (1 - self.a)
+            ),
+            "piecewise_decay": lambda t: torch.where(
+                t <= self.a, self.b - ((self.b - 1) / self.a) * t, (1 - t) / (1 - self.a)
             ),
         }
 
@@ -379,7 +385,11 @@ class MET(nn.Module):
                 x_t,
                 t,
                 (
-                    dx_t * self.c[self.grad_decay_method](t) * self.grad_mul
+                    dx_t
+                    * expand_tensor_like(
+                        input_tensor=self.c[self.grad_decay_method](t) * self.grad_mul,
+                        expand_to=dx_t,
+                    )
                     if dx_t is not None
                     else None
                 ),

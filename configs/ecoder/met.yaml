@@ -22,6 +22,7 @@ angles_radians_reconstruction_loss_weight: 10.0
 grad_decay_a: 0.8
 grad_decay_b: 0.8
 grad_mul: 4.0
+early_stopping_grad_norm: null
 qkv_bias: false
 qk_norm: true
 scale_attn_norm: false

@@ -6,7 +6,7 @@ import torch
 from flow_matching.path import MixtureDiscreteProbPath
 from flow_matching.solver.solver import Solver
 from flow_matching.solver.utils import get_nearest_times
-from flow_matching.utils import ModelWrapper, categorical
+from flow_matching.utils import ModelWrapper, categorical, expand_tensor_like
 from torch import Tensor
 from torch.nn import functional as F
 
@@ -57,6 +57,11 @@ class MultimodalSolver(Solver):
         model_sampling_fn (str, optional): If ``model`` is a class instance
             with multiple methods, this specifies the method to use for
             forward passes during sampling. Defaults to ``"forward"``.
+        early_stopping_grad_norm (Optional[float], optional): If specified,
+            sampling will stop early if the model output velocity (or gradient)
+            norm with respect to each modality falls below this value. This
+            effectively enables adaptive compute for sampling. Defaults to
+            ``None``.
 
     Raises:
         TypeError: If ``model`` is not callable or if ``modality_configs``
@@ -69,6 +74,7 @@ class MultimodalSolver(Solver):
         modality_configs: List[Dict[str, Any]],
         source_distribution_p: Optional[Tensor] = None,
         model_sampling_fn: str = "forward",
+        early_stopping_grad_norm: Optional[float] = None,
     ):
         super().__init__()
         if not callable(model):
@@ -77,6 +83,7 @@ class MultimodalSolver(Solver):
         self.modality_configs = modality_configs
         self.source_distribution_p = source_distribution_p
         self.model_sampling_fn = model_sampling_fn
+        self.early_stopping_grad_norm = early_stopping_grad_norm
 
         self._validate_configs()
 
@@ -214,6 +221,18 @@ class MultimodalSolver(Solver):
 
         with ctx, torch.set_grad_enabled(enable_grad):
             for i in range(n_steps):
+                if self.early_stopping_grad_norm is not None:
+                    early_stopping_state_dict = {
+                        idx: False for idx in range(len(self.modality_configs))
+                    }
+                    mask_jump_state = {
+                        idx: torch.zeros(
+                            size=states[idx].shape, device=states[idx].device, dtype=torch.bool
+                        )
+                        for idx in range(len(self.modality_configs))
+                        if self.modality_configs[idx]["type"] == "discrete"
+                    }
+
                 # NOTE: For now, all modalities share the same time
                 t = [t_discretization[i : i + 1].repeat(batch_size)] * len(states)
                 h = t_discretization[i + 1 : i + 2] - t_discretization[i : i + 1]
@@ -229,9 +248,10 @@ class MultimodalSolver(Solver):
                 for idx, config in enumerate(self.modality_configs):
                     model_output = outputs[idx]
 
-                    t_expanded = t[idx].reshape(
-                        -1, *[1] * (model_output.dim() - 1)
-                    )  # Expand t to match model_output shape
+                    t_expanded = expand_tensor_like(
+                        input_tensor=t[idx],
+                        expand_to=model_output,
+                    )
 
                     if config["type"] == "continuous":
                         # Sample x_{t+h} = x_t + h * v(x_t,t)
@@ -245,6 +265,12 @@ class MultimodalSolver(Solver):
                         )
 
                         states[idx] = states[idx] + h * velocity_output
+
+                        if self.early_stopping_grad_norm is not None:
+                            early_stopping_state_dict[idx] = (
+                                torch.norm(velocity_output, dim=-1).max()
+                                < self.early_stopping_grad_norm
+                            )
 
                     elif config["type"] == "discrete":
                         dtype = config.get("dtype_categorical", torch.float32)
@@ -295,6 +321,19 @@ class MultimodalSolver(Solver):
                             if mask_jump.sum() > 0:
                                 states[idx][mask_jump] = categorical(u[mask_jump].to(dtype=dtype))
 
+                            if self.early_stopping_grad_norm is not None:
+                                # If N - M tokens have jumped, consider as early stopping criterion
+                                mask_jump_state[idx] = (
+                                    mask_jump_state[idx] | mask_jump
+                                    if steps_counter > 0
+                                    else mask_jump
+                                )
+
+                                early_stopping_state_dict[idx] = (
+                                    mask_jump_state[idx].sum(-1)
+                                    > mask_jump_state[idx].shape[1] - self.early_stopping_grad_norm
+                                ).all()
+
                     # Increment time for each modality
                     t[idx] = t[idx] + h
 
@@ -309,6 +348,15 @@ class MultimodalSolver(Solver):
                     ctx.n = (torch.cat(t) * n_steps).mean().long().item()
                     ctx.refresh()
                     ctx.set_description(f"NFE: {steps_counter}")
+
+                if self.early_stopping_grad_norm is not None and all(
+                    early_stopping_state_dict.values()
+                ):
+                    if verbose:
+                        print(
+                            f"Early stopping at step {i+1}/{n_steps} (t={t_discretization[i+1].item():.4f}) due to velocity/gradient norms being below threshold."
+                        )
+                    break
 
         if return_intermediates:
             if step_size is None:

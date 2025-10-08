@@ -66,6 +66,11 @@ class Flow(nn.Module):
         model_sampling_fn (str, optional): If ``model`` is a class instance
             with multiple methods, this specifies the method to use for
             forward passes during sampling. Defaults to ``"forward"``.
+        early_stopping_grad_norm (Optional[float], optional): If specified,
+            sampling will stop early if the model output velocity (or gradient)
+            norm with respect to each modality falls below this value. This
+            effectively enables adaptive compute for sampling. Defaults to
+            ``None``.
     """
 
     def __init__(
@@ -73,6 +78,7 @@ class Flow(nn.Module):
         model: nn.Module,
         modalities: Dict[str, Dict[str, Any]],
         model_sampling_fn: str = "forward",
+        early_stopping_grad_norm: Optional[float] = None,
     ) -> None:
         super().__init__()
         self.model = model
@@ -110,6 +116,7 @@ class Flow(nn.Module):
             model=self.model,
             modality_configs=self.modality_configs,
             model_sampling_fn=model_sampling_fn,
+            early_stopping_grad_norm=early_stopping_grad_norm,
         )
 
     def training_loss(
@@ -157,6 +164,11 @@ class Flow(nn.Module):
         loss_dict = {}
         total_loss = 0.0
 
+        c = (
+            model_extras.pop("jump_coefficient_fn")
+            if "jump_coefficient_fn" in model_extras
+            else None
+        )
         model_output = model_output or self.model(x_t, t, **model_extras)
 
         for i, name in enumerate(self.paths):
@@ -170,7 +182,13 @@ class Flow(nn.Module):
                     f"Expected integer tensor for discrete modality '{name}', "
                     f"got {x_t[i].dtype}",
                 )
-                loss = loss_fn(model_output[i], x_1[i], x_t[i], t[i])
+                loss = loss_fn(
+                    model_output[i],
+                    x_1[i],
+                    x_t[i],
+                    t[i],
+                    jump_coefficient=c(t[i]) if c is not None else None,
+                )
             else:
                 # Continuous case: model returns velocity field.
                 assert x_t[i].is_floating_point(), (

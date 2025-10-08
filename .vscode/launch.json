@@ -174,6 +174,7 @@
                 "ebm_module.sampling.batch_size=10",
                 "ecoder=met",
                 // "ecoder.discrete_denoising_initial_condition=zeros",
+                // "ecoder.early_stopping_grad_norm=10.0",
                 // "ecoder.mcmc_step_size=5",
                 // "ecoder.mcmc_step_size_learnable=true",
                 // "ecoder.mcmc_step_index_learnable=false",
