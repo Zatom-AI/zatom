@@ -9,7 +9,7 @@
 #SBATCH --nodes=4                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
 #SBATCH --gpus-per-node=4                                     # request A100 GPU resource(s)
 #SBATCH --ntasks-per-node=4                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
-#SBATCH --time=00-14:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
+#SBATCH --time=00-22:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
 #SBATCH --job-name=mft-b-mn                                   # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
@@ -41,7 +41,7 @@ NHEAD=12  # 6, 12, 16
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
 DEFAULT_RUN_ID="szimp13s"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-10-08_13-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_DATE="2025-10-08_18-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_NAME="MFT-B__${DATASET}_multinode"    # Name of the model type and dataset configuration
