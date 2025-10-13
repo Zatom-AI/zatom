@@ -160,6 +160,7 @@ class MultimodalModel(nn.Module):
         fused_attn: Whether to use PyTorch's `scaled_dot_product_attention`.
         jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
         use_pytorch_implementation: Whether to use PyTorch's Transformer implementation.
+        remove_t_conditioning: Whether to remove timestep conditioning for each modality.
         add_mask_atom_type: Whether to add a mask token for atom types.
         norm_layer: Normalization layer.
     """
@@ -188,6 +189,7 @@ class MultimodalModel(nn.Module):
         fused_attn: bool = True,
         jvp_attn: bool = False,
         use_pytorch_implementation: bool = False,
+        remove_t_conditioning: bool = False,
         add_mask_atom_type: bool = True,
         norm_layer: Type[nn.Module] = LayerNorm,
     ):
@@ -204,6 +206,7 @@ class MultimodalModel(nn.Module):
         self.flex_attn = flex_attn
         self.jvp_attn = jvp_attn
         self.use_pytorch_implementation = use_pytorch_implementation
+        self.remove_t_conditioning = remove_t_conditioning
 
         self.vocab_size = max_num_elements + int(add_mask_atom_type)
         self.atom_type_embedder = nn.Embedding(self.vocab_size, d_model * 2)
@@ -352,7 +355,7 @@ class MultimodalModel(nn.Module):
 
         modals_t = torch.cat(
             [
-                t.unsqueeze(-1)
+                t.unsqueeze(-1) * 0 if self.remove_t_conditioning else t.unsqueeze(-1)
                 for t in [atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t]
             ],
             dim=-1,

@@ -1,0 +1,39 @@
+_target_: zatom.models.ecoders.met.MET
+
+encoder: ${encoder}
+
+d_x: ${encoder.d_model}
+d_model: 768 # 384, 768, 1024
+num_layers: 12 # 12, 12, 24
+nhead: 12 # 6, 12, 16
+num_datasets: 2
+max_num_elements: 100
+context_length: 2048
+rope_base: 10000
+mlp_ratio: 4.0
+proj_drop: 0.1
+attn_drop: 0.0
+class_dropout_prob: 0.1
+atom_types_reconstruction_loss_weight: 1.0
+pos_reconstruction_loss_weight: 10.0
+frac_coords_reconstruction_loss_weight: 10.0
+lengths_scaled_reconstruction_loss_weight: 1.0
+angles_radians_reconstruction_loss_weight: 10.0
+grad_decay_a: 0.8
+grad_decay_b: 0.8
+grad_mul: 1.0
+early_stopping_grad_norm: null
+qkv_bias: false
+qk_norm: true
+scale_attn_norm: false
+proj_bias: false
+flex_attn: false
+fused_attn: true
+jvp_attn: false
+weighted_rigid_align_pos: true
+weighted_rigid_align_frac_coords: false
+use_pytorch_implementation: false
+remove_t_conditioning: true
+add_mask_atom_type: ${ebm_module.interpolant.corrupt}
+norm_layer: ${resolve_variable:zatom.models.encoders.custom_transformer.LayerNorm}
+grad_decay_method: linear_decay # NOTE: must be one of (`linear_decay`, `truncated_decay`, `piecewise_decay`)

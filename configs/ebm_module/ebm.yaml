@@ -17,10 +17,10 @@ augmentations:
   pos: true
 
 sampling:
-  cfg_scale: 2.0 # classifier-free guidance scale (only used if `ecoder=mft`)
+  cfg_scale: 2.0 # classifier-free guidance scale (only used if `ecoder=mft` or `ecoder=met`)
   num_samples: 1000
   batch_size: 100
-  steps: 100 # number of ODE steps (only used if `ecoder=mft`)
+  steps: 100 # number of ODE steps (only used if `ecoder=mft` or `ecoder=met`)
   atom_types_temperature: 1.0 # NOTE: if `atom_types_top_p` is `null`, this will be ignored
   atom_types_top_p: null # NOTE: if `null`, argmax-decoding will instead be applied
   data_dir: ${paths.data_dir}
