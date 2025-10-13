@@ -810,24 +810,9 @@ class FMLitModule(LightningModule):
             return_raw_discrete_logits=True,
         )
 
-        # Sample atom types
-        atom_types_logits = denoised_modals_list[-1]["atom_types"][token_mask.reshape(-1)]
-
-        if self.hparams.sampling.atom_types_top_p is not None:
-            atom_types_probs = torch.softmax(
-                atom_types_logits / self.hparams.sampling.atom_types_temperature, dim=-1
-            )
-            atom_types = sample_top_p(
-                atom_types_probs, self.hparams.sampling.atom_types_top_p
-            ).squeeze(-1)
-        else:
-            atom_types = (
-                atom_types_logits.argmax(-1) if atom_types_logits.ndim == 2 else atom_types_logits
-            )
-
         # Collect final sample modalities and remove padding (to convert to PyG format)
         out = {
-            "atom_types": atom_types,
+            "atom_types": denoised_modals_list[-1]["atom_types"][token_mask.reshape(-1)],
             "pos": denoised_modals_list[-1]["pos"][token_mask],
             "frac_coords": denoised_modals_list[-1]["frac_coords"][token_mask],
             "lengths_scaled": denoised_modals_list[-1]["lengths_scaled"].squeeze(-2),

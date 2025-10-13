@@ -203,7 +203,7 @@
                 "trainer.check_val_every_n_epoch=null",
                 // "+trainer.detect_anomaly=true",
                 // "trainer.gradient_clip_val=1.0",
-                "trainer.val_check_interval=1000",
+                "trainer.val_check_interval=10",
                 "trainer.max_epochs=50000",
                 "trainer.overfit_batches=1"
             ]
