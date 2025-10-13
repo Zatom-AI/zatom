@@ -10,6 +10,8 @@ from flow_matching.utils import ModelWrapper, categorical
 from torch import Tensor
 from torch.nn import functional as F
 
+from zatom.utils.training_utils import weighted_rigid_align
+
 try:
     from tqdm import tqdm
 
@@ -244,7 +246,14 @@ class MultimodalSolver(Solver):
                             else model_output
                         )
 
-                        states[idx] = states[idx] + h * velocity_output
+                        new_state = states[idx] + h * velocity_output
+                        new_state = (
+                            # Maybe perform Euler-Maruyama step (i.e., with rigid alignment)
+                            weighted_rigid_align(states[idx], new_state)
+                            if config.get("should_rigid_align", False)
+                            else new_state
+                        )
+                        states[idx] = new_state
 
                     elif config["type"] == "discrete":
                         dtype = config.get("dtype_categorical", torch.float32)

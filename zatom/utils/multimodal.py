@@ -103,6 +103,7 @@ class Flow(nn.Module):
                 ),
                 "path": path,
                 "x_1_prediction": modalities[name].get("x_1_prediction", False),
+                "should_rigid_align": modalities[name].get("should_rigid_align", None),
             }
             for name, path in self.paths.items()
         ]
