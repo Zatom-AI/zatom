@@ -39,14 +39,14 @@
             ]
         },
         {
-            "name": "[EVAL] eval_ebm.py",
+            "name": "[EVAL] eval_fm.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zatom/eval_ebm.py",
+            "program": "${workspaceFolder}/zatom/eval_fm.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "ckpt_path=logs/train_fm/runs/MFT-B__joint_2025-10-01_15-00-00/checkpoints/ebm-epoch@49-step@850-val_qm9_valid_rate@0.0995-val_mp20_valid_rate@0.0465.ckpt",
+                "ckpt_path=logs/train_fm/runs/MFT-B__joint_2025-10-01_15-00-00/checkpoints/fm-epoch@49-step@850-val_qm9_valid_rate@0.0995-val_mp20_valid_rate@0.0465.ckpt",
                 "data.datamodule.num_workers.train=1",
                 "data.datamodule.num_workers.val=1",
                 "data.datamodule.num_workers.test=1",
@@ -79,7 +79,7 @@
             "args": [
                 // "callbacks.last_model_checkpoint.every_n_train_steps=50",
                 // "callbacks.model_checkpoint.every_n_train_steps=50",
-                // "ckpt_path=logs/overfit_ebm/runs/MFT-B__net@768_joint_overfitting_molecule-and-material_vel-parametrized_unified-time_batch-ot_2025-10-11_15-30-00/checkpoints/",
+                // "ckpt_path=logs/overfit_fm/runs/MFT-B__net@768_joint_overfitting_molecule-and-material_vel-parametrized_unified-time_batch-ot_2025-10-11_15-30-00/checkpoints/",
                 // "resume_from_last_step_dir=false",
                 "data.datamodule.batch_size.train=2",
                 "data.datamodule.batch_size.val=2",
@@ -125,7 +125,7 @@
                 // "net.unified_modal_time=true",
                 "seed=42",
                 // "strategy=optimized_ddp",
-                "task_name=overfit_ebm",
+                "task_name=overfit_fm",
                 // "trainer=ddp",
                 "trainer=mps",
                 "trainer.accumulate_grad_batches=4",
@@ -152,7 +152,7 @@
             "args": [
                 // "callbacks.last_model_checkpoint.every_n_train_steps=50",
                 // "callbacks.model_checkpoint.every_n_train_steps=50",
-                // "ckpt_path=logs/overfit_ebm/runs/MFT-B__net@768_joint_overfitting_molecule-and-material_2025-10-08_13-30-00/checkpoints/",
+                // "ckpt_path=logs/overfit_fm/runs/MFT-B__net@768_joint_overfitting_molecule-and-material_2025-10-08_13-30-00/checkpoints/",
                 // "resume_from_last_step_dir=false",
                 "data.datamodule.batch_size.train=2",
                 "data.datamodule.batch_size.val=2",
@@ -196,7 +196,7 @@
                 // "net.unified_modal_time=true",
                 "seed=42",
                 // "strategy=optimized_ddp",
-                "task_name=debug_ebm",
+                "task_name=debug_fm",
                 // "trainer=ddp",
                 "trainer=mps",
                 "trainer.accumulate_grad_batches=4",
