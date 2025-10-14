@@ -174,6 +174,10 @@ def main(cfg: DictConfig) -> None:
     # Set float32 matmul precision
     if cfg.float32_matmul_precision is not None:
         torch.set_float32_matmul_precision(cfg.float32_matmul_precision)
+    if cfg.cuda_matmul_allow_tf32:
+        torch.backends.cuda.matmul.allow_tf32 = True
+    if cfg.cudnn_allow_tf32:
+        torch.backends.cudnn.allow_tf32 = True
 
     # Run evaluation
     set_omegaconf_flag_recursive(
