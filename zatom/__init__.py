@@ -57,6 +57,16 @@ def resolve_omegaconf_variable(variable_path: str) -> Any:
     return attribute
 
 
+def resolve_batch_size(base_size: int, scale_factor: float) -> int:
+    """Resolve batch size based on base size and scale factor."""
+    return max(1, round(base_size * scale_factor))
+
+
+def resolve_grad_accum_steps(base_steps: int, scale_factor: float) -> int:
+    """Resolve gradient accumulation steps based on base steps and scale factor."""
+    return max(1, round(base_steps / scale_factor))
+
+
 def register_custom_omegaconf_resolvers():
     """Register custom OmegaConf resolvers."""
     OmegaConf.register_new_resolver("generate_index", lambda length: generate_index(length))
@@ -73,5 +83,14 @@ def register_custom_omegaconf_resolvers():
             num_cycles=num_cycles,
             min_lr_factor=min_lr_factor,
         ),
+    )
+
+    OmegaConf.register_new_resolver(
+        "resolve_batch_size",
+        lambda base_size, scale_factor: resolve_batch_size(base_size, scale_factor),
+    )
+    OmegaConf.register_new_resolver(
+        "resolve_grad_accum_steps",
+        lambda base_steps, scale_factor: resolve_grad_accum_steps(base_steps, scale_factor),
     )
     OmegaConf.register_new_resolver("multiply", lambda x, y: x * y)

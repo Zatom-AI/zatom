@@ -8,6 +8,7 @@ num_layers: 12 # 12, 12, 24
 nhead: 12 # 6, 12, 16
 num_datasets: 2
 max_num_elements: 100
+batch_size_scale_factor: 1 # 2, 1, 0.375
 context_length: 2048
 rope_base: 10000
 mlp_ratio: 4.0

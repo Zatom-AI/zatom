@@ -30,9 +30,10 @@ datamodule:
       proportion: 0.0
 
   batch_size:
-    train: 900
-    val: 900
-    test: 900
+    base_accumulate_grad_batches: 1
+    train: ${resolve_batch_size:900,${model.architecture.batch_size_scale_factor}}
+    val: ${resolve_batch_size:900,${model.architecture.batch_size_scale_factor}}
+    test: ${resolve_batch_size:900,${model.architecture.batch_size_scale_factor}}
 
   num_workers:
     train: 16

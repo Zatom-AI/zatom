@@ -758,6 +758,7 @@ class MFT(nn.Module):
         num_datasets: Number of datasets for context conditioning.
         num_spacegroups: Number of spacegroups for context conditioning.
         max_num_elements: Maximum number of elements in the dataset.
+        batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 200M) model variant.
         context_length: Context length for the attention mechanism.
         rope_base: Base frequency for rotary positional encoding.
         mlp_ratio: Ratio of hidden to input dimension in MLP.
@@ -808,6 +809,7 @@ class MFT(nn.Module):
         num_datasets: int = 2,  # Context conditioning input
         num_spacegroups: int = 230,  # Context conditioning input
         max_num_elements: int = 100,
+        batch_size_scale_factor: int = 1,
         context_length: int | None = 2048,
         rope_base: int | None = 10_000,
         mlp_ratio: float = 4.0,
@@ -861,6 +863,7 @@ class MFT(nn.Module):
                 grad_decay_method != "none"
             ), "EqM mode requires a gradient decay method (i.e., grad_decay_method != 'none')."
 
+        self.batch_size_scale_factor = batch_size_scale_factor
         self.class_dropout_prob = class_dropout_prob
         self.atom_types_loss_weight = atom_types_loss_weight
         self.pos_loss_weight = pos_loss_weight

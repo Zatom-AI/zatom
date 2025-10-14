@@ -81,7 +81,6 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
-    trainer.accumulate_grad_batches=1 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
     ckpt_path=$CKPT_PATH

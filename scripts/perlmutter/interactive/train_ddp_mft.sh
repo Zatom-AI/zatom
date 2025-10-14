@@ -67,8 +67,8 @@ bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
-    callbacks.last_model_checkpoint.every_n_train_steps=1500 \
     data=$DATASET \
+    data.datamodule.batch_size.base_accumulate_grad_batches=2 \
     date=$RUN_DATE \
     model/architecture=mft_200M \
     logger=wandb \
@@ -76,7 +76,6 @@ bash -c "
     strategy=optimized_ddp \
     task_name=$TASK_NAME \
     trainer=ddp \
-    trainer.accumulate_grad_batches=2 \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
     ckpt_path=$CKPT_PATH
