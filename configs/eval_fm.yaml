@@ -2,9 +2,9 @@
 
 defaults:
   - data: joint
+  - model: default
   - model/architecture: default
   - model/architecture/encoder: default
-  - model: default
   - logger: null # set logger here or use command line (e.g. `python train_fm.py logger=wandb`)
   - strategy: default
   - trainer: default

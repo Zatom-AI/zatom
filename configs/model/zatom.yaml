@@ -47,7 +47,8 @@ scheduler:
   _partial_: true
   lr_lambda: ${resolve_lr_scheduler:constant_schedule_with_warmup,10}
 
-scheduler_frequency: ${trainer.check_val_every_n_epoch}
+scheduler_frequency: 1
+# scheduler_frequency: ${trainer.check_val_every_n_epoch}
 
 # compile model for faster training with pytorch 2.0
 compile: true
