@@ -10,7 +10,7 @@ import torch
 from torch import nn
 from torch.nn.attention.flex_attention import create_block_mask
 
-from zatom.models.encoders.custom_transformer import (
+from zatom.models.architectures.encoders.custom_transformer import (
     Block,
     LayerNorm,
     Mlp,

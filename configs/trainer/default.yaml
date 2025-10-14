@@ -11,7 +11,7 @@ accelerator: cpu
 devices: 1
 
 # mixed precision for extra speed-up
-# precision: bf16-mixed
+precision: bf16-mixed
 
 # check validation set every N training epochs
 val_check_interval: 1.0

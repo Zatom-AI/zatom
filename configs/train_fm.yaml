@@ -3,22 +3,26 @@
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
-  - _self_
-  - data: joint # NOTE: must be one of (`joint`,)
-  - encoder: transformer # NOTE: must be one of (`transformer`,)
-  - net: mft # NOTE: must be one of (`mft`, `met`)
-  - fm_module: fm
-  - callbacks: fm_default # NOTE: must be one of `fm_{default,}`
-  - logger: null # set logger here or use command line (e.g. `python train_fm.py logger=tensorboard`)
+  - data: joint
+  - model/architecture: default
+  - model/architecture/encoder: default
+  - model: default
+  - callbacks: default
+  - logger: null # set logger here or use command line (e.g. `python train_fm.py logger=wandb`)
   - strategy: default
   - trainer: default
   - paths: default
   - extras: default
   - hydra: default
   - environment: default
+  - _self_
+
+  # experiment configs allow for version control of specific hyperparameters
+  # e.g. best hyperparameters for given model and datamodule
+  - experiment: null
 
 # run name and date, e.g., for logging
-name: ""
+name: "train_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}"
 date: ${now:%Y-%m-%d}_${now:%H-%M-%S}
 
 # task name, determines output directory path

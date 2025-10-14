@@ -55,8 +55,7 @@ def log_hyperparameters(object_dict: Dict[str, Any]) -> None:
 
     # Save model hyperparameters
     if "fm" in hparams["task_name"]:
-        hparams["fm_module"] = cfg["fm_module"]
-        hparams["net"] = cfg["net"]
+        hparams["model"] = cfg["model"]
     else:
         raise ValueError(f"Task name {hparams['task_name']} not recognized!")
 

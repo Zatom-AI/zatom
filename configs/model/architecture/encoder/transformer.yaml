@@ -1,7 +1,7 @@
-_target_: zatom.models.encoders.transformer.TransformerEncoder
+_target_: zatom.models.architectures.encoders.transformer.TransformerEncoder
 
-d_model: ${fm_module.net.d_model}
-nhead: ${fm_module.net.nhead}
+d_model: ${model.architecture.d_model}
+nhead: ${model.architecture.nhead}
 dim_feedforward: 2048 # Argument for PyTorch implementation only
 num_layers: 8
 context_length: 2048
@@ -24,5 +24,5 @@ jvp_attn: false
 checkpoint_activations: false
 use_pytorch_implementation: false
 act_layer: ${resolve_variable:torch.nn.GELU}
-norm_layer: ${resolve_variable:zatom.models.encoders.custom_transformer.LayerNorm}
-mlp_layer: ${resolve_variable:zatom.models.encoders.custom_transformer.Mlp}
+norm_layer: ${resolve_variable:zatom.models.architectures.encoders.custom_transformer.LayerNorm}
+mlp_layer: ${resolve_variable:zatom.models.architectures.encoders.custom_transformer.Mlp}

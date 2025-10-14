@@ -20,14 +20,14 @@ from flow_matching.utils import expand_tensor_like
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.attention.flex_attention import create_block_mask
 
-from zatom.models.encoders.custom_transformer import (
+from zatom.models.architectures.encoders.custom_transformer import (
     SDPA_BACKENDS,
     Attention,
     LayerNorm,
     Mlp,
     build_attention_mask,
 )
-from zatom.models.encoders.transformer import get_index_embedding
+from zatom.models.architectures.encoders.transformer import get_index_embedding
 from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow

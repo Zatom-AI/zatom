@@ -1,4 +1,4 @@
-name: train_sweep_joint_2025-08-31_14-00-00
+name: train_sweep_joint-qm9-mp20_2025-10-14_14-00-00
 project: zatom
 program: zatom/train_fm.py
 
@@ -16,13 +16,19 @@ parameters:
     values: [joint]
 
   date:
-    value: "2025-08-31_14-00-00"
+    value: "2025-10-14_14-00-00"
+
+  experiment:
+    value: train
 
   logger:
     value: wandb
 
+  model/architecture:
+    values: [mft_50M, mft_200M, mft_570M, met_50M, met_200M, met_570M]
+
   name:
-    value: "train_${hydra:runtime.choices.data}"
+    value: "train_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}"
 
   seed:
     value: 42

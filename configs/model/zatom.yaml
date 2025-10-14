@@ -1,20 +1,24 @@
-_target_: zatom.models.fm_module.FMLitModule
+_target_: zatom.models.zatom.Zatom
 
-net: ${net}
+architecture:
+  max_num_elements: 100
+  add_mask_atom_type: true
 
 interpolant:
   _target_: zatom.models.interpolants.flow_matching.FlowMatchingInterpolant
   disc_feats: [atom_types]
   cont_feats: [pos, frac_coords, lengths_scaled, angles_radians]
-  mask_token_index: ${net.max_num_elements}
+  mask_token_index: ${model.architecture.max_num_elements}
   min_t: 0
   max_t: 0
-  corrupt: True
+  corrupt: ${model.architecture.add_mask_atom_type}
   disc_interpolant_type: masking # NOTE: must be one of (`uniform`, `masking`)
 
 augmentations:
-  frac_coords: false
+  frac_coords: true
   pos: true
+  scale: 16.0
+  multiplicity: 16 # number of copies per GPU
 
 sampling:
   cfg_scale: 2.0 # classifier-free guidance scale
@@ -35,13 +39,13 @@ datasets: ${data.datamodule.datasets}
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
-  lr: 0.0001
+  lr: 1e-4
   weight_decay: 0.0
 
 scheduler:
-  # _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
-  # _partial_: true
-  # lr_lambda: ${resolve_lr_scheduler:cosine_schedule_with_warmup,10000,1000000,0.5,1e-5}
+  _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
+  _partial_: true
+  lr_lambda: ${resolve_lr_scheduler:constant_schedule_with_warmup,10}
 
 scheduler_frequency: ${trainer.check_val_every_n_epoch}
 

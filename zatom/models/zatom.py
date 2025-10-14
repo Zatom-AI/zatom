@@ -19,7 +19,6 @@ from zatom.eval.crystal_generation import CrystalGenerationEvaluator
 from zatom.eval.mof_generation import MOFGenerationEvaluator
 from zatom.eval.molecule_generation import MoleculeGenerationEvaluator
 from zatom.utils import pylogger
-from zatom.utils.sampling_utils import sample_top_p
 from zatom.utils.training_utils import random_rotation_matrix
 from zatom.utils.typing_utils import typecheck
 
@@ -51,7 +50,7 @@ NON_PERIODIC_DATASETS = {
 }
 
 
-class FMLitModule(LightningModule):
+class Zatom(LightningModule):
     """LightningModule for generative flow matching of 3D atomic systems.
 
     A `LightningModule` implements 6 key methods:
@@ -83,7 +82,7 @@ class FMLitModule(LightningModule):
 
     def __init__(
         self,
-        net: torch.nn.Module,
+        architecture: torch.nn.Module,
         interpolant: DictConfig,
         augmentations: DictConfig,
         sampling: DictConfig,
@@ -101,8 +100,8 @@ class FMLitModule(LightningModule):
         # Also ensures init params will be stored in ckpt.
         self.save_hyperparameters(logger=False)
 
-        # Network architecture
-        self.net = net
+        # Model architecture
+        self.model = architecture
 
         # Interpolant for flow matching-based data corruption
         self.interpolant = interpolant
@@ -334,7 +333,7 @@ class FMLitModule(LightningModule):
             if self.hparams.datasets[dataset].proportion > 0.0
         )
 
-        if self.net.jvp_attn:
+        if self.model.jvp_attn:
             # Find the smallest power of 2 >= max(max_num_nodes, 32)
             min_num_nodes = max(max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()
@@ -344,7 +343,7 @@ class FMLitModule(LightningModule):
         noisy_dense_batch = self.interpolant.corrupt_batch(batch)
 
         # Prepare conditioning inputs to forward pass
-        use_cfg = self.net.class_dropout_prob > 0
+        use_cfg = self.model.class_dropout_prob > 0
         dataset_idx = batch.dataset_idx + int(
             use_cfg
         )  # 0 -> null class (for classifier-free guidance or CFG)
@@ -377,14 +376,14 @@ class FMLitModule(LightningModule):
         target_tensors = {
             "atom_types": dense_atom_types,
             "pos": dense_pos
-            / 10.0,  # Supervise model predictions using nanometers (not Angstroms)
+            / self.hparams.augmentations.scale,  # Supervise model predictions in units other than Angstroms
             "frac_coords": dense_frac_coords,
             "lengths_scaled": dense_lengths_scaled,
             "angles_radians": dense_angles_radians,
         }
 
         # Run forward pass with loss calculation
-        loss_dict = self.net.forward_with_loss_wrapper(
+        loss_dict = self.model.forward_with_loss_wrapper(
             atom_types=noisy_dense_batch["atom_types"],
             pos=noisy_dense_batch["pos"],
             frac_coords=noisy_dense_batch["frac_coords"],
@@ -433,6 +432,19 @@ class FMLitModule(LightningModule):
             sample_is_periodic = torch.isin(batch.dataset_idx, self.periodic_datasets)
             batch.node_is_periodic = sample_is_periodic[batch.batch]
 
+            if self.hparams.augmentations.multiplicity > 1:
+                # Augment batch by random rotations and translations multiple times
+                orig_batch_size = batch.num_graphs
+                batch = Batch.from_data_list(
+                    [copy.deepcopy(batch) for _ in range(self.hparams.augmentations.multiplicity)]
+                )
+                batch._num_graphs = self.hparams.augmentations.multiplicity * orig_batch_size
+                # batch.id = [i for id_list in batch.id for i in id_list]
+                # batch.ptr = torch.cat([
+                #     torch.tensor([0], device=self.device, dtype=torch.long),
+                #     torch.cumsum(torch.bincount(batch.batch), dim=0)
+                # ])
+
             if self.hparams.augmentations.frac_coords is True:
                 if batch.node_is_periodic.any():
                     # Sample random translation vector from batch length distribution / 2
@@ -463,9 +475,12 @@ class FMLitModule(LightningModule):
                 cell_aug = batch.cell @ rot_mat.T
                 batch.cell = cell_aug
                 # # NOTE: Fractional coordinates are rotation-invariant
+                # cell_per_node_inv = torch.linalg.inv(
+                #     batch.cell[batch.batch][batch.node_is_periodic]
+                # )
                 # assert torch.allclose(
-                #     batch.frac_coords,
-                #     torch.einsum("bi,bij->bj", pos_aug, torch.linalg.inv(cell_aug)[batch.batch]) % 1.0,
+                #     batch.frac_coords[batch.node_is_periodic],
+                #     torch.einsum("bi,bij->bj", pos_aug[batch.node_is_periodic], cell_per_node_inv) % 1.0,
                 #     rtol=1e-3,
                 #     atol=1e-3,
                 # )
@@ -645,7 +660,10 @@ class FMLitModule(LightningModule):
                     _atom_types[_atom_types == self.interpolant.mask_token_index] = (
                         1  # Mask atom type -> 1 (H) to prevent crash
                     )
-                    _pos = out["pos"].narrow(0, start_idx, num_atom) * 10.0  # nm to A
+                    _pos = (
+                        out["pos"].narrow(0, start_idx, num_atom)
+                        * self.hparams.augmentations.scale
+                    )  # alternative units to Angstroms
                     _frac_coords = out["frac_coords"].narrow(0, start_idx, num_atom)
                     _lengths = out["lengths_scaled"][idx_in_batch] * float(num_atom) ** (
                         1 / 3
@@ -733,7 +751,7 @@ class FMLitModule(LightningModule):
 
         # Create dataset_idx tensor
         # NOTE 0 -> null class within EBT, while 0 -> MP20 elsewhere, so increment by 1 (for classifier-free guidance or CFG)
-        use_cfg = self.net.class_dropout_prob > 0
+        use_cfg = self.model.class_dropout_prob > 0
         dataset_idx = torch.full(
             (batch_size,), dataset_idx + int(use_cfg), dtype=torch.int64, device=self.device
         )
@@ -793,8 +811,8 @@ class FMLitModule(LightningModule):
             ),
         )
 
-        # Use forward pass of network to predict sample modalities
-        denoised_modals_list, _ = self.net.sample(
+        # Use forward pass of model to predict sample modalities
+        denoised_modals_list, _ = self.model.sample(
             atom_types=noisy_dense_batch["atom_types"],
             pos=noisy_dense_batch["pos"],
             frac_coords=noisy_dense_batch["frac_coords"],
@@ -843,27 +861,27 @@ class FMLitModule(LightningModule):
         # In a memory-efficient way, exclude certain (unmanaged) modules from being managed by FSDP
         if isinstance(self.trainer.strategy, FSDPStrategy) and hasattr(self, "ignored_modules"):
             ignored_modules = []
-            net_list_grouped_modules = [
+            model_list_grouped_modules = [
                 lst
-                for n in dir(self.net)
-                if isinstance(getattr(self.net, n), list)
-                and all(isinstance(x, torch.nn.Module) for x in getattr(self.net, n))
-                for lst in getattr(self.net, n)
+                for n in dir(self.model)
+                if isinstance(getattr(self.model, n), list)
+                and all(isinstance(x, torch.nn.Module) for x in getattr(self.model, n))
+                for lst in getattr(self.model, n)
             ]
-            net_modules = list(self.net.modules()) + net_list_grouped_modules
-            for module in net_modules:
+            model_modules = list(self.model.modules()) + model_list_grouped_modules
+            for module in model_modules:
                 if module.__class__ in self.ignored_modules:
                     ignored_modules.append(module)
 
             self.trainer.strategy.kwargs["ignored_modules"] = ignored_modules
 
         if self.hparams.compile:
-            # Prefer `self.net.compile` over `torch.compile(self.net)` to avoid `_orig_` prefix checkpoint issues.
+            # Prefer `self.model.compile` over `torch.compile(self.model)` to avoid `_orig_` prefix checkpoint issues.
             # Reference: https://github.com/Lightning-AI/pytorch-lightning/issues/20233#issuecomment-2868169706.
             log.info(
                 f"Rank {self.trainer.global_rank}: Compiling model with `torch.compile(fullgraph=True)`."
             )
-            self.net.compile(fullgraph=True)
+            self.model.compile(fullgraph=True)
 
         # Using WandB, log model gradients every N steps
         if (
@@ -875,7 +893,7 @@ class FMLitModule(LightningModule):
                 f"Rank {self.trainer.global_rank}: Logging model gradients to WandB every {self.hparams.log_grads_every_n_steps} steps."
             )
             self.logger.watch(
-                self.net,
+                self.model,
                 log="gradients",
                 log_freq=self.hparams.log_grads_every_n_steps,
                 log_graph=False,

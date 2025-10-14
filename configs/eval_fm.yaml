@@ -1,21 +1,25 @@
 # @package _global_
 
 defaults:
-  - _self_
-  - data: joint # NOTE: must be one of (`joint`,)
-  - encoder: transformer # NOTE: must be one of (`transformer`,)
-  - net: mft # NOTE: must be one of (`mft`, `met`)
-  - fm_module: fm
-  - logger: null
+  - data: joint
+  - model/architecture: default
+  - model/architecture/encoder: default
+  - model: default
+  - logger: null # set logger here or use command line (e.g. `python train_fm.py logger=wandb`)
   - strategy: default
   - trainer: default
   - paths: default
   - extras: default
   - hydra: default
   - environment: default
+  - _self_
+
+  # experiment configs allow for version control of specific hyperparameters
+  # e.g. best hyperparameters for given model and datamodule
+  - experiment: null
 
 # run name and date, e.g., for logging
-name: ""
+name: "eval_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}"
 date: ${now:%Y-%m-%d}_${now:%H-%M-%S}
 
 # task name, determines output directory path

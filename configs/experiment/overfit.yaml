@@ -1,0 +1,58 @@
+# @package _global_
+
+# Options for training:
+# - /model/architecture:
+#         [mft_50M, mft_200M, mft_570M,
+#          met_50M, met_200M, met_570M]
+# - /logger: [null, wandb]
+# - /trainer: [default, mps, ddp, fsdp]
+
+defaults:
+  - override /data: joint
+  - override /model: zatom
+  - override /model/architecture: mft_200M
+  - override /model/architecture/encoder: transformer
+  - override /callbacks: default
+  - override /logger: wandb
+  - override /trainer: ddp
+
+# All parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+name: "overfit_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}_molecule-and-material"
+seed: 42
+task_name: overfit_fm
+
+trainer:
+  check_val_every_n_epoch: 1000
+  max_epochs: 10000
+  overfit_batches: 1
+
+data:
+  datamodule:
+    batch_size:
+      train: 2
+      val: 2
+      test: 2
+    num_workers:
+      train: 0
+      val: 0
+      test: 0
+    datasets:
+      mp20:
+        proportion: 4e-5
+      qm9:
+        proportion: 1e-5
+      qmof150:
+        proportion: 0.0
+      omol25:
+        proportion: 0.0
+      geom:
+        proportion: 0.0
+
+model:
+  log_grads_every_n_steps: 100
+
+  sampling:
+    num_samples: 10
+    batch_size: 10

@@ -76,11 +76,11 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     # Avoid instantiating the `datasets` config as an object
     with open_dict(cfg):
-        for dataset in cfg.fm_module.datasets:
-            cfg.fm_module.datasets[dataset].pop("_target_")
+        for dataset in cfg.model.datasets:
+            cfg.model.datasets[dataset].pop("_target_")
 
-    log.info(f"Instantiating model <{cfg.fm_module._target_}>")
-    model: LightningModule = hydra.utils.instantiate(cfg.fm_module)
+    log.info(f"Instantiating model <{cfg.model._target_}>")
+    model: LightningModule = hydra.utils.instantiate(cfg.model)
 
     log.info("Instantiating loggers...")
     logger: List[Logger] = instantiate_loggers(cfg.get("logger"))
