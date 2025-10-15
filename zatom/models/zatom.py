@@ -19,7 +19,7 @@ from zatom.eval.crystal_generation import CrystalGenerationEvaluator
 from zatom.eval.mof_generation import MOFGenerationEvaluator
 from zatom.eval.molecule_generation import MoleculeGenerationEvaluator
 from zatom.utils import pylogger
-from zatom.utils.training_utils import random_rotation_matrix
+from zatom.utils.training_utils import random_rotation_matrix, scatter_mean_torch
 from zatom.utils.typing_utils import typecheck
 
 log = pylogger.RankedLogger(__name__)
@@ -431,6 +431,11 @@ class Zatom(LightningModule):
             # Save masks used to apply augmentations
             sample_is_periodic = torch.isin(batch.dataset_idx, self.periodic_datasets)
             batch.node_is_periodic = sample_is_periodic[batch.batch]
+
+            # Center non-periodic molecules at origin before any augmentations
+            batch.pos[~batch.node_is_periodic] -= scatter_mean_torch(
+                src=batch.pos, index=batch.batch, dim=0
+            )[batch.batch][~batch.node_is_periodic]
 
             if self.hparams.augmentations.multiplicity > 1:
                 # Augment batch by random rotations and translations multiple times
