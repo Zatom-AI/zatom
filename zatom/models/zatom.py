@@ -480,9 +480,9 @@ class Zatom(LightningModule):
                         )
                         / 2
                     )
-                    # Apply same random translation to all periodic Cartesian coordinates
-                    pos_aug = batch.pos[batch.node_is_periodic] + random_translation
-                    batch.pos[batch.node_is_periodic] = pos_aug
+                    # Apply same random translation to all Cartesian coordinates
+                    pos_aug = batch.pos + random_translation
+                    batch.pos = pos_aug
                     # Compute new fractional coordinates for periodic samples
                     cell_per_node_inv = torch.linalg.inv(
                         batch.cell[batch.batch][batch.node_is_periodic]
