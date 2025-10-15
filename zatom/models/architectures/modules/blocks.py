@@ -1,3 +1,9 @@
+"""Transformer blocks and related modules.
+
+Adapted from:
+    - https://github.com/apple/ml-simplefold
+"""
+
 import collections.abc
 from functools import partial
 from itertools import repeat

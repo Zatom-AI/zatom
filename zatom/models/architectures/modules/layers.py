@@ -1,3 +1,9 @@
+"""Attention layers.
+
+Adapted from:
+    - https://github.com/apple/ml-simplefold
+"""
+
 import math
 
 import torch

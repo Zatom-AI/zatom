@@ -1,12 +1,11 @@
 """Multimodal flow transformer (MFT).
 
 Adapted from:
-    - https://github.com/alexiglad/EBT
+    - https://github.com/apple/ml-simplefold
     - https://github.com/facebookresearch/flow_matching
     - https://github.com/facebookresearch/all-atom-diffusion-transformer
 """
 
-import math
 from typing import Any, Dict, List, Literal, Tuple, Type
 
 import torch
@@ -28,6 +27,12 @@ from zatom.models.architectures.encoders.custom_transformer import (
     build_attention_mask,
 )
 from zatom.models.architectures.encoders.transformer import get_index_embedding
+from zatom.models.architectures.modules.layers import (
+    ConditionEmbedder,
+    FinalLayer,
+    TimestepEmbedder,
+    modulate,
+)
 from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
@@ -41,126 +46,9 @@ log = pylogger.RankedLogger(__name__)
 
 GRAD_DECAY_METHODS = Literal["none", "linear_decay", "truncated_decay", "piecewise_decay"]
 
-#################################################################################
-#                             Embedding Layers                                  #
-#################################################################################
-
-
-class LabelEmbedder(nn.Module):
-    """Embed class labels into vector representations.
-
-    NOTE: Also handles label dropout for context conditioning.
-
-    Args:
-        num_classes: The number of classes.
-        hidden_dim: The dimensionality of the hidden representations.
-        dropout_prob: The dropout probability for context conditioning.
-    """
-
-    def __init__(self, num_classes: int, hidden_dim: int, dropout_prob: float):
-        super().__init__()
-        use_cfg_embedding = dropout_prob > 0
-        self.embedding_table = nn.Embedding(num_classes + use_cfg_embedding, hidden_dim)
-        self.num_classes = num_classes
-        self.dropout_prob = dropout_prob
-
-    @typecheck
-    def token_drop(
-        self, labels: torch.Tensor, force_drop_ids: torch.Tensor | None = None
-    ) -> torch.Tensor:
-        """Drop labels to enable context conditioning.
-
-        Args:
-            labels: The input labels tensor.
-            force_drop_ids: Optional tensor indicating which labels to drop.
-
-        Returns:
-            The modified labels tensor.
-        """
-        if force_drop_ids is None:
-            drop_ids = torch.rand(labels.shape[0], device=labels.device) < self.dropout_prob
-        else:
-            drop_ids = force_drop_ids == 1
-        labels = torch.where(drop_ids, 0, labels)
-        # NOTE: 0 is the label for the null class
-        return labels
-
-    @typecheck
-    def forward(
-        self, labels: torch.Tensor, train: bool, force_drop_ids: torch.Tensor | None = None
-    ) -> torch.Tensor:
-        """Forward pass for label embedding.
-
-        Args:
-            labels: The input labels tensor.
-            train: Whether the model is in training mode.
-            force_drop_ids: Optional tensor indicating which labels to drop.
-
-        Returns:
-            The output embeddings tensor.
-        """
-        use_dropout = self.dropout_prob > 0
-        if (train and use_dropout) or (force_drop_ids is not None):
-            labels = self.token_drop(labels, force_drop_ids)
-        embeddings = self.embedding_table(labels)
-        return embeddings
-
-
-class TimestepEmbedder(nn.Module):
-    """Embed scalar timesteps into vector representations.
-
-    Args:
-        hidden_dim: The dimensionality of the hidden representations.
-        frequency_embedding_dim: The dimensionality of the frequency embeddings.
-    """
-
-    def __init__(self, hidden_dim: int, frequency_embedding_dim: int = 256):
-        super().__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(frequency_embedding_dim, hidden_dim, bias=True),
-            nn.SiLU(),
-            nn.Linear(hidden_dim, hidden_dim, bias=True),
-        )
-        self.frequency_embedding_dim = frequency_embedding_dim
-
-    @staticmethod
-    def timestep_embedding(t: torch.Tensor, dim: int, max_period: int = 10000) -> torch.Tensor:
-        """Create sinusoidal timestep embeddings.
-
-        Args:
-            t: The input tensor.
-            dim: The dimensionality of the output embeddings.
-            max_period: The maximum period for the sinusoidal functions.
-
-        Returns:
-            The sinusoidal timestep embeddings.
-        """
-        half = dim // 2
-        freqs = torch.exp(
-            -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
-        ).to(device=t.device)
-        args = t[..., None].float() * freqs[None]
-        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
-        if dim % 2:
-            embedding = torch.cat([embedding, torch.zeros_like(embedding[..., :1])], dim=-1)
-        return embedding
-
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the timestep embedder.
-
-        Args:
-            t: The input tensor.
-
-        Returns:
-            The output tensor.
-        """
-        t_freq = self.timestep_embedding(t, self.frequency_embedding_dim)
-        t_emb = self.mlp(t_freq)
-        return t_emb
-
 
 #################################################################################
-#                                 Core MFT Model                                #
+#                              Misc. Utilities                                  #
 #################################################################################
 
 
@@ -185,21 +73,9 @@ def sample_logit_normal(
     return t
 
 
-@typecheck
-def modulate(x: torch.Tensor, shift: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
-    """Modulate the input tensor x with the given shift and scale.
-
-    Args:
-        x: The input tensor.
-        shift: The shift tensor.
-        scale: The scale tensor.
-
-    Returns:
-        The modulated tensor.
-    """
-    # NOTE: This is global modulation.
-    # TODO: Explore per-token modulation.
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+#################################################################################
+#                              Multimodal Modules                               #
+#################################################################################
 
 
 class Block(nn.Module):
@@ -322,39 +198,6 @@ class Block(nn.Module):
         return x
 
 
-class FinalLayer(nn.Module):
-    """The final layer of MFT.
-
-    Args:
-        hidden_dim: The dimensionality of the hidden representations.
-        out_dim: The dimensionality of the output representations.
-    """
-
-    def __init__(self, hidden_dim: int, out_dim: int):
-        super().__init__()
-        self.norm_final = nn.LayerNorm(hidden_dim, elementwise_affine=False, eps=1e-6)
-        self.linear = nn.Linear(hidden_dim, out_dim, bias=True)
-        self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(), nn.Linear(hidden_dim, 2 * hidden_dim, bias=True)
-        )
-
-    @typecheck
-    def forward(self, x: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
-        """Forward pass for the final MFT layer.
-
-        Args:
-            x: The input tensor.
-            c: The context tensor.
-
-        Returns:
-            The output tensor.
-        """
-        shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
-        x = modulate(self.norm_final(x), shift, scale)
-        x = self.linear(x)
-        return x
-
-
 class MultimodalModel(nn.Module):
     """Multimodal model with an encoder-decoder architecture.
 
@@ -435,8 +278,8 @@ class MultimodalModel(nn.Module):
 
         self.x_embedder = nn.Linear(d_x, d_model, bias=True)
         self.t_embedder = TimestepEmbedder(d_model)
-        self.dataset_embedder = LabelEmbedder(num_datasets, d_model, class_dropout_prob)
-        self.spacegroup_embedder = LabelEmbedder(num_spacegroups, d_model, class_dropout_prob)
+        self.dataset_embedder = ConditionEmbedder(num_datasets, d_model, class_dropout_prob)
+        self.spacegroup_embedder = ConditionEmbedder(num_spacegroups, d_model, class_dropout_prob)
 
         self.blocks = nn.ModuleList(
             [
@@ -772,6 +615,11 @@ class MultimodalModel(nn.Module):
             eps.append(torch.cat([half_eps, half_eps], dim=0))
 
         return tuple(eps)
+
+
+#################################################################################
+#                           Multimodal Flow Transformer                         #
+#################################################################################
 
 
 class MFT(nn.Module):
