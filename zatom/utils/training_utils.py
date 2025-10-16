@@ -2,6 +2,7 @@ import math
 from typing import Any, Callable
 
 import torch
+from torch.nn.attention import SDPBackend
 
 from zatom.utils.pylogger import RankedLogger
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
@@ -32,6 +33,14 @@ def get_best_device() -> torch.device:
 
 
 BEST_DEVICE = get_best_device()
+
+SDPA_BACKENDS = [
+    SDPBackend.ERROR,
+    SDPBackend.MATH,
+    SDPBackend.FLASH_ATTENTION,
+    SDPBackend.EFFICIENT_ATTENTION,
+    SDPBackend.CUDNN_ATTENTION,
+]
 
 # Classes
 

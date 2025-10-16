@@ -11,8 +11,8 @@ import torch
 from torch import Tensor, nn
 from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.encoders.custom_transformer import SDPA_BACKENDS
 from zatom.models.architectures.modules.layers import FinalLayer
+from zatom.utils.training_utils import SDPA_BACKENDS
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
 #################################################################################
@@ -113,7 +113,7 @@ class MultimodalDiT(nn.Module):
             nn.SiLU(),
         )
 
-        atom_feat_dim = atom_pos_embed_channels + token_pos_embed_channels + hidden_size * 5 + 1
+        atom_feat_dim = atom_pos_embed_channels + token_pos_embed_channels + hidden_size * 3 + 1
         self.atom_feat_proj = nn.Sequential(
             nn.Linear(atom_feat_dim, hidden_size),
             nn.LayerNorm(hidden_size),
@@ -129,7 +129,7 @@ class MultimodalDiT(nn.Module):
                 nn.LayerNorm(hidden_size),
             )
 
-        self.atom_in_proj = nn.Linear(hidden_size * 5, hidden_size, bias=False)
+        self.atom_in_proj = nn.Linear(hidden_size * 3, hidden_size, bias=False)
 
         self.context2atom_proj = nn.Sequential(
             nn.Linear(hidden_size, self.atom_hidden_size_enc),
@@ -164,12 +164,11 @@ class MultimodalDiT(nn.Module):
         self.angles_radians_head = nn.Linear(hidden_size, 3, bias=True)
 
     @typecheck
-    def create_local_attn_bias(
+    def create_local_attn_mask(
         self,
         n: int,
         n_queries: int,
         n_keys: int,
-        inf: float = 1e10,
         device: torch.device | None = None,
     ) -> Tensor:
         """Create local attention bias based on query window n_queries and kv window n_keys.
@@ -178,7 +177,6 @@ class MultimodalDiT(nn.Module):
             n: the length of quiries
             n_queries: window size of quiries
             n_keys: window size of keys/values
-            inf: The inf to mask attention. Defaults to 1e10.
             device: The device of the attention bias. Defaults to None.
 
         Returns:
@@ -186,14 +184,13 @@ class MultimodalDiT(nn.Module):
         """
         n_trunks = int(math.ceil(n / n_queries))
         padded_n = n_trunks * n_queries
-        attn_mask = torch.zeros(padded_n, padded_n, device=device)
+        attn_mask = torch.zeros(padded_n, padded_n, device=device, dtype=torch.bool)
         for block_index in range(0, n_trunks):
             i = block_index * n_queries
             j1 = max(0, n_queries * block_index - (n_keys - n_queries) // 2)
             j2 = n_queries * block_index + (n_queries + n_keys) // 2
-            attn_mask[i : i + n_queries, j1:j2] = 1.0
-        attn_bias = (1 - attn_mask) * -inf
-        return attn_bias.to(device=device)[:n, :n]
+            attn_mask[i : i + n_queries, j1:j2] = True
+        return attn_mask[:n, :n]
 
     @typecheck
     def create_atom_attn_mask(
@@ -202,27 +199,26 @@ class MultimodalDiT(nn.Module):
         atom_n_queries: int | None = None,
         atom_n_keys: int | None = None,
         device: torch.device | None = None,
-        inf: float = 1e10,
-    ) -> Tensor:
+    ) -> Tensor | None:
         """Create attention mask for atoms.
+
+        NOTE: Assumes each batch consists of a single unique example.
 
         Args:
             natoms: The number of atoms.
             atom_n_queries: The number of query positions for local attention.
             atom_n_keys: The number of key positions for local attention.
             device: The device of the attention mask. Defaults to None.
-            inf: The inf to mask attention. Defaults to 1e10.
 
         Returns:
             The attention mask for atoms.
         """
         if atom_n_queries is not None and atom_n_keys is not None:
-            atom_attn_mask = self.create_local_attn_bias(
+            atom_attn_mask = self.create_local_attn_mask(
                 n=natoms,
                 n_queries=atom_n_queries,
                 n_keys=atom_n_keys,
                 device=device,
-                inf=inf,
             )
         else:
             atom_attn_mask = None
@@ -254,7 +250,6 @@ class MultimodalDiT(nn.Module):
         ),
         feats: Dict[str, Tensor],
         mask: Bool["b m"],  # type: ignore
-        seq_idx: Int["b m"] | None = None,  # type: ignore
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
     ) -> Tuple[
         Float["b m v"],  # type: ignore - atom_types
@@ -288,7 +283,6 @@ class MultimodalDiT(nn.Module):
                 max_num_tokens: Maximum number of unmasked tokens for each batch element.
                 token_index: Indices of the tokens in the batch.
             mask: True if valid token, False if padding (B, M).
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
             sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
 
         Returns:
@@ -299,7 +293,7 @@ class MultimodalDiT(nn.Module):
         atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t = t
 
         device = atom_types.device
-        num_atoms = num_tokens = atom_types.shape[1]
+        batch_size, num_atoms = _, num_tokens = atom_types.shape
 
         dataset_idx = feats["dataset_idx"]
         spacegroup = feats["spacegroup"]
@@ -316,7 +310,10 @@ class MultimodalDiT(nn.Module):
             dim=-1,
         )
 
-        # Create atom attention masks
+        # Create attention masks
+        pairwise_mask = mask.unsqueeze(1) * mask.unsqueeze(2)  # (B, M, M)
+        attention_mask = pairwise_mask.unsqueeze(1)
+
         atom_attn_mask_enc = self.create_atom_attn_mask(
             natoms=num_atoms,
             atom_n_queries=self.atom_n_queries_enc,
@@ -330,8 +327,19 @@ class MultimodalDiT(nn.Module):
             device=device,
         )
 
+        atom_attn_mask_enc = (
+            attention_mask
+            if atom_attn_mask_enc is None
+            else atom_attn_mask_enc[None, None, ...].expand(batch_size, 1, -1, -1)
+        )
+        atom_attn_mask_dec = (
+            attention_mask
+            if atom_attn_mask_dec is None
+            else atom_attn_mask_dec[None, None, ...].expand(batch_size, 1, -1, -1)
+        )
+
         # Create condition embeddings for AdaLN
-        t_emb = self.time_embedder(modals_t)  # (B, D)
+        t_emb = self.time_embedder(modals_t).mean(-2)  # (B, D), via averaging over all modalities
         d_emb = self.dataset_embedder(dataset_idx, self.training)  # (B, C)
         s_emb = self.spacegroup_embedder(spacegroup, self.training)  # (B, C)
         c_emb = t_emb + d_emb + s_emb
@@ -343,11 +351,19 @@ class MultimodalDiT(nn.Module):
         ref_pos_emb = self.atom_pos_embedder(pos=feats["ref_pos"])
         atom_token_pos = self.token_pos_embedder(pos=atom_to_token_idx.unsqueeze(-1).float())
         atom_types_emb = self.atom_type_embedder(atom_types)
+        lengths_scaled_emb = self.lengths_scaled_embedder(lengths_scaled).expand(
+            -1, num_atoms, -1
+        )  # (B, M, D)
+        angles_radians_emb = self.angles_radians_embedder(angles_radians).expand(
+            -1, num_atoms, -1
+        )  # (B, M, D)
         atom_feat = torch.cat(
             [
-                ref_pos_emb,  # (B, M, C)
-                atom_token_pos,  # (B, M, C)
+                ref_pos_emb,  # (B, M, PE1)
+                atom_token_pos,  # (B, M, PE2)
                 atom_types_emb,  # (B, M, C)
+                lengths_scaled_emb,  # (B, M, C)
+                angles_radians_emb,  # (B, M, C)
                 mask.float().unsqueeze(-1),  # (B, M, 1)
             ],
             dim=-1,
@@ -360,15 +376,8 @@ class MultimodalDiT(nn.Module):
         atom_frac_coord = self.atom_pos_embedder(pos=frac_coords)  # (B, M, C)
         atom_frac_coord = self.frac_coords_proj(atom_frac_coord)  # (B, M, D)
 
-        lengths_scaled_emb = self.lengths_scaled_embedder(lengths_scaled).expand(
-            -1, num_atoms, -1
-        )  # (B, M, D)
-        angles_radians_emb = self.angles_radians_embedder(angles_radians).expand(
-            -1, num_atoms, -1
-        )  # (B, M, D)
-
         atom_in = torch.cat(
-            [atom_feat, atom_coord, atom_frac_coord, lengths_scaled_emb, angles_radians_emb],
+            [atom_feat, atom_coord, atom_frac_coord],
             dim=-1,
         )
         atom_in = self.atom_in_proj(atom_in)  # (B, M, D)
@@ -381,7 +390,7 @@ class MultimodalDiT(nn.Module):
             ],
             dim=-1,
         )  # (B, M, 4)
-        token_pe_pos = (feats["token_index"].unsqueeze(-1).float(),)  # (B, N, 1)
+        token_pe_pos = feats["token_index"].unsqueeze(-1).float()  # (B, N, 1)
 
         # Run atom encoder
         atom_c_emb_enc = self.atom_enc_cond_proj(c_emb)
@@ -405,7 +414,7 @@ class MultimodalDiT(nn.Module):
         latent = self.trunk(
             latents=latent,
             c=c_emb,
-            attention_mask=None,
+            attention_mask=attention_mask,
             pos=token_pe_pos,
         )
 
@@ -468,7 +477,6 @@ class MultimodalDiT(nn.Module):
         feats: Dict[str, Tensor],
         mask: Bool["b m"],  # type: ignore
         cfg_scale: float,
-        seq_idx: Int["b m"] | None = None,  # type: ignore
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
     ) -> Tuple[
         Float["b m v"],  # type: ignore - atom_types
@@ -507,7 +515,6 @@ class MultimodalDiT(nn.Module):
                 token_index: Indices of the tokens in the batch.
             mask: True if valid token, False if padding (B, N).
             cfg_scale: Classifier-free guidance scale.
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
             sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
 
         Returns:
@@ -520,7 +527,6 @@ class MultimodalDiT(nn.Module):
             t,
             feats,
             mask,
-            seq_idx=seq_idx,
             sdpa_backends=sdpa_backends,
         )
 

@@ -132,7 +132,7 @@ class AbsolutePositionEncoding(nn.Module):
             emb: (M, D) or (N, M, D), where D is embedding dimension per position.
         """
         embed_dim = self.hidden_dim // (self.in_dim * 2)
-        omega = 2 ** torch.linspace(0, math.log(224, 2) - 1, embed_dim).to(pos.device)
+        omega = 2 ** torch.linspace(0, math.log(224, 2) - 1, embed_dim, device=pos.device)
         omega *= torch.pi
 
         if len(pos.shape) == 1:
@@ -268,4 +268,4 @@ class AxialRotaryPositionEncoding(nn.Module):
             pos = pos.unsqueeze(-1)
         freqs_cis = compute_axial_cis(pos, self.in_dim, self.embed_dim, self.base)
         freqs_cis = freqs_cis.unsqueeze(1)
-        return apply_rotary_emb(xq, xk, freqs_cis.to(xq.device))
+        return apply_rotary_emb(xq, xk, freqs_cis)

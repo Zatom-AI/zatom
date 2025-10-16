@@ -18,13 +18,13 @@ from flow_matching.path.scheduler import (
 from flow_matching.utils import expand_tensor_like
 from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.encoders.custom_transformer import SDPA_BACKENDS
 from zatom.models.architectures.modules.dit import MultimodalDiT
 from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
     BEST_DEVICE,
+    SDPA_BACKENDS,
     sample_logit_normal,
     weighted_rigid_align,
 )
@@ -80,8 +80,6 @@ class MFT(nn.Module):
             norm with respect to each modality falls below this value. This
             effectively enables adaptive compute for sampling. Defaults to
             ``None``.
-        flex_attn: Whether to use PyTorch's FlexAttention.
-        fused_attn: Whether to use PyTorch's `scaled_dot_product_attention`.
         jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
         weighted_rigid_align_pos: Whether to apply weighted rigid alignment between target and predicted atom positions for loss calculation.
         weighted_rigid_align_frac_coords: Whether to apply weighted rigid alignment between target and predicted atom fractional coordinates for loss calculation.
@@ -125,8 +123,6 @@ class MFT(nn.Module):
         grad_decay_b: float = 0.8,
         grad_mul: float = 1.0,
         early_stopping_grad_norm: float | None = None,
-        flex_attn: bool = False,
-        fused_attn: bool = True,
         jvp_attn: bool = False,
         weighted_rigid_align_pos: bool = True,
         weighted_rigid_align_frac_coords: bool = False,
@@ -138,10 +134,6 @@ class MFT(nn.Module):
         grad_decay_method: GRAD_DECAY_METHODS = "none",
     ):
         super().__init__()
-
-        assert (
-            sum([flex_attn, fused_attn, jvp_attn]) <= 1
-        ), "Only one of flex_attn, fused_attn, or jvp_attn can be True."
 
         if enable_eqm_mode:
             assert (
@@ -259,7 +251,6 @@ class MFT(nn.Module):
         mask: Bool["b m"],  # type: ignore
         steps: int = 100,
         cfg_scale: float = 2.0,
-        seq_idx: Int["b m"] | None = None,  # type: ignore
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
         modal_input_dict: (
             Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]] | None
@@ -281,7 +272,6 @@ class MFT(nn.Module):
             mask: True if valid token, False if padding.
             steps: Number of integration steps for the multimodal ODE solver.
             cfg_scale: Classifier-free guidance scale.
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
             sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
             modal_input_dict: If not None, a dictionary specifying input modalities to use and their input metadata.
                 The keys should be a subset of `["atom_types", "pos", "frac_coords", "lengths_scaled", "angles_radians"]`,
@@ -316,9 +306,6 @@ class MFT(nn.Module):
             else:
                 feats[feat] = torch.cat([feats[feat], feats[feat]], dim=0)  # [2B, M, ...]
 
-        if seq_idx is not None:
-            seq_idx = torch.cat([seq_idx, seq_idx], dim=0)  # [2B, M]
-
         # Predict each modality in one step
         pred_modals = self.flow.sample(
             x_init=[
@@ -334,7 +321,6 @@ class MFT(nn.Module):
             feats=feats,
             mask=mask,
             cfg_scale=cfg_scale,
-            seq_idx=seq_idx,
             sdpa_backends=sdpa_backends,
         )
 
@@ -410,7 +396,8 @@ class MFT(nn.Module):
 
         modal_t = None
         if self.unified_modal_time:
-            # Sample a single time point from a logit-normal distribution for all modalities
+            # Sample a single time point from a logit-normal distribution for all modalities.
+            # See https://arxiv.org/abs/2509.18480 for more details.
             modal_t = 0.98 * sample_logit_normal(
                 n=batch_size, m=0.8, s=1.7, device=device
             ) + 0.02 * torch.rand(batch_size, device=device)

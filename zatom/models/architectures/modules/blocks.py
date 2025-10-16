@@ -7,7 +7,7 @@ Adapted from:
 import collections.abc
 from functools import partial
 from itertools import repeat
-from typing import Tuple, Type
+from typing import Any, Tuple, Type
 
 import torch
 from torch import Tensor, nn
@@ -177,7 +177,7 @@ class DiTBlock(nn.Module):
         self,
         latents: Tensor,
         c: Tensor,
-        **kwargs: dict,
+        **kwargs: Any,
     ) -> Tensor:
         """Forward pass of the DiT block.
 
@@ -237,7 +237,7 @@ class TransformerBlock(nn.Module):
     def forward(
         self,
         latents: Tensor,
-        **kwargs: dict,
+        **kwargs: Any,
     ) -> Tensor:
         """Forward pass of the Transformer block.
 
@@ -270,7 +270,7 @@ class HomogenTrunk(nn.Module):
         self.blocks = nn.ModuleList([block() for _ in range(depth)])
 
     @typecheck
-    def forward(self, latents: Tensor, c: Tensor, **kwargs: dict) -> Tensor:
+    def forward(self, latents: Tensor, c: Tensor, **kwargs: Any) -> Tensor:
         """Forward pass of the homogeneous trunk.
 
         Args:

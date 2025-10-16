@@ -102,7 +102,7 @@ class SelfAttentionLayer(nn.Module):
             qkv[0],
             qkv[1],
             qkv[2],
-        )  # make torchscript happy (cannot use tensor as tuple)
+        )  # Make torchscript happy (as one cannot use tensor as tuple)
 
         q, k = self.q_norm(q), self.k_norm(k)
 
@@ -152,14 +152,17 @@ class EfficientSelfAttentionLayer(SelfAttentionLayer):
         qkv = rearrange(qkv, "b n t h c -> t b h n c")
         q, k, v = qkv.unbind(0)
 
-        if attn_mask is not None:
-            attn_mask = attn_mask.to(dtype=q.dtype)
-
         if self.pos_embedder and pos is not None:
             q, k = self.pos_embedder(q, k, pos)
 
         q, k = self.q_norm(q), self.k_norm(k)
-        x = nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+
+        x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+        if not self.training:
+            # Ensure no NaNs appear during eval if a (padding) row is (fully) masked
+            # NOTE: This appears to be a bug in PyTorch's fused attention: https://github.com/pytorch/pytorch/issues/163997
+            fully_masked = (~attn_mask).all(dim=-1, keepdim=True)
+            x = torch.where(fully_masked, torch.zeros_like(x), x)
 
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
@@ -288,62 +291,64 @@ class TimestepEmbedder(nn.Module):
         return t_emb
 
 
-class ConditionEmbedder(nn.Module):
-    """Embed class labels into vector representations. Also handle label dropout for classifier-
-    free guidance.
+class LabelEmbedder(nn.Module):
+    """Embed class labels into vector representations.
+
+    NOTE: Also handles label dropout for context conditioning.
 
     Args:
-        input_dim: Dimension of the input class labels.
-        hidden_size: Dimension of the output embeddings.
-        dropout_prob: Probability of dropping out the class labels.
+        num_classes: The number of classes.
+        hidden_size: The dimensionality of the hidden representations.
+        dropout_prob: The dropout probability for context conditioning.
     """
 
-    def __init__(self, input_dim: int, hidden_size: int, dropout_prob: float):
+    def __init__(self, num_classes: int, hidden_size: int, dropout_prob: float):
         super().__init__()
-        self.proj = nn.Sequential(
-            nn.Linear(input_dim, hidden_size),
-            nn.LayerNorm(hidden_size),
-            nn.SiLU(),
-        )
+        self.num_classes = num_classes
         self.dropout_prob = dropout_prob
-        self.null_token = nn.Parameter(torch.randn(input_dim), requires_grad=True)
+
+        use_cfg_embedding = dropout_prob > 0
+        self.embedding_table = nn.Embedding(num_classes + use_cfg_embedding, hidden_size)
 
     @typecheck
-    def token_drop(self, cond: Tensor, force_drop_ids: Tensor | None = None):
-        """Drop conditions to enable classifier-free guidance.
+    def token_drop(
+        self, labels: torch.Tensor, force_drop_ids: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """Drop labels to enable context conditioning.
 
         Args:
-            cond: Condition tensor of shape (B, ..., C).
-            force_drop_ids: Optional boolean tensor of shape (B,) indicating which
-                            conditions to drop. If None, random dropout is applied.
+            labels: The input labels tensor.
+            force_drop_ids: Optional tensor indicating which labels to drop.
 
         Returns:
-            Condition tensor with some entries replaced by the null token.
+            The modified labels tensor.
         """
         if force_drop_ids is None:
-            drop_ids = torch.rand(cond.shape[0], device=cond.device) < self.dropout_prob
+            drop_ids = torch.rand(labels.shape[0], device=labels.device) < self.dropout_prob
         else:
-            drop_ids = force_drop_ids
-        cond[drop_ids] = self.null_token[None, None, :]
-        return cond
+            drop_ids = force_drop_ids == 1
+        labels = torch.where(drop_ids, 0, labels)
+        # NOTE: 0 is the label for the null class
+        return labels
 
     @typecheck
-    def forward(self, cond: Tensor, train: bool, force_drop_ids: Tensor | None = None) -> Tensor:
-        """Forward pass of the Condition Embedder.
+    def forward(
+        self, labels: torch.Tensor, train: bool, force_drop_ids: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """Forward pass for label embedding.
 
         Args:
-            cond: Condition tensor of shape (B, ..., C).
-            train: Boolean indicating whether in training mode.
-            force_drop_ids: Optional boolean tensor of shape (B,) indicating which
-                            conditions to drop. If None, random dropout is applied.
+            labels: The input labels tensor.
+            train: Whether the model is in training mode.
+            force_drop_ids: Optional tensor indicating which labels to drop.
 
         Returns:
-            A tensor of shape (B, ..., C) containing the condition embeddings.
+            The output embeddings tensor.
         """
         use_dropout = self.dropout_prob > 0
         if (train and use_dropout) or (force_drop_ids is not None):
-            cond = self.token_drop(cond, force_drop_ids)
-        embeddings = self.proj(cond)
+            labels = self.token_drop(labels, force_drop_ids)
+        embeddings = self.embedding_table(labels)
         return embeddings
 
 

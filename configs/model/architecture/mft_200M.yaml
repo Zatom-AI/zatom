@@ -10,14 +10,14 @@ time_embedder:
   hidden_size: ${model.architecture.hidden_size}
 
 dataset_embedder:
-  _target_: zatom.models.architectures.modules.layers.ConditionEmbedder
-  input_dim: 2
+  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  num_classes: 2
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
-  _target_: zatom.models.architectures.modules.layers.ConditionEmbedder
-  input_dim: 230
+  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  num_classes: 230
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
@@ -53,14 +53,14 @@ trunk:
       qk_norm: True
       pos_embedder:
         _target_: zatom.models.architectures.modules.pos_embed.AxialRotaryPositionEncoding
-        in_dim: 4
+        in_dim: 1
         embed_dim: ${model.architecture.hidden_size}
         num_heads: ${model.architecture.token_num_heads}
         base: 100.0
 
 atom_hidden_size_enc: 256
-atom_n_queries_enc: null
-atom_n_keys_enc: null
+atom_n_queries_enc: null # NOTE: if null, user-provided `mask` will be used instead
+atom_n_keys_enc: null # NOTE: if null, user-provided `mask` will be used instead
 atom_encoder_transformer:
   _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
   depth: 1
@@ -84,8 +84,8 @@ atom_encoder_transformer:
         base: 100.0
 
 atom_hidden_size_dec: 256
-atom_n_queries_dec: null
-atom_n_keys_dec: null
+atom_n_queries_dec: null # NOTE: if null, user-provided `mask` will be used instead
+atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
 atom_decoder_transformer:
   _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
   depth: 1
@@ -119,9 +119,7 @@ grad_decay_a: 0.8
 grad_decay_b: 0.8
 grad_mul: 1.0
 early_stopping_grad_norm: null
-flex_attn: false
-fused_attn: true
-jvp_attn: false
+jvp_attn: false # NOTE: currently unused
 weighted_rigid_align_pos: true
 weighted_rigid_align_frac_coords: false
 continuous_x_1_prediction: false
