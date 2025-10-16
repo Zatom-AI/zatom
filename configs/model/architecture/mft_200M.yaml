@@ -3,8 +3,6 @@ _target_: zatom.models.architectures.mft.MFT
 hidden_size: 768
 token_num_heads: 12
 atom_num_heads: 4
-output_channels: 3
-use_atom_mask: False
 use_length_condition: True
 
 time_embedder:
@@ -61,8 +59,8 @@ trunk:
         base: 100.0
 
 atom_hidden_size_enc: 256
-atom_n_queries_enc: 32
-atom_n_keys_enc: 128
+atom_n_queries_enc: null
+atom_n_keys_enc: null
 atom_encoder_transformer:
   _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
   depth: 1
@@ -86,8 +84,8 @@ atom_encoder_transformer:
         base: 100.0
 
 atom_hidden_size_dec: 256
-atom_n_queries_dec: 32
-atom_n_keys_dec: 128
+atom_n_queries_dec: null
+atom_n_keys_dec: null
 atom_decoder_transformer:
   _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
   depth: 1

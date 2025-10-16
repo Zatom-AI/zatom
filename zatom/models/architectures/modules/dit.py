@@ -35,7 +35,6 @@ class MultimodalDiT(nn.Module):
         hidden_size: The hidden size for the model.
         token_num_heads: The number of (token) attention heads for the trunk transformer.
         atom_num_heads: The number of (atom) attention heads for the atom transformers.
-        output_channels: The number of output channels (e.g., 3 for 3D coordinates).
         atom_hidden_size_enc: The hidden size for the atom encoder transformer.
         atom_hidden_size_dec: The hidden size for the atom decoder transformer.
         atom_n_queries_enc: The number of query positions for local attention in the atom encoder.
@@ -43,7 +42,6 @@ class MultimodalDiT(nn.Module):
         atom_n_queries_dec: The number of query positions for local attention in the atom decoder.
         atom_n_keys_dec: The number of key positions for local attention in the atom decoder.
         max_num_elements: The maximum number of unique atom types (elements).
-        use_atom_mask: Whether to use attention masks for atoms.
         use_length_condition: Whether to condition on sequence length.
         add_mask_atom_type: Whether to add a special mask atom type.
         remove_t_conditioning: Whether to remove time conditioning.
@@ -62,7 +60,6 @@ class MultimodalDiT(nn.Module):
         hidden_size: int = 1152,
         token_num_heads: int = 16,
         atom_num_heads: int = 4,
-        output_channels: int = 3,
         atom_hidden_size_enc: int = 256,
         atom_hidden_size_dec: int = 256,
         atom_n_queries_enc: int = 32,
@@ -70,7 +67,6 @@ class MultimodalDiT(nn.Module):
         atom_n_queries_dec: int = 32,
         atom_n_keys_dec: int = 128,
         max_num_elements: int = 100,
-        use_atom_mask: bool = False,
         use_length_condition: bool = True,
         add_mask_atom_type: bool = True,
         remove_t_conditioning: bool = False,
@@ -91,10 +87,8 @@ class MultimodalDiT(nn.Module):
         self.atom_decoder_transformer = atom_decoder_transformer
 
         self.hidden_size = hidden_size
-        self.output_channels = output_channels
         self.token_num_heads = token_num_heads
         self.atom_num_heads = atom_num_heads
-        self.use_atom_mask = use_atom_mask
         self.use_length_condition = use_length_condition
         self.remove_t_conditioning = remove_t_conditioning
 
@@ -204,19 +198,19 @@ class MultimodalDiT(nn.Module):
     @typecheck
     def create_atom_attn_mask(
         self,
-        feats: dict[str, Tensor],
         natoms: int,
         atom_n_queries: int | None = None,
         atom_n_keys: int | None = None,
+        device: torch.device | None = None,
         inf: float = 1e10,
     ) -> Tensor:
         """Create attention mask for atoms.
 
         Args:
-            feats: The input features.
             natoms: The number of atoms.
             atom_n_queries: The number of query positions for local attention.
             atom_n_keys: The number of key positions for local attention.
+            device: The device of the attention mask. Defaults to None.
             inf: The inf to mask attention. Defaults to 1e10.
 
         Returns:
@@ -227,7 +221,7 @@ class MultimodalDiT(nn.Module):
                 n=natoms,
                 n_queries=atom_n_queries,
                 n_keys=atom_n_keys,
-                device=feats["ref_pos"].device,
+                device=device,
                 inf=inf,
             )
         else:
@@ -304,7 +298,8 @@ class MultimodalDiT(nn.Module):
         atom_types, pos, frac_coords, lengths_scaled, angles_radians = x
         atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t = t
 
-        num_atoms = num_tokens = atom_types.shape
+        device = atom_types.device
+        num_atoms = num_tokens = atom_types.shape[1]
 
         dataset_idx = feats["dataset_idx"]
         spacegroup = feats["spacegroup"]
@@ -323,16 +318,16 @@ class MultimodalDiT(nn.Module):
 
         # Create atom attention masks
         atom_attn_mask_enc = self.create_atom_attn_mask(
-            feats,
             natoms=num_atoms,
             atom_n_queries=self.atom_n_queries_enc,
             atom_n_keys=self.atom_n_keys_enc,
+            device=device,
         )
         atom_attn_mask_dec = self.create_atom_attn_mask(
-            feats,
             natoms=num_atoms,
             atom_n_queries=self.atom_n_queries_dec,
             atom_n_keys=self.atom_n_keys_dec,
+            device=device,
         )
 
         # Create condition embeddings for AdaLN

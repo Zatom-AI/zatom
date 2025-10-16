@@ -58,14 +58,12 @@ class MFT(nn.Module):
         hidden_size: Hidden size of the model.
         token_num_heads: Number of (token) attention heads in the token trunk.
         atom_num_heads: Number of (atom) attention heads in the atom encoder/decoder.
-        output_channels: Number of output channels.
         atom_hidden_size_enc: Hidden size of the atom encoder.
         atom_hidden_size_dec: Hidden size of the atom decoder.
         atom_n_queries_enc: Number of queries in the atom encoder.
         atom_n_keys_enc: Number of keys in the atom encoder.
         atom_n_queries_dec: Number of queries in the atom decoder.
         atom_n_keys_dec: Number of keys in the atom decoder.
-        use_atom_mask: Whether to use an atom mask.
         use_length_condition: Whether to use the length condition.
         max_num_elements: Maximum number of elements in the dataset.
         batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 200M) model variant.
@@ -109,14 +107,12 @@ class MFT(nn.Module):
         hidden_size: int = 1152,
         token_num_heads: int = 16,
         atom_num_heads: int = 4,
-        output_channels: int = 3,
         atom_hidden_size_enc: int = 256,
         atom_hidden_size_dec: int = 256,
         atom_n_queries_enc: int = 32,
         atom_n_keys_enc: int = 128,
         atom_n_queries_dec: int = 32,
         atom_n_keys_dec: int = 128,
-        use_atom_mask: bool = False,
         use_length_condition: bool = True,
         max_num_elements: int = 100,
         batch_size_scale_factor: int = 1,
@@ -188,7 +184,6 @@ class MFT(nn.Module):
             hidden_size=hidden_size,
             token_num_heads=token_num_heads,
             atom_num_heads=atom_num_heads,
-            output_channels=output_channels,
             atom_hidden_size_enc=atom_hidden_size_enc,
             atom_hidden_size_dec=atom_hidden_size_dec,
             atom_n_queries_enc=atom_n_queries_enc,
@@ -196,7 +191,6 @@ class MFT(nn.Module):
             atom_n_queries_dec=atom_n_queries_dec,
             atom_n_keys_dec=atom_n_keys_dec,
             max_num_elements=max_num_elements,
-            use_atom_mask=use_atom_mask,
             use_length_condition=use_length_condition,
             add_mask_atom_type=add_mask_atom_type,
             remove_t_conditioning=remove_t_conditioning,
