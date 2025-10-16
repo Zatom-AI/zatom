@@ -11,7 +11,6 @@ defaults:
   - override /data: joint
   - override /model: zatom
   - override /model/architecture: mft_200M
-  - override /model/architecture/encoder: transformer
   - override /callbacks: default
   - override /logger: wandb
   - override /trainer: ddp

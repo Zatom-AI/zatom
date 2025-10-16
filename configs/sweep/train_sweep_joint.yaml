@@ -28,7 +28,7 @@ parameters:
     values: [mft_50M, mft_200M, mft_570M, met_50M, met_200M, met_570M]
 
   name:
-    value: "train_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}"
+    value: "train_arch-${hydra:runtime.choices.model/architecture}_${hydra:runtime.choices.data}"
 
   seed:
     value: 42

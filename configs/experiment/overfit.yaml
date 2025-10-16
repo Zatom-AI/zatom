@@ -11,7 +11,6 @@ defaults:
   - override /data: joint
   - override /model: zatom
   - override /model/architecture: mft_200M
-  - override /model/architecture/encoder: transformer
   - override /callbacks: default
   - override /logger: wandb
   - override /trainer: ddp
@@ -19,7 +18,7 @@ defaults:
 # All parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-name: "overfit_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}_molecule-and-material"
+name: "overfit_arch-${hydra:runtime.choices.model/architecture}_${hydra:runtime.choices.data}_molecule-and-material"
 seed: 42
 task_name: overfit_fm
 

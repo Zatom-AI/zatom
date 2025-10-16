@@ -267,10 +267,10 @@ class TimestepEmbedder(nn.Module):
             * torch.arange(start=0, end=half, dtype=torch.float32, device=t.device)
             / half
         )
-        args = t[:, None].float() * freqs[None]
+        args = t[..., None].float() * freqs[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if dim % 2:
-            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
+            embedding = torch.cat([embedding, torch.zeros_like(embedding[..., :1])], dim=-1)
         return embedding
 
     @typecheck

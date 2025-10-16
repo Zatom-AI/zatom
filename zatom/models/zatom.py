@@ -5,6 +5,7 @@ from typing import Any, Dict, Literal, Tuple
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from lightning import LightningModule
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import FSDPStrategy
@@ -373,17 +374,6 @@ class Zatom(LightningModule):
 
         dense_atom_types[~mask] = -100  # Mask out padding tokens during loss calculation
 
-        ref_pos = (
-            noisy_dense_batch.get("ref_pos", noisy_dense_batch["pos"])
-            * self.hparams.augmentations.ref_scale
-        )  # Use scaled reference positions
-        atom_to_token_idx = noisy_dense_batch.get(
-            "atom_to_token_idx",
-            torch.arange(noisy_dense_batch["pos"].shape[1], device=self.device).expand(
-                batch.batch_size, -1
-            ),
-        )  # (num_atoms,)
-
         target_tensors = {
             "atom_types": dense_atom_types,
             "pos": dense_pos
@@ -393,6 +383,39 @@ class Zatom(LightningModule):
             "angles_radians": dense_angles_radians,
         }
 
+        # Build features for conditioning
+        num_atoms = num_tokens = noisy_dense_batch["pos"].shape[1]
+
+        ref_pos = (
+            noisy_dense_batch.get("ref_pos", noisy_dense_batch["pos"])
+            * self.hparams.augmentations.ref_scale
+        )  # Use scaled reference positions - (batch_size, num_atoms, 3)
+
+        atom_to_token_idx = noisy_dense_batch.get(
+            # NOTE: Atoms and tokens are currently treated synonymously (i.e. one atom per token)
+            "atom_to_token_idx",
+            torch.arange(num_atoms, device=self.device).expand(batch.batch_size, -1),
+        )  # (batch_size, num_atoms)
+
+        atom_to_token = noisy_dense_batch.get(
+            "atom_to_token",
+            F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(torch.float32),
+        )  # (batch_size, num_atoms, num_tokens)
+
+        max_num_tokens = mask.sum(dim=1)  # (batch_size,)
+
+        # Assemble features for conditioning
+        feats = {
+            "dataset_idx": dataset_idx,
+            "spacegroup": spacegroup,
+            "ref_pos": ref_pos,
+            "ref_space_uid": atom_to_token_idx,
+            "atom_to_token": atom_to_token,
+            "atom_to_token_idx": atom_to_token_idx,
+            "max_num_tokens": max_num_tokens,
+            "token_index": atom_to_token_idx,
+        }
+
         # Run forward pass with loss calculation
         loss_dict = self.model.forward_with_loss_wrapper(
             atom_types=noisy_dense_batch["atom_types"],
@@ -400,10 +423,7 @@ class Zatom(LightningModule):
             frac_coords=noisy_dense_batch["frac_coords"],
             lengths_scaled=noisy_dense_batch["lengths_scaled"],
             angles_radians=noisy_dense_batch["angles_radians"],
-            dataset_idx=dataset_idx,
-            spacegroup=spacegroup,
-            ref_pos=ref_pos,
-            atom_to_token_idx=atom_to_token_idx,
+            feats=feats,
             mask=noisy_dense_batch["token_mask"],
             token_is_periodic=dense_node_is_periodic,
             target_tensors=target_tensors,
@@ -832,16 +852,38 @@ class Zatom(LightningModule):
             ),
         )
 
+        # Build features for conditioning
+        num_atoms = num_tokens = noisy_dense_batch["pos"].shape[1]
+
         ref_pos = (
             noisy_dense_batch.get("ref_pos", noisy_dense_batch["pos"])
             * self.hparams.augmentations.ref_scale
-        )  # Use scaled reference positions
+        )  # Use scaled reference positions - (batch_size, num_atoms, 3)
+
         atom_to_token_idx = noisy_dense_batch.get(
+            # NOTE: Atoms and tokens are currently treated synonymously (i.e. one atom per token)
             "atom_to_token_idx",
-            torch.arange(noisy_dense_batch["pos"].shape[1], device=self.device).expand(
-                batch_size, -1
-            ),
-        )  # (num_atoms,)
+            torch.arange(num_atoms, device=self.device).expand(batch_size, -1),
+        )  # (batch_size, num_atoms)
+
+        atom_to_token = noisy_dense_batch.get(
+            "atom_to_token",
+            F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(torch.float32),
+        )  # (batch_size, num_atoms, num_tokens)
+
+        max_num_tokens = token_mask.sum(dim=1)  # (batch_size,)
+
+        # Assemble features for conditioning
+        feats = {
+            "dataset_idx": dataset_idx,
+            "spacegroup": spacegroup,
+            "ref_pos": ref_pos,
+            "ref_space_uid": atom_to_token_idx,
+            "atom_to_token": atom_to_token,
+            "atom_to_token_idx": atom_to_token_idx,
+            "max_num_tokens": max_num_tokens,
+            "token_index": atom_to_token_idx,
+        }
 
         # Use forward pass of model to predict sample modalities
         denoised_modals_list, _ = self.model.sample(
@@ -850,16 +892,10 @@ class Zatom(LightningModule):
             frac_coords=noisy_dense_batch["frac_coords"],
             lengths_scaled=noisy_dense_batch["lengths_scaled"],
             angles_radians=noisy_dense_batch["angles_radians"],
-            dataset_idx=dataset_idx,
-            spacegroup=spacegroup,
-            ref_pos=ref_pos,
-            atom_to_token_idx=atom_to_token_idx,
+            feats=feats,
             mask=token_mask,
             steps=steps,
             cfg_scale=cfg_scale,
-            training=False,
-            no_randomness=True,
-            return_raw_discrete_logits=True,
         )
 
         # Collect final sample modalities and remove padding (to convert to PyG format)

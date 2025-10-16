@@ -4,7 +4,6 @@ defaults:
   - data: joint
   - model: default
   - model/architecture: default
-  - model/architecture/encoder: default
   - logger: null # set logger here or use command line (e.g. `python train_fm.py logger=wandb`)
   - strategy: default
   - trainer: default
@@ -19,7 +18,7 @@ defaults:
   - experiment: null
 
 # run name and date, e.g., for logging
-name: "eval_arch-${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_${hydra:runtime.choices.data}"
+name: "eval_arch-${hydra:runtime.choices.model/architecture}_${hydra:runtime.choices.data}"
 date: ${now:%Y-%m-%d}_${now:%H-%M-%S}
 
 # task name, determines output directory path

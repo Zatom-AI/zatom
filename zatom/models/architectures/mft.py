@@ -6,7 +6,7 @@ Adapted from:
     - https://github.com/facebookresearch/all-atom-diffusion-transformer
 """
 
-from typing import Any, Dict, List, Literal, Tuple, Type
+from typing import Any, Dict, List, Literal, Tuple
 
 import torch
 import torch.nn as nn
@@ -16,21 +16,10 @@ from flow_matching.path.scheduler import (
     PolynomialConvexScheduler,
 )
 from flow_matching.utils import expand_tensor_like
-from torch.nn.attention import SDPBackend, sdpa_kernel
-from torch.nn.attention.flex_attention import create_block_mask
+from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.encoders.custom_transformer import (
-    SDPA_BACKENDS,
-    LayerNorm,
-    build_attention_mask,
-)
-from zatom.models.architectures.encoders.transformer import get_index_embedding
-from zatom.models.architectures.modules.blocks import DiTBlock
-from zatom.models.architectures.modules.layers import (
-    ConditionEmbedder,
-    FinalLayer,
-    TimestepEmbedder,
-)
+from zatom.models.architectures.encoders.custom_transformer import SDPA_BACKENDS
+from zatom.models.architectures.modules.dit import MultimodalDiT
 from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
@@ -47,417 +36,6 @@ GRAD_DECAY_METHODS = Literal["none", "linear_decay", "truncated_decay", "piecewi
 
 
 #################################################################################
-#                              Multimodal Modules                               #
-#################################################################################
-
-
-class MultimodalModel(nn.Module):
-    """Multimodal model with an encoder-decoder architecture.
-
-    Args:
-        encoder: The encoder module.
-        d_x: Input dimension.
-        d_model: Model dimension.
-        num_layers: Number of Transformer layers.
-        nhead: Number of attention heads.
-        num_datasets: Number of datasets for context conditioning.
-        num_spacegroups: Number of spacegroups for context conditioning.
-        max_num_elements: Maximum number of elements in the dataset.
-        context_length: Context length for the attention mechanism.
-        rope_base: Base frequency for rotary positional encoding.
-        mlp_ratio: Ratio of hidden to input dimension in MLP.
-        proj_drop: Dropout probability for the projection layer.
-        attn_drop: Dropout probability for the attention layer.
-        class_dropout_prob: Probability of dropping class labels for context conditioning.
-        qkv_bias: If True, add a learnable bias to query, key, value.
-        qk_norm: If True, apply normalization to query and key.
-        scale_attn_norm: If True, apply scaling to attention
-            normalization.
-        proj_bias: If True, add bias to output projection.
-        flex_attn: Whether to use PyTorch's FlexAttention.
-        fused_attn: Whether to use PyTorch's `scaled_dot_product_attention`.
-        jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
-        remove_t_conditioning: Whether to remove timestep conditioning for each modality.
-        add_mask_atom_type: Whether to add a mask token for atom types.
-        norm_layer: Normalization layer.
-    """
-
-    def __init__(
-        self,
-        encoder: nn.Module,
-        d_x: int = 512,
-        d_model: int = 768,
-        num_layers: int = 12,
-        nhead: int = 12,
-        num_datasets: int = 2,  # Context conditioning input
-        num_spacegroups: int = 230,  # Context conditioning input
-        max_num_elements: int = 100,
-        context_length: int | None = 2048,
-        rope_base: int | None = 10_000,
-        mlp_ratio: float = 4.0,
-        proj_drop: float = 0.1,
-        attn_drop: float = 0.0,
-        class_dropout_prob: float = 0.1,
-        qkv_bias: bool = False,
-        qk_norm: bool = True,
-        scale_attn_norm: bool = False,
-        proj_bias: bool = False,
-        flex_attn: bool = False,
-        fused_attn: bool = True,
-        jvp_attn: bool = False,
-        remove_t_conditioning: bool = False,
-        add_mask_atom_type: bool = True,
-        norm_layer: Type[nn.Module] = LayerNorm,
-    ):
-        super().__init__()
-
-        assert (
-            sum([flex_attn, fused_attn, jvp_attn]) <= 1
-        ), "Only one of flex_attn, fused_attn, or jvp_attn can be True."
-
-        self.encoder = encoder
-        self.d_model = d_model
-        self.nhead = nhead
-        self.context_length = context_length
-        self.flex_attn = flex_attn
-        self.jvp_attn = jvp_attn
-        self.remove_t_conditioning = remove_t_conditioning
-
-        self.vocab_size = max_num_elements + int(add_mask_atom_type)
-        self.atom_type_embedder = nn.Embedding(self.vocab_size, d_model * 2)
-
-        self.x_embedder = nn.Linear(d_x, d_model, bias=True)
-        self.t_embedder = TimestepEmbedder(d_model)
-        self.dataset_embedder = ConditionEmbedder(num_datasets, d_model, class_dropout_prob)
-        self.spacegroup_embedder = ConditionEmbedder(num_spacegroups, d_model, class_dropout_prob)
-
-        self.blocks = nn.ModuleList(
-            [
-                DiTBlock(
-                    d_model,
-                    nhead,
-                    context_length=context_length,
-                    rope_base=rope_base,
-                    mlp_ratio=mlp_ratio,
-                    attn_drop=attn_drop,
-                    proj_drop=proj_drop,
-                    qkv_bias=qkv_bias,
-                    qk_norm=qk_norm,
-                    scale_attn_norm=scale_attn_norm,
-                    proj_bias=proj_bias,
-                    flex_attn=flex_attn,
-                    fused_attn=fused_attn,
-                    jvp_attn=jvp_attn,
-                    norm_layer=norm_layer,
-                )
-                for _ in range(num_layers)
-            ]
-        )
-        self.final_layer = FinalLayer(d_model, d_x)
-
-        self.atom_types_head = nn.Linear(d_model, self.vocab_size, bias=True)
-        self.pos_head = nn.Linear(d_model, 3, bias=False)
-        self.frac_coords_head = nn.Linear(d_model, 3, bias=False)
-        self.lengths_scaled_head = nn.Linear(d_model, 3, bias=True)
-        self.angles_radians_head = nn.Linear(d_model, 3, bias=True)
-
-        self.initialize_weights()
-
-    @typecheck
-    def initialize_weights(self):
-        """Initialize transformer layers."""
-
-        def _basic_init(module):
-            if isinstance(module, nn.Linear):
-                torch.nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.constant_(module.bias, 0)
-
-        self.apply(_basic_init)
-
-        # Initialize label embedding table
-        nn.init.normal_(self.dataset_embedder.embedding_table.weight, std=0.02)
-        nn.init.normal_(self.spacegroup_embedder.embedding_table.weight, std=0.02)
-
-        # Initialize timestep embedding MLP:
-        nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
-        nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
-
-        # Zero-out adaLN modulation layers in MFT blocks
-        for block in self.blocks:
-            nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
-            nn.init.constant_(block.adaLN_modulation[-1].bias, 0)
-
-        # Zero-out final layers
-        nn.init.constant_(self.final_layer.adaLN_modulation[-1].weight, 0)
-        nn.init.constant_(self.final_layer.adaLN_modulation[-1].bias, 0)
-        nn.init.constant_(self.final_layer.linear.weight, 0)
-        nn.init.constant_(self.final_layer.linear.bias, 0)
-
-    @property
-    def device(self) -> torch.device:
-        """Return the device of the model."""
-        return next(self.parameters()).device
-
-    @typecheck
-    def forward(
-        self,
-        x: (
-            Tuple[
-                Int["b m"],  # type: ignore - atom_types
-                Float["b m 3"],  # type: ignore - pos
-                Float["b m 3"],  # type: ignore - frac_coords
-                Float["b 1 3"],  # type: ignore - lengths_scaled
-                Float["b 1 3"],  # type: ignore - angles_radians
-            ]
-            | List[torch.Tensor]
-        ),
-        t: (
-            Tuple[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
-            ]
-            | List[torch.Tensor]
-        ),
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        ref_pos: Float["b m 3"],  # type: ignore
-        atom_to_token_idx: Int["b m"],  # type: ignore
-        mask: Bool["b m"],  # type: ignore
-        seq_idx: Int["b m"] | None = None,  # type: ignore
-        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
-    ) -> Tuple[
-        Float["b m v"],  # type: ignore - atom_types
-        Float["b m 3"],  # type: ignore - pos
-        Float["b m 3"],  # type: ignore - frac_coords
-        Float["b 1 3"],  # type: ignore - lengths_scaled
-        Float["b 1 3"],  # type: ignore - angles_radians
-    ]:
-        """Forward pass of MultimodalModel.
-
-        Args:
-            x: Tuple or list of input tensors for each modality:
-                atom_types: Atom types tensor (B, N).
-                pos: Atom positions tensor (B, N, 3).
-                frac_coords: Fractional coordinates tensor (B, N, 3).
-                lengths_scaled: Scaled lengths tensor (B, 1, 3).
-                angles_radians: Angles in radians tensor (B, 1, 3).
-            t: Tuple or list of time tensors for each modality:
-                atom_types_t: Time t for atom types (B,).
-                pos_t: Time t for positions (B,).
-                frac_coords_t: Time t for fractional coordinates (B,).
-                lengths_scaled_t: Time t for lengths (B,).
-                angles_radians_t: Time t for angles (B,).
-            dataset_idx: Dataset index for each sample (B,).
-            spacegroup: Spacegroup index for each sample (B,).
-            ref_pos: Reference atom positions for each sample (B, N, 3).
-            atom_to_token_idx: Mapping from atom indices to token indices (B, N).
-            mask: True if valid token, False if padding (B, N).
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
-            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
-
-        Returns:
-            Output velocity fields for each modality as a tuple.
-        """
-        assert len(x) == 5, "Input list x must contain 5 tensors."
-        assert len(t) == 5, "Input list t must contain 5 tensors."
-
-        # Organize inputs
-        atom_types, pos, frac_coords, lengths_scaled, angles_radians = x
-        atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t = t
-
-        batch_size, num_tokens = atom_types.shape
-
-        modals_t = torch.cat(
-            [
-                t.unsqueeze(-1) * 0 if self.remove_t_conditioning else t.unsqueeze(-1)
-                for t in [atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t]
-            ],
-            dim=-1,
-        )
-
-        # Atom type embedding
-        atom_types = self.atom_type_embedder(atom_types)
-
-        # Positional embedding
-        token_idx = torch.cumsum(mask, dim=-1, dtype=torch.int64) - 1
-
-        # Create the attention mask
-        if seq_idx is None:
-            seq_idx = torch.ones_like(token_idx)
-
-        def padded_document_mask_mod(
-            b: torch.Tensor, h: torch.Tensor, q_idx: torch.Tensor, kv_idx: torch.Tensor
-        ) -> torch.Tensor:
-            """Create a padded document mask for the attention mechanism.
-
-            Args:
-                b: Batch index.
-                h: Head index (not used in this implementation).
-                q_idx: Index of the query token.
-                kv_idx: Index of the key-value tokens.
-
-            Returns:
-                A boolean tensor value.
-            """
-            seq_ids = seq_idx
-            non_padding_mask = (seq_ids[b, q_idx] != 0) & (seq_ids[b, kv_idx] != 0)
-            document_mask = seq_ids[b, q_idx] == seq_ids[b, kv_idx]
-            return non_padding_mask & document_mask
-
-        attn_mask = (
-            create_block_mask(
-                mask_mod=padded_document_mask_mod,
-                B=batch_size,
-                H=None,
-                Q_LEN=num_tokens,
-                KV_LEN=num_tokens,
-                device=self.device,
-            )
-            if self.flex_attn
-            else build_attention_mask(
-                mask, seq_idx, dtype=torch.bool if self.jvp_attn else pos.dtype
-            )
-        )
-        if self.jvp_attn:
-            attn_mask = attn_mask.expand(-1, self.nhead, -1, -1)  # [B, H, N, N]
-
-        with sdpa_kernel(sdpa_backends):
-            # Input embeddings: [B, N, C]
-            x_encoding = self.encoder(
-                atom_types,
-                pos,
-                frac_coords,
-                lengths_scaled,
-                angles_radians,
-                token_idx,
-                mask,
-                attn_mask=attn_mask,
-            )
-            x = self.x_embedder(x_encoding)
-
-            # Conditioning embeddings
-            t = self.t_embedder(modals_t).mean(-2)  # [B, C]
-            d = self.dataset_embedder(dataset_idx, self.training)  # [B, C]
-            s = self.spacegroup_embedder(spacegroup, self.training)  # [B, C]
-            c = t + d + s  # [B, C]
-
-            # Transformer blocks
-            for block in self.blocks:
-                x = block(x, c, attn_mask, pos_ids=token_idx)  # [B, N, C]
-
-        # Prediction layers
-        x = self.final_layer(x, c)  # [B, N, 1]
-        x = x * mask.unsqueeze(-1)  # Mask out padding tokens
-
-        # Collect predictions
-        global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # [B, 1, 1]
-        pred_modals = (
-            self.atom_types_head(x) * mask.unsqueeze(-1),  # [B, N, V]
-            self.pos_head(x) * mask.unsqueeze(-1),  # [B, N, 3]
-            self.frac_coords_head(x) * mask.unsqueeze(-1),  # [B, N, 3]
-            self.lengths_scaled_head(x.mean(-2, keepdim=True)) * global_mask,  # [B, 1, 3]
-            self.angles_radians_head(x.mean(-2, keepdim=True)) * global_mask,  # [B, 1, 3]
-        )
-
-        return pred_modals
-
-    @typecheck
-    def forward_with_cfg(
-        self,
-        x: (
-            Tuple[
-                Int["b m"],  # type: ignore - atom_types
-                Float["b m 3"],  # type: ignore - pos
-                Float["b m 3"],  # type: ignore - frac_coords
-                Float["b 1 3"],  # type: ignore - lengths_scaled
-                Float["b 1 3"],  # type: ignore - angles_radians
-            ]
-            | List[torch.Tensor]
-        ),
-        t: (
-            Tuple[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
-            ]
-            | List[torch.Tensor]
-        ),
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        ref_pos: Float["b m 3"],  # type: ignore
-        atom_to_token_idx: Int["b m"],  # type: ignore
-        mask: Bool["b m"],  # type: ignore
-        cfg_scale: float,
-        seq_idx: Int["b m"] | None = None,  # type: ignore
-        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
-    ) -> Tuple[
-        Float["b m v"],  # type: ignore - atom_types
-        Float["b m 3"],  # type: ignore - pos
-        Float["b m 3"],  # type: ignore - frac_coords
-        Float["b 1 3"],  # type: ignore - lengths_scaled
-        Float["b 1 3"],  # type: ignore - angles_radians
-    ]:
-        """Forward pass of MultimodalModel, but also batches the unconditional forward pass for
-        classifier-free guidance.
-
-        NOTE: Assumes batch x's and class labels are ordered such that the first half are the conditional
-        samples and the second half are the unconditional samples.
-
-        Args:
-            x: Tuple or list of input tensors for each modality:
-                atom_types: Atom types tensor (B, N).
-                pos: Atom positions tensor (B, N, 3).
-                frac_coords: Fractional coordinates tensor (B, N, 3).
-                lengths_scaled: Scaled lengths tensor (B, 1, 3).
-                angles_radians: Angles in radians tensor (B, 1, 3).
-            t: Tuple or list of time tensors for each modality:
-                atom_types_t: Time t for atom types (B,).
-                pos_t: Time t for positions (B,).
-                frac_coords_t: Time t for fractional coordinates (B,).
-                lengths_scaled_t: Time t for lengths (B,).
-                angles_radians_t: Time t for angles (B,).
-            dataset_idx: Dataset index for each sample (B,).
-            spacegroup: Spacegroup index for each sample (B,).
-            ref_pos: Reference atom positions for each sample (B, N, 3).
-            atom_to_token_idx: Mapping from atom indices to token indices (B, N).
-            mask: True if valid token, False if padding (B, N).
-            cfg_scale: Classifier-free guidance scale.
-            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
-            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
-
-        Returns:
-            Output velocity fields for each modality as a tuple.
-        """
-        half_x = tuple(x_[: len(x_) // 2] for x_ in x)
-        combined_x = tuple(torch.cat([half_x_, half_x_], dim=0) for half_x_ in half_x)
-        model_out = self.forward(
-            combined_x,
-            t,
-            dataset_idx,
-            spacegroup,
-            ref_pos,
-            atom_to_token_idx,
-            mask,
-            seq_idx=seq_idx,
-            sdpa_backends=sdpa_backends,
-        )
-
-        eps = []
-        for modal in model_out:
-            cond_eps, uncond_eps = torch.split(modal, len(modal) // 2, dim=0)
-            half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
-            eps.append(torch.cat([half_eps, half_eps], dim=0))
-
-        return tuple(eps)
-
-
-#################################################################################
 #                           Multimodal Flow Transformer                         #
 #################################################################################
 
@@ -469,21 +47,28 @@ class MFT(nn.Module):
     except that there is no self conditioning and the model learns flows for each modality.
 
     Args:
-        encoder: The encoder module.
-        d_x: Input dimension.
-        d_model: Model dimension.
-        num_layers: Number of Transformer layers.
-        nhead: Number of attention heads.
-        num_datasets: Number of datasets for context conditioning.
-        num_spacegroups: Number of spacegroups for context conditioning.
+        time_embedder: Time embedder module.
+        dataset_embedder: Dataset embedder module.
+        spacegroup_embedder: Spacegroup embedder module.
+        token_pos_embedder: Token positional embedder module.
+        atom_pos_embedder: Atom positional embedder module.
+        trunk: The Transformer trunk module.
+        atom_encoder_transformer: Multimodal atom encoder Transformer module.
+        atom_decoder_transformer: Multimodal atom decoder Transformer module.
+        hidden_size: Hidden size of the model.
+        token_num_heads: Number of (token) attention heads in the token trunk.
+        atom_num_heads: Number of (atom) attention heads in the atom encoder/decoder.
+        output_channels: Number of output channels.
+        atom_hidden_size_enc: Hidden size of the atom encoder.
+        atom_hidden_size_dec: Hidden size of the atom decoder.
+        atom_n_queries_enc: Number of queries in the atom encoder.
+        atom_n_keys_enc: Number of keys in the atom encoder.
+        atom_n_queries_dec: Number of queries in the atom decoder.
+        atom_n_keys_dec: Number of keys in the atom decoder.
+        use_atom_mask: Whether to use an atom mask.
+        use_length_condition: Whether to use the length condition.
         max_num_elements: Maximum number of elements in the dataset.
         batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 200M) model variant.
-        context_length: Context length for the attention mechanism.
-        rope_base: Base frequency for rotary positional encoding.
-        mlp_ratio: Ratio of hidden to input dimension in MLP.
-        proj_drop: Dropout probability for the projection layer.
-        attn_drop: Dropout probability for the attention layer.
-        class_dropout_prob: Probability of dropping class labels for context conditioning.
         atom_types_loss_weight: Weighting factor for the atom types loss.
         pos_loss_weight: Weighting factor for the atom positions loss.
         frac_coords_loss_weight: Weighting factor for the atom fractional coordinates loss.
@@ -497,11 +82,6 @@ class MFT(nn.Module):
             norm with respect to each modality falls below this value. This
             effectively enables adaptive compute for sampling. Defaults to
             ``None``.
-        qkv_bias: If True, add a learnable bias to query, key, value.
-        qk_norm: If True, apply normalization to query and key.
-        scale_attn_norm: If True, apply scaling to attention
-            normalization.
-        proj_bias: If True, add bias to output projection.
         flex_attn: Whether to use PyTorch's FlexAttention.
         fused_attn: Whether to use PyTorch's `scaled_dot_product_attention`.
         jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
@@ -512,28 +92,34 @@ class MFT(nn.Module):
         remove_t_conditioning: Whether to remove timestep conditioning for each modality.
         enable_eqm_mode: Whether to enable Equilibrium Matching (EqM) mode.
         add_mask_atom_type: Whether to add a mask token for atom types.
-        norm_layer: Normalization layer.
         grad_decay_method: Method for decaying the target gradient magnitude as a function of time.
             Must be one of (`none`, `linear_decay`, `truncated_decay`, `piecewise_decay`).
     """
 
     def __init__(
         self,
-        encoder: nn.Module,
-        d_x: int = 512,
-        d_model: int = 768,
-        num_layers: int = 12,
-        nhead: int = 12,
-        num_datasets: int = 2,  # Context conditioning input
-        num_spacegroups: int = 230,  # Context conditioning input
+        time_embedder: nn.Module,
+        dataset_embedder: nn.Module,
+        spacegroup_embedder: nn.Module,
+        token_pos_embedder: nn.Module,
+        atom_pos_embedder: nn.Module,
+        trunk: nn.Module,
+        atom_encoder_transformer: nn.Module,
+        atom_decoder_transformer: nn.Module,
+        hidden_size: int = 1152,
+        token_num_heads: int = 16,
+        atom_num_heads: int = 4,
+        output_channels: int = 3,
+        atom_hidden_size_enc: int = 256,
+        atom_hidden_size_dec: int = 256,
+        atom_n_queries_enc: int = 32,
+        atom_n_keys_enc: int = 128,
+        atom_n_queries_dec: int = 32,
+        atom_n_keys_dec: int = 128,
+        use_atom_mask: bool = False,
+        use_length_condition: bool = True,
         max_num_elements: int = 100,
         batch_size_scale_factor: int = 1,
-        context_length: int | None = 2048,
-        rope_base: int | None = 10_000,
-        mlp_ratio: float = 4.0,
-        proj_drop: float = 0.1,
-        attn_drop: float = 0.0,
-        class_dropout_prob: float = 0.1,
         atom_types_loss_weight: float = 1.0,
         pos_loss_weight: float = 10.0,
         frac_coords_loss_weight: float = 10.0,
@@ -543,10 +129,6 @@ class MFT(nn.Module):
         grad_decay_b: float = 0.8,
         grad_mul: float = 1.0,
         early_stopping_grad_norm: float | None = None,
-        qkv_bias: bool = False,
-        qk_norm: bool = True,
-        scale_attn_norm: bool = False,
-        proj_bias: bool = False,
         flex_attn: bool = False,
         fused_attn: bool = True,
         jvp_attn: bool = False,
@@ -557,7 +139,6 @@ class MFT(nn.Module):
         remove_t_conditioning: bool = False,
         enable_eqm_mode: bool = False,
         add_mask_atom_type: bool = True,
-        norm_layer: Type[nn.Module] = LayerNorm,
         grad_decay_method: GRAD_DECAY_METHODS = "none",
     ):
         super().__init__()
@@ -581,7 +162,7 @@ class MFT(nn.Module):
             ), "EqM mode requires a gradient decay method (i.e., grad_decay_method != 'none')."
 
         self.batch_size_scale_factor = batch_size_scale_factor
-        self.class_dropout_prob = class_dropout_prob
+        self.class_dropout_prob = dataset_embedder.dropout_prob
         self.atom_types_loss_weight = atom_types_loss_weight
         self.pos_loss_weight = pos_loss_weight
         self.frac_coords_loss_weight = frac_coords_loss_weight
@@ -595,31 +176,30 @@ class MFT(nn.Module):
         self.vocab_size = max_num_elements + int(add_mask_atom_type)
 
         # Build multimodal model
-        model = MultimodalModel(
-            encoder=encoder,
-            d_x=d_x,
-            d_model=d_model,
-            num_layers=num_layers,
-            nhead=nhead,
-            num_datasets=num_datasets,
-            num_spacegroups=num_spacegroups,
+        model = MultimodalDiT(
+            time_embedder=time_embedder,
+            dataset_embedder=dataset_embedder,
+            spacegroup_embedder=spacegroup_embedder,
+            token_pos_embedder=token_pos_embedder,
+            atom_pos_embedder=atom_pos_embedder,
+            trunk=trunk,
+            atom_encoder_transformer=atom_encoder_transformer,
+            atom_decoder_transformer=atom_decoder_transformer,
+            hidden_size=hidden_size,
+            token_num_heads=token_num_heads,
+            atom_num_heads=atom_num_heads,
+            output_channels=output_channels,
+            atom_hidden_size_enc=atom_hidden_size_enc,
+            atom_hidden_size_dec=atom_hidden_size_dec,
+            atom_n_queries_enc=atom_n_queries_enc,
+            atom_n_keys_enc=atom_n_keys_enc,
+            atom_n_queries_dec=atom_n_queries_dec,
+            atom_n_keys_dec=atom_n_keys_dec,
             max_num_elements=max_num_elements,
-            context_length=context_length,
-            rope_base=rope_base,
-            mlp_ratio=mlp_ratio,
-            proj_drop=proj_drop,
-            attn_drop=attn_drop,
-            class_dropout_prob=class_dropout_prob,
-            qkv_bias=qkv_bias,
-            qk_norm=qk_norm,
-            scale_attn_norm=scale_attn_norm,
-            proj_bias=proj_bias,
-            flex_attn=flex_attn,
-            fused_attn=fused_attn,
-            jvp_attn=jvp_attn,
-            remove_t_conditioning=remove_t_conditioning,
+            use_atom_mask=use_atom_mask,
+            use_length_condition=use_length_condition,
             add_mask_atom_type=add_mask_atom_type,
-            norm_layer=norm_layer,
+            remove_t_conditioning=remove_t_conditioning,
         )
 
         # Instantiate paths and losses for Flow
@@ -681,13 +261,12 @@ class MFT(nn.Module):
     @typecheck
     def sample(
         self,
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        ref_pos: Float["b m 3"],  # type: ignore
-        atom_to_token_idx: Int["b m"],  # type: ignore
+        feats: Dict[str, torch.Tensor],
         mask: Bool["b m"],  # type: ignore
         steps: int = 100,
         cfg_scale: float = 2.0,
+        seq_idx: Int["b m"] | None = None,  # type: ignore
+        sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
         modal_input_dict: (
             Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]] | None
         ) = None,
@@ -696,13 +275,20 @@ class MFT(nn.Module):
         """ODE-driven sampling with MFT using classifier-free guidance.
 
         Args:
-            dataset_idx: Dataset index for each sample.
-            spacegroup: Spacegroup index for each sample.
-            ref_pos: Reference atom positions for each sample.
-            atom_to_token_idx: Mapping from atom indices to token indices.
+            feats: Features for conditioning including:
+                dataset_idx: Dataset index for each sample.
+                spacegroup: Spacegroup index for each sample.
+                ref_pos: Reference atom positions tensor.
+                ref_space_uids: Reference space unique IDs tensor.
+                atom_to_token: One-hot mapping from atom indices to token indices.
+                atom_to_token_idx: Mapping from atom indices to token indices.
+                max_num_tokens: Maximum number of unmasked tokens for each batch element.
+                token_index: Indices of the tokens in the batch.
             mask: True if valid token, False if padding.
             steps: Number of integration steps for the multimodal ODE solver.
             cfg_scale: Classifier-free guidance scale.
+            seq_idx: Indices of unique token sequences in the batch (optional unless using sequence packing).
+            sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
             modal_input_dict: If not None, a dictionary specifying input modalities to use and their input metadata.
                 The keys should be a subset of `["atom_types", "pos", "frac_coords", "lengths_scaled", "angles_radians"]`,
                 and the values should be tuples of (x_t, t).
@@ -727,13 +313,17 @@ class MFT(nn.Module):
                 modal_input_dict[modal] = (kwargs[modal], t)
 
         # Set up conditioning inputs for classifier-free guidance
-        dataset_idx_null = torch.zeros_like(dataset_idx)
-        dataset_idx = torch.cat([dataset_idx, dataset_idx_null], dim=0)  # [2B]
-        spacegroup_null = torch.zeros_like(spacegroup)
-        spacegroup = torch.cat([spacegroup, spacegroup_null], dim=0)  # [2B]
-        ref_pos = torch.cat([ref_pos, ref_pos], dim=0)  # [2B, N, 3]
-        atom_to_token_idx = torch.cat([atom_to_token_idx, atom_to_token_idx], dim=0)  # [2B, N]
-        mask = torch.cat([mask, mask], dim=0)  # [2B, N]
+        mask = torch.cat([mask, mask], dim=0)  # [2B, M]
+        for feat in feats:
+            if feat in ("dataset_idx", "spacegroup"):
+                feats[feat] = torch.cat(
+                    [feats[feat], torch.zeros_like(feats[feat])], dim=0
+                )  # [2B]
+            else:
+                feats[feat] = torch.cat([feats[feat], feats[feat]], dim=0)  # [2B, M, ...]
+
+        if seq_idx is not None:
+            seq_idx = torch.cat([seq_idx, seq_idx], dim=0)  # [2B, M]
 
         # Predict each modality in one step
         pred_modals = self.flow.sample(
@@ -747,12 +337,11 @@ class MFT(nn.Module):
             time_grid=None,  # For now, use same time point for all modalities
             device=mask.device,
             steps=steps,
-            dataset_idx=dataset_idx,
-            spacegroup=spacegroup,
-            ref_pos=ref_pos,
-            atom_to_token_idx=atom_to_token_idx,
+            feats=feats,
             mask=mask,
             cfg_scale=cfg_scale,
+            seq_idx=seq_idx,
+            sdpa_backends=sdpa_backends,
         )
 
         # Prepare denoised modalities and remove null class samples
@@ -781,10 +370,7 @@ class MFT(nn.Module):
         frac_coords: Float["b m 3"],  # type: ignore - referenced via `locals()`
         lengths_scaled: Float["b 1 3"],  # type: ignore - referenced via `locals()`
         angles_radians: Float["b 1 3"],  # type: ignore - referenced via `locals()`
-        dataset_idx: Int[" b"],  # type: ignore
-        spacegroup: Int[" b"],  # type: ignore
-        ref_pos: Float["b m 3"],  # type: ignore
-        atom_to_token_idx: Int["b m"],  # type: ignore
+        feats: Dict[str, torch.Tensor],
         mask: Bool["b m"],  # type: ignore
         token_is_periodic: Bool["b m"],  # type: ignore
         target_tensors: Dict[str, torch.Tensor],
@@ -799,10 +385,15 @@ class MFT(nn.Module):
             frac_coords: Fractional coordinates tensor.
             lengths_scaled: Lattice lengths tensor.
             angles_radians: Lattice angles tensor.
-            dataset_idx: Dataset index for each sample.
-            spacegroup: Spacegroup index for each sample.
-            ref_pos: Reference atom positions tensor.
-            atom_to_token_idx: Mapping from atom indices to token indices.
+            feats: Features for conditioning including:
+                dataset_idx: Dataset index for each sample.
+                spacegroup: Spacegroup index for each sample.
+                ref_pos: Reference atom positions tensor.
+                ref_space_uids: Reference space unique IDs tensor.
+                atom_to_token: One-hot mapping from atom indices to token indices.
+                atom_to_token_idx: Mapping from atom indices to token indices.
+                max_num_tokens: Maximum number of unmasked tokens for each batch element.
+                token_index: Indices of the tokens in the batch.
             mask: True if valid token, False if padding.
             token_is_periodic: Boolean mask indicating periodic tokens.
             target_tensors: Dictionary containing the following target tensors for loss calculation:
@@ -851,9 +442,9 @@ class MFT(nn.Module):
             dx_t = getattr(path_sample, "dx_t", None)
 
             # Apply mask
-            if x_t.shape == (batch_size, num_tokens):  # [B, N]
+            if x_t.shape == (batch_size, num_tokens):  # [B, M]
                 x_t *= mask
-            elif x_t.shape == (batch_size, num_tokens, 3):  # [B, N, 3]
+            elif x_t.shape == (batch_size, num_tokens, 3):  # [B, M, 3]
                 x_t *= mask.unsqueeze(-1)
             elif x_t.shape == (batch_size, 1, 3):  # [B, 1, 3]
                 x_t *= mask.any(-1, keepdim=True).unsqueeze(-1)
@@ -891,10 +482,7 @@ class MFT(nn.Module):
                 modal_input_dict["lengths_scaled"][1],  # lengths_scaled_t
                 modal_input_dict["angles_radians"][1],  # angles_radians_t
             ),
-            dataset_idx=dataset_idx,
-            spacegroup=spacegroup,
-            ref_pos=ref_pos,
-            atom_to_token_idx=atom_to_token_idx,
+            feats=feats,
             mask=mask,
         )
 

@@ -37,7 +37,7 @@ parameters:
     value: wandb
 
   name:
-    value: "eval_${hydra:runtime.choices.model/architecture}_enc-${hydra:runtime.choices.model/architecture/encoder}_steps-${hydra:runtime.choices.model.sampling.steps}_cfg-${hydra:runtime.choices.model.sampling.cfg_scale}_mp20"
+    value: "eval_${hydra:runtime.choices.model/architecture}_steps-${hydra:runtime.choices.model.sampling.steps}_cfg-${hydra:runtime.choices.model.sampling.cfg_scale}_mp20"
 
   seed:
     value: 42
