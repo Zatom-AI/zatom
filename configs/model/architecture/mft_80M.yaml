@@ -134,4 +134,4 @@ remove_t_conditioning: false
 enable_eqm_mode: false
 add_mask_atom_type: true
 
-grad_decay_method: none # NOTE: must be one of (`none`, `linear_decay`, `truncated_decay`, `piecewise_decay`)
+grad_decay_method: none # NOTE: must be `none` when `enable_eqm_mode=false`
