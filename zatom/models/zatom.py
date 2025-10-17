@@ -781,7 +781,7 @@ class Zatom(LightningModule):
             steps: The number of ODE steps to use for sampling. Only applicable if using flow matching-based sampling.
 
         Returns:
-            A tuple containing the sampled crystal structure modalities, the original batch, and the generated sample modalities for the final MCMC step.
+            A tuple containing the sampled crystal structure modalities, the original batch, and the generated sample modalities for the final sampling step.
         """
         # Sample random lengths from distribution: (B, 1)
         sample_lengths = torch.multinomial(
