@@ -479,6 +479,15 @@ class MFT(nn.Module):
             if not config.get("should_rigid_align", False):
                 continue
 
+            if config.get("x_1_prediction", False):
+                # When parametrizing x_1, directly align target modality to predicted modality
+                pred_modal = model_output[idx]
+                target_tensors[modal] = weighted_rigid_align(
+                    pred_modal, target_tensors[modal], mask=mask
+                )
+                continue  # No need to re-sample if predicting x_1 directly
+
+            # Otherwise, re-sample target modality velocity via one-step Euler iteration
             pred_modal_vel = model_output[idx]
             target_modal = target_tensors[modal]
 
