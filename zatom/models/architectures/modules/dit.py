@@ -45,6 +45,7 @@ class MultimodalDiT(nn.Module):
         use_length_condition: Whether to condition on sequence length.
         add_mask_atom_type: Whether to add a special mask atom type.
         remove_t_conditioning: Whether to remove time conditioning.
+        jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
     """
 
     def __init__(
@@ -70,6 +71,7 @@ class MultimodalDiT(nn.Module):
         use_length_condition: bool = True,
         add_mask_atom_type: bool = True,
         remove_t_conditioning: bool = False,
+        jvp_attn: bool = False,
     ):
         super().__init__()
         self.time_embedder = time_embedder
@@ -91,6 +93,7 @@ class MultimodalDiT(nn.Module):
         self.atom_num_heads = atom_num_heads
         self.use_length_condition = use_length_condition
         self.remove_t_conditioning = remove_t_conditioning
+        self.jvp_attn = jvp_attn
 
         self.atom_hidden_size_enc = atom_hidden_size_enc
         self.atom_hidden_size_dec = atom_hidden_size_dec
@@ -337,6 +340,16 @@ class MultimodalDiT(nn.Module):
             if atom_attn_mask_dec is None
             else atom_attn_mask_dec[None, None, ...].expand(batch_size, 1, -1, -1)
         )
+
+        if self.jvp_attn:
+            # NOTE: JVP Flash Attention expects the attention mask to be of shape (B, H, M, M)
+            attention_mask = attention_mask.expand(-1, self.token_num_heads, -1, -1).contiguous()
+            atom_attn_mask_enc = atom_attn_mask_enc.expand(
+                -1, self.atom_num_heads, -1, -1
+            ).contiguous()
+            atom_attn_mask_dec = atom_attn_mask_dec.expand(
+                -1, self.atom_num_heads, -1, -1
+            ).contiguous()
 
         # Create condition embeddings for AdaLN
         t_emb = self.time_embedder(modals_t).mean(-2)  # (B, D), via averaging over all modalities

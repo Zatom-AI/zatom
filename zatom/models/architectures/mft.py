@@ -80,7 +80,7 @@ class MFT(nn.Module):
             norm with respect to each modality falls below this value. This
             effectively enables adaptive compute for sampling. Defaults to
             ``None``.
-        jvp_attn: Whether to use a Triton kernel for Jacobian-vector product (JVP) Flash Attention.
+        jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
         weighted_rigid_align_pos: Whether to apply weighted rigid alignment between target and predicted atom positions for loss calculation.
         weighted_rigid_align_frac_coords: Whether to apply weighted rigid alignment between target and predicted atom fractional coordinates for loss calculation.
         continuous_x_1_prediction: Whether the model predicts clean data at t=1 for continuous modalities.
@@ -186,6 +186,7 @@ class MFT(nn.Module):
             use_length_condition=use_length_condition,
             add_mask_atom_type=add_mask_atom_type,
             remove_t_conditioning=remove_t_conditioning,
+            jvp_attn=jvp_attn,
         )
 
         # Instantiate paths and losses for Flow

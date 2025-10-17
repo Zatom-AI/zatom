@@ -5,6 +5,7 @@ Adapted from:
 """
 
 import math
+import warnings
 
 import torch
 import torch.nn.functional as F
@@ -12,6 +13,17 @@ from einops import rearrange
 from torch import Tensor, nn
 
 from zatom.utils.typing_utils import typecheck
+
+# Suppress warnings from JVP Flash Attention for padding rows that are fully masked
+warnings.filterwarnings(
+    "ignore", message=".*divide by zero encountered in matmul.*", category=RuntimeWarning
+)
+warnings.filterwarnings(
+    "ignore", message=".*overflow encountered in matmul.*", category=RuntimeWarning
+)
+warnings.filterwarnings(
+    "ignore", message=".*invalid value encountered in matmul.*", category=RuntimeWarning
+)
 
 #################################################################################
 #                               Misc. Utilities                                 #
@@ -50,6 +62,7 @@ class SelfAttentionLayer(nn.Module):
         proj_drop: Dropout probability for output projection.
         use_bias: If True, add a learnable bias to the output projection.
         qk_norm: If True, apply RMSNorm to queries and keys.
+        jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
         pos_embedder: Optional positional embedding module.
         linear_target: The linear layer class to use (default: nn.Linear).
     """
@@ -64,11 +77,19 @@ class SelfAttentionLayer(nn.Module):
         proj_drop: float = 0.0,
         use_bias: bool = True,
         qk_norm: bool = True,
+        jvp_attn: bool = False,
         pos_embedder: nn.Module | None = None,
         linear_target: nn.Module = nn.Linear,
     ):
         super().__init__()
         self.num_heads = num_heads
+        self.jvp_attn = jvp_attn
+
+        if jvp_attn and not isinstance(self, EfficientSelfAttentionLayer):
+            raise ValueError(
+                "The `jvp_attn` option can only be used with `EfficientSelfAttentionLayer`."
+            )
+
         head_dim = hidden_size // num_heads
         self.scale = qk_scale or head_dim**-0.5
 
@@ -157,12 +178,21 @@ class EfficientSelfAttentionLayer(SelfAttentionLayer):
 
         q, k = self.q_norm(q), self.k_norm(k)
 
-        x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
-        if not self.training:
-            # Ensure no NaNs appear during eval if a (padding) row is (fully) masked
-            # NOTE: This appears to be a bug in PyTorch's fused attention: https://github.com/pytorch/pytorch/issues/163997
-            fully_masked = (~attn_mask).all(dim=-1, keepdim=True)
-            x = torch.where(fully_masked, torch.zeros_like(x), x)
+        # JVP Flash Attention, with support for second-order derivatives
+        if self.jvp_attn:
+            from jvp_flash_attention.jvp_attention import attention as jvp_attention
+
+            x = jvp_attention(q, k, v, attn_mask=attn_mask)
+
+        # PyTorch's Scaled Dot Product Attention
+        else:
+            x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+
+            if not self.training:
+                # Ensure no NaNs appear during eval if a (padding) row is (fully) masked
+                # NOTE: This appears to be a bug in PyTorch's fused attention: https://github.com/pytorch/pytorch/issues/163997
+                fully_masked = (~attn_mask).all(dim=-1, keepdim=True)
+                x = torch.where(fully_masked, torch.zeros_like(x), x)
 
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
