@@ -78,6 +78,7 @@ bash -c "
     ckpt_path=$CKPT_PATH \
     data=$DATASET \
     date=$RUN_DATE \
+    experiment=train \
     model/architecture=$ARCHITECTURE \
     name=$RUN_NAME \
     task_name=$TASK_NAME \

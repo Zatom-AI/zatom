@@ -21,6 +21,9 @@ parameters:
   date:
     value: "2025-10-14_14-00-00"
 
+  experiment:
+    value: eval
+
   model.sampling.batch_size:
     value: 1000
 

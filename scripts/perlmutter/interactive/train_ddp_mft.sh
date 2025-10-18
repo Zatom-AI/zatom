@@ -73,6 +73,7 @@ bash -c "
     data=$DATASET \
     data.datamodule.batch_size.base_accumulate_grad_batches=4 \
     date=$RUN_DATE \
+    experiment=train \
     model/architecture=$ARCHITECTURE \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
