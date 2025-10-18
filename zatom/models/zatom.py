@@ -485,7 +485,7 @@ class Zatom(LightningModule):
                 # ])
 
             if self.hparams.augmentations.pos is True:
-                rot_mat = random_rotation_matrix(validate=True, device=self.device)
+                rot_mat = random_rotation_matrix(validate=False, device=self.device)
                 pos_aug = batch.pos @ rot_mat.T
                 batch.pos = pos_aug
                 cell_aug = batch.cell @ rot_mat.T
@@ -518,13 +518,16 @@ class Zatom(LightningModule):
                     batch.pos = pos_aug
                     # Compute new fractional coordinates for periodic samples
                     cell_per_node_inv = torch.linalg.inv(
-                        batch.cell[batch.batch][batch.node_is_periodic]
+                        # NOTE: `torch.linalg.inv` does not support low precision dtypes
+                        batch.cell[batch.batch][batch.node_is_periodic].float()
                     )
                     frac_coords_aug = torch.einsum(
                         "bi,bij->bj", batch.pos[batch.node_is_periodic], cell_per_node_inv
                     )
                     frac_coords_aug = frac_coords_aug % 1.0
-                    batch.frac_coords[batch.node_is_periodic] = frac_coords_aug
+                    batch.frac_coords[batch.node_is_periodic] = frac_coords_aug.type(
+                        batch.frac_coords.dtype
+                    )
 
         # Forward pass with loss calculation
         loss_dict = self.forward(batch)

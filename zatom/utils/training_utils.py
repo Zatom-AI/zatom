@@ -494,14 +494,15 @@ def random_rotation_matrix(validate: bool = False, **tensor_kwargs: Any) -> torc
                 1 - 2 * q[1] ** 2 - 2 * q[2] ** 2,
             ],
         ],
-        dtype=q.dtype,
         **tensor_kwargs,
     )
 
     if validate:
+        rot_identity_mat = rot_mat @ rot_mat.T
+        identity_mat = torch.eye(3, device=rot_mat.device, dtype=rot_identity_mat.dtype)
         assert torch.allclose(
-            rot_mat @ rot_mat.T,
-            torch.eye(3, device=rot_mat.device, dtype=rot_mat.dtype),
+            rot_identity_mat,
+            identity_mat,
             atol=1e-5,
             rtol=1e-5,
         ), "Not a rotation matrix."
