@@ -494,6 +494,7 @@ def random_rotation_matrix(validate: bool = False, **tensor_kwargs: Any) -> torc
                 1 - 2 * q[1] ** 2 - 2 * q[2] ** 2,
             ],
         ],
+        dtype=q.dtype,
         **tensor_kwargs,
     )
 
