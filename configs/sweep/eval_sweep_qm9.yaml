@@ -1,5 +1,6 @@
 name: eval_sweep_qm9_2025-10-14_14-00-00
 project: zatom
+entity: zatom
 program: zatom/eval_fm.py
 
 method: grid

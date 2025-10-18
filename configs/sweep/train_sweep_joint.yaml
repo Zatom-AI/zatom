@@ -1,5 +1,6 @@
-name: train_sweep_joint-qm9-mp20_2025-10-14_14-00-00
+name: train_sweep_joint-qm9-mp20_2025-10-18_10-00-00
 project: zatom
+entity: zatom
 program: zatom/train_fm.py
 
 method: grid
@@ -15,8 +16,11 @@ parameters:
   data:
     values: [joint]
 
+  data.datamodule.batch_size.base_accumulate_grad_batches:
+    value: 8
+
   date:
-    value: "2025-10-14_14-00-00"
+    value: "2025-10-18_10-00-00"
 
   experiment:
     value: train
@@ -33,11 +37,14 @@ parameters:
   seed:
     value: 42
 
+  strategy:
+    value: default
+
   trainer:
     value: gpu
 
   trainer.check_val_every_n_epoch:
-    value: 5
+    value: 10
 
 command:
   - ${env}
