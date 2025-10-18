@@ -34,7 +34,7 @@ mkdir -p "$TORCH_HOME"
 mkdir -p "$HF_HOME"
 
 # Define run details
-DEFAULT_SWEEP_ID="qa4e4vnh"                   # NOTE: Generate a unique ID for each run by running `wandb sweep configs/sweep/{train,eval}_sweep_{joint,qm9,mp20,qmof150,omol25,geom}.yaml`
+DEFAULT_SWEEP_ID="1k2b6il4"                   # NOTE: Generate a unique ID for each run by running `wandb sweep configs/sweep/{train,eval}_sweep_{joint,qm9,mp20,qmof150,omol25,geom}.yaml`
 SWEEP_ID=${1:-$DEFAULT_SWEEP_ID}              # First argument or default ID if not provided
 
 # Inform user of job details
