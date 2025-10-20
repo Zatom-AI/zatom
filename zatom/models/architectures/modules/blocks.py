@@ -200,14 +200,15 @@ class DiTBlock(nn.Module):
         return latents
 
 
-class TransformerBlock(nn.Module):
-    """A DiT Transformer block with adaptive layer norm zero (adaLN-Zero) conditioning.
+class DiPBlock(nn.Module):
+    """A Diffusion Platonic Transformer (DiP) block with adaptive layer norm zero (adaLN-Zero)
+    conditioning.
 
     Args:
         self_attention_layer: A callable that returns a self-attention layer.
         hidden_size: The hidden size of the transformer block.
         mlp_ratio: The ratio of the MLP hidden size to the hidden size. Default: 4.0
-        use_swiglu: Whether to use SwiGLU activation in the MLP. Default: False
+        use_swiglu: Whether to use SwiGLU activation in the MLP. Default: True
     """
 
     def __init__(
@@ -215,42 +216,71 @@ class TransformerBlock(nn.Module):
         self_attention_layer: Type[nn.Module],
         hidden_size: int,
         mlp_ratio: float = 4.0,
-        use_swiglu: bool = False,
+        use_swiglu: bool = True,
     ):
+        raise NotImplementedError("DiPBlock is not yet implemented. Please use DiTBlock instead.")
+
         super().__init__()
         self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.attn = self_attention_layer()
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
-        approx_gelu = lambda: nn.GELU(approximate="tanh")
         if use_swiglu:
             self.mlp = SwiGLUFeedForward(hidden_size, mlp_hidden_dim)
         else:
+            approx_gelu = lambda: nn.GELU(approximate="tanh")
             self.mlp = Mlp(
                 in_features=hidden_size,
                 hidden_features=mlp_hidden_dim,
                 act_layer=approx_gelu,
                 drop=0,
             )
+        self.adaLN_modulation = nn.Sequential(
+            nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True)
+        )
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        """Initialize weights following DiT paper."""
+
+        def _basic_init(module):
+            if isinstance(module, nn.Linear):
+                torch.nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
+        # Initialize transformer layers:
+        self.apply(_basic_init)
+
+        # Zero-out adaLN modulation layers in DiT encoder blocks
+        nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
+        nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
 
     @typecheck
     def forward(
         self,
         latents: Tensor,
+        c: Tensor,
         **kwargs: Any,
     ) -> Tensor:
-        """Forward pass of the Transformer block.
+        """Forward pass of the DiP block.
 
         Args:
             latents: Input tensor of shape (B, N, D).
+            c: Conditioning tensor of shape (B, D).
             **kwargs: Additional arguments for the self-attention layer.
 
         Returns:
             Output tensor of shape (B, N, D).
         """
-        _latents = self.attn(self.norm1(latents), **kwargs)
-        latents = latents + _latents
-        latents = latents + self.mlp(self.norm2(latents))
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(
+            c
+        ).chunk(6, dim=1)
+        _latents = self.attn(modulate(self.norm1(latents), shift_msa, scale_msa), **kwargs)
+        latents = latents + gate_msa.unsqueeze(1) * _latents
+        latents = latents + gate_mlp.unsqueeze(1) * self.mlp(
+            modulate(self.norm2(latents), shift_mlp, scale_mlp)
+        )
         return latents
 
 
@@ -258,7 +288,7 @@ class HomogenTrunk(nn.Module):
     """A homogeneous trunk for the DiT model.
 
     Args:
-        block: A callable that returns a DiTBlock or TransformerBlock.
+        block: A callable that returns a DiTBlock or DiPBlock.
         depth: The number of blocks in the trunk.
 
     Returns:
