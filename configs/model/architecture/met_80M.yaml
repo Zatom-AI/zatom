@@ -134,5 +134,6 @@ unified_modal_time: true
 remove_t_conditioning: true
 enable_eqm_mode: true
 add_mask_atom_type: true
+treat_discrete_modalities_as_continuous: false
 
 grad_decay_method: linear_decay # NOTE: must be one of (`linear_decay`, `truncated_decay`, `piecewise_decay`)

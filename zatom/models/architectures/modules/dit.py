@@ -44,6 +44,7 @@ class MultimodalDiT(nn.Module):
         max_num_elements: The maximum number of unique atom types (elements).
         use_length_condition: Whether to condition on sequence length.
         add_mask_atom_type: Whether to add a special mask atom type.
+        treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         remove_t_conditioning: Whether to remove time conditioning.
         jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
     """
@@ -70,6 +71,7 @@ class MultimodalDiT(nn.Module):
         max_num_elements: int = 100,
         use_length_condition: bool = True,
         add_mask_atom_type: bool = True,
+        treat_discrete_modalities_as_continuous: bool = False,
         remove_t_conditioning: bool = False,
         jvp_attn: bool = False,
     ):
@@ -104,7 +106,15 @@ class MultimodalDiT(nn.Module):
 
         vocab_size = max_num_elements + int(add_mask_atom_type)
 
-        self.atom_type_embedder = nn.Embedding(vocab_size, hidden_size)
+        self.atom_type_embedder = (
+            nn.Sequential(
+                nn.Linear(vocab_size, hidden_size, bias=False),
+                nn.LayerNorm(hidden_size),
+                nn.SiLU(),
+            )
+            if treat_discrete_modalities_as_continuous
+            else nn.Embedding(vocab_size, hidden_size)
+        )
         self.lengths_scaled_embedder = nn.Sequential(
             nn.Linear(3, hidden_size, bias=False),
             nn.LayerNorm(hidden_size),
@@ -233,7 +243,7 @@ class MultimodalDiT(nn.Module):
         self,
         x: (
             Tuple[
-                Int["b m"],  # type: ignore - atom_types
+                Int["b m"] | Float["b m v"],  # type: ignore - atom_types
                 Float["b m 3"],  # type: ignore - pos
                 Float["b m 3"],  # type: ignore - frac_coords
                 Float["b 1 3"],  # type: ignore - lengths_scaled
@@ -265,7 +275,7 @@ class MultimodalDiT(nn.Module):
 
         Args:
             x: Tuple or list of input tensors for each modality:
-                atom_types: Atom types tensor (B, M).
+                atom_types: Atom types tensor (B, M) or (B, M, V), where V is the number of atom types.
                 pos: Atom positions tensor (B, M, 3).
                 frac_coords: Fractional coordinates tensor (B, M, 3).
                 lengths_scaled: Scaled lengths tensor (B, 1, 3).
@@ -295,8 +305,8 @@ class MultimodalDiT(nn.Module):
         atom_types, pos, frac_coords, lengths_scaled, angles_radians = x
         atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t = t
 
-        device = atom_types.device
-        batch_size, num_atoms = _, num_tokens = atom_types.shape
+        device = mask.device
+        batch_size, num_atoms = _, num_tokens = mask.shape
 
         dataset_idx = feats["dataset_idx"]
         spacegroup = feats["spacegroup"]
@@ -472,7 +482,7 @@ class MultimodalDiT(nn.Module):
         self,
         x: (
             Tuple[
-                Int["b m"],  # type: ignore - atom_types
+                Int["b m"] | Float["b m v"],  # type: ignore - atom_types
                 Float["b m 3"],  # type: ignore - pos
                 Float["b m 3"],  # type: ignore - frac_coords
                 Float["b 1 3"],  # type: ignore - lengths_scaled
@@ -509,7 +519,7 @@ class MultimodalDiT(nn.Module):
 
         Args:
             x: Tuple or list of input tensors for each modality:
-                atom_types: Atom types tensor (B, N).
+                atom_types: Atom types tensor (B, N) or (B, N, V), where V is the number of atom types.
                 pos: Atom positions tensor (B, N, 3).
                 frac_coords: Fractional coordinates tensor (B, N, 3).
                 lengths_scaled: Scaled lengths tensor (B, 1, 3).

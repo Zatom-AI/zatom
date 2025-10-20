@@ -134,5 +134,6 @@ unified_modal_time: true
 remove_t_conditioning: false
 enable_eqm_mode: false
 add_mask_atom_type: true
+treat_discrete_modalities_as_continuous: false
 
 grad_decay_method: none # NOTE: must be `none` when `enable_eqm_mode=false`

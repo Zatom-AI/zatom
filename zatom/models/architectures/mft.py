@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Literal, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from flow_matching.path import AffineProbPath, MixtureDiscreteProbPath
 from flow_matching.path.scheduler import (
     CondOTScheduler,
@@ -89,6 +90,7 @@ class MFT(nn.Module):
         remove_t_conditioning: Whether to remove timestep conditioning for each modality.
         enable_eqm_mode: Whether to enable Equilibrium Matching (EqM) mode.
         add_mask_atom_type: Whether to add a mask token for atom types.
+        treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         grad_decay_method: Method for decaying the target gradient magnitude as a function of time.
             Must be one of (`none`, `linear_decay`, `truncated_decay`, `piecewise_decay`).
     """
@@ -133,6 +135,7 @@ class MFT(nn.Module):
         remove_t_conditioning: bool = False,
         enable_eqm_mode: bool = False,
         add_mask_atom_type: bool = True,
+        treat_discrete_modalities_as_continuous: bool = False,
         grad_decay_method: GRAD_DECAY_METHODS = "none",
     ):
         super().__init__()
@@ -163,6 +166,7 @@ class MFT(nn.Module):
         self.logit_normal_time = logit_normal_time
         self.unified_modal_time = unified_modal_time
         self.grad_decay_method = grad_decay_method
+        self.treat_discrete_modalities_as_continuous = treat_discrete_modalities_as_continuous
 
         self.vocab_size = max_num_elements + int(add_mask_atom_type)
 
@@ -188,6 +192,7 @@ class MFT(nn.Module):
             max_num_elements=max_num_elements,
             use_length_condition=use_length_condition,
             add_mask_atom_type=add_mask_atom_type,
+            treat_discrete_modalities_as_continuous=treat_discrete_modalities_as_continuous,
             remove_t_conditioning=remove_t_conditioning,
             jvp_attn=jvp_attn,
         )
@@ -195,11 +200,20 @@ class MFT(nn.Module):
         # Instantiate paths and losses for Flow
         cond_ot_scheduler = EquilibriumCondOTScheduler if enable_eqm_mode else CondOTScheduler
         modalities = {
-            "atom_types": {
-                "path": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=1.0)),
-                # loss omitted → Flow will use MixturePathGeneralizedKL automatically
-                "weight": self.atom_types_loss_weight,
-            },
+            "atom_types": (
+                {
+                    "path": AffineProbPath(scheduler=cond_ot_scheduler()),
+                    # loss omitted → Flow will use squared error automatically
+                    "weight": self.atom_types_loss_weight,
+                    "x_1_prediction": continuous_x_1_prediction,
+                }
+                if treat_discrete_modalities_as_continuous
+                else {
+                    "path": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=1.0)),
+                    # loss omitted → Flow will use MixturePathGeneralizedKL automatically
+                    "weight": self.atom_types_loss_weight,
+                }
+            ),
             "pos": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
                 # loss omitted → Flow will use squared error automatically
@@ -285,6 +299,7 @@ class MFT(nn.Module):
         Returns:
             A list of predicted modalities as a dictionary and a null variable (for sake of API compatibility).
         """
+        device = mask.device
         batch_size, num_tokens = mask.shape
 
         if modal_input_dict is None:
@@ -293,6 +308,12 @@ class MFT(nn.Module):
             for modal in self.modals:
                 assert modal in kwargs, f"Missing required modality input: {modal}"
                 t = torch.ones(batch_size, device=BEST_DEVICE)
+
+                if modal == "atom_types" and self.treat_discrete_modalities_as_continuous:
+                    # Maybe convert atom types to random continuous (one-hot) vectors
+                    kwargs[modal] = torch.randn(
+                        batch_size, num_tokens, self.vocab_size, device=device
+                    )
 
                 # Set up modality inputs for classifier-free guidance
                 kwargs[modal] = torch.cat([kwargs[modal], kwargs[modal]], dim=0)  # [2B, N, C]
@@ -333,7 +354,11 @@ class MFT(nn.Module):
             {
                 modal: (
                     # Take the first half of the batch
-                    pred_modals[modal_idx]
+                    (
+                        pred_modals[modal_idx].argmax(dim=-1)
+                        if self.treat_discrete_modalities_as_continuous
+                        else pred_modals[modal_idx]
+                    )
                     .detach()
                     .chunk(2, dim=0)[0]
                     .reshape(batch_size * num_tokens)
@@ -394,8 +419,8 @@ class MFT(nn.Module):
         Returns:
             Dictionary of loss values.
         """
-        device = atom_types.device
-        batch_size, num_tokens = atom_types.shape
+        device = mask.device
+        batch_size, num_tokens = mask.shape
 
         # Sample time points and corresponding noised inputs for each modality
         modal_input_dict = {}
@@ -429,6 +454,13 @@ class MFT(nn.Module):
                 # Sample a time point from a uniform distribution
                 t = torch.rand(batch_size, device=device) * (1 - epsilon)
 
+            if modal == "atom_types" and self.treat_discrete_modalities_as_continuous:
+                # Maybe convert atom types to (random) continuous (one-hot) vectors
+                x_0 = torch.randn(batch_size, num_tokens, self.vocab_size, device=device)
+                x_1 = F.one_hot(
+                    x_1 * mask, num_classes=self.vocab_size
+                ).float()  # Int[B, N] -> Float[B, N, V]
+
             # Sample probability path
             path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
             x_t = path_sample.x_t
@@ -437,7 +469,10 @@ class MFT(nn.Module):
             # Apply mask
             if x_t.shape == (batch_size, num_tokens):  # [B, M]
                 x_t *= mask
-            elif x_t.shape == (batch_size, num_tokens, 3):  # [B, M, 3]
+            elif x_t.shape in [
+                (batch_size, num_tokens, 3),
+                (batch_size, num_tokens, self.vocab_size),
+            ]:  # [B, M, C]
                 x_t *= mask.unsqueeze(-1)
             elif x_t.shape == (batch_size, 1, 3):  # [B, 1, 3]
                 x_t *= mask.any(-1, keepdim=True).unsqueeze(-1)
@@ -521,9 +556,15 @@ class MFT(nn.Module):
             modal_input_dict[modal][2] = path_sample.dx_t
 
         # Calculate the loss for each modality
+        target_atom_types = (
+            # Mask out -100 padding to construct target atom types
+            F.one_hot(target_tensors["atom_types"] * mask, num_classes=self.vocab_size).float()
+            if self.treat_discrete_modalities_as_continuous
+            else target_tensors["atom_types"] * mask
+        )
         training_loss, training_loss_dict = self.flow.training_loss(
             x_1=[
-                target_tensors["atom_types"] * mask,  # Mask out -100 padding
+                target_atom_types,
                 target_tensors["pos"],
                 target_tensors["frac_coords"],
                 target_tensors["lengths_scaled"],
@@ -579,6 +620,8 @@ class MFT(nn.Module):
                 loss_token_is_periodic = (
                     token_is_periodic.any(-1, keepdim=True).unsqueeze(-1).float()
                 )  # NOTE: A periodic sample is one with any periodic atoms
+            elif modal == "atom_types" and self.treat_discrete_modalities_as_continuous:
+                loss_mask = mask.unsqueeze(-1)
 
             # Mask loss values
             modal_loss_value = modal_loss_value * loss_mask
