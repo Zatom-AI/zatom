@@ -1,0 +1,145 @@
+_target_: zatom.models.architectures.mft.MFT
+
+# Modules
+multimodal_model:
+  _target_: zatom.models.architectures.modules.dip.MultimodalDiP
+  _partial_: True
+
+time_embedder:
+  _target_: zatom.models.architectures.modules.layers.TimestepEmbedder
+  hidden_size: ${model.architecture.hidden_size}
+
+dataset_embedder:
+  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  num_classes: 2
+  hidden_size: ${model.architecture.hidden_size}
+  dropout_prob: 0.1
+
+spacegroup_embedder:
+  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  num_classes: 230
+  hidden_size: ${model.architecture.hidden_size}
+  dropout_prob: 0.1
+
+token_pos_embedder:
+  _target_: zatom.models.architectures.modules.pos_embed.AbsolutePositionEncoding
+  in_dim: 1
+  embed_dim: ${model.architecture.hidden_size}
+  include_input: True
+
+atom_pos_embedder:
+  _target_: platonic_transformers.models.platoformer.ape.PlatonicAPE
+  embed_dim: 128
+  solid_name: ${model.architecture.solid_name}
+  freq_sigma: 0.5
+  spatial_dims: 3
+  learned_freqs: True
+
+atom_encoder_transformer:
+  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  depth: 2
+  block:
+    _target_: zatom.models.architectures.modules.blocks.DiPBlock
+    _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
+    hidden_size: ${model.architecture.atom_hidden_size_enc}
+    mlp_ratio: 4.0
+    use_swiglu: True # SwiGLU FFN
+    self_attention_layer:
+      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer # NOTE: this may require a Platonic alternative
+      _partial_: True
+      hidden_size: ${model.architecture.atom_hidden_size_enc}
+      num_heads: ${model.architecture.atom_num_heads}
+      qk_norm: True
+      jvp_attn: ${model.architecture.jvp_attn}
+      pos_embedder:
+        _target_: zatom.models.architectures.modules.pos_embed.PlatonicAxialRotaryPositionEncoding
+        in_dim: 4
+        embed_dim: ${model.architecture.atom_hidden_size_enc}
+        num_heads: ${model.architecture.atom_num_heads}
+        base: 100.0
+
+trunk:
+  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  depth: 16
+  block:
+    _target_: zatom.models.architectures.modules.blocks.DiPBlock
+    _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
+    hidden_size: ${model.architecture.hidden_size}
+    mlp_ratio: 4.0
+    use_swiglu: True # SwiGLU FFN
+    self_attention_layer:
+      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer # NOTE: this may require a Platonic alternative
+      _partial_: True
+      hidden_size: ${model.architecture.hidden_size}
+      num_heads: ${model.architecture.token_num_heads}
+      qk_norm: True
+      jvp_attn: ${model.architecture.jvp_attn}
+      pos_embedder:
+        _target_: zatom.models.architectures.modules.pos_embed.PlatonicAxialRotaryPositionEncoding
+        in_dim: 1
+        embed_dim: ${model.architecture.hidden_size}
+        num_heads: ${model.architecture.token_num_heads}
+        base: 100.0
+
+atom_decoder_transformer:
+  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  depth: 2
+  block:
+    _target_: zatom.models.architectures.modules.blocks.DiPBlock
+    _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
+    hidden_size: ${model.architecture.atom_hidden_size_dec}
+    mlp_ratio: 4.0
+    use_swiglu: True # SwiGLU FFN
+    self_attention_layer:
+      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer # NOTE: this may require a Platonic alternative
+      _partial_: True
+      hidden_size: ${model.architecture.atom_hidden_size_dec}
+      num_heads: ${model.architecture.atom_num_heads}
+      qk_norm: True
+      jvp_attn: ${model.architecture.jvp_attn}
+      pos_embedder:
+        _target_: zatom.models.architectures.modules.pos_embed.PlatonicAxialRotaryPositionEncoding
+        in_dim: 4
+        embed_dim: ${model.architecture.atom_hidden_size_dec}
+        num_heads: ${model.architecture.atom_num_heads}
+        base: 100.0
+
+# General architecture parameters
+hidden_size: 768
+token_num_heads: 12
+atom_num_heads: 4
+atom_hidden_size_enc: 256
+atom_hidden_size_dec: 256
+atom_n_queries_enc: null # NOTE: if null, user-provided `mask` will be used instead
+atom_n_keys_enc: null # NOTE: if null, user-provided `mask` will be used instead
+atom_n_queries_dec: null # NOTE: if null, user-provided `mask` will be used instead
+atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
+max_num_elements: 100
+batch_size_scale_factor: 1 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
+
+atom_types_loss_weight: 1.0
+pos_loss_weight: 10.0
+frac_coords_loss_weight: 10.0
+lengths_scaled_loss_weight: 1.0
+angles_radians_loss_weight: 10.0
+grad_decay_a: 0.8 # NOTE: only used if `enable_eqm_mode=true`
+grad_decay_b: 0.8 # NOTE: only used if `enable_eqm_mode=true`
+grad_mul: 1.0 # NOTE: only used if `enable_eqm_mode=true`
+early_stopping_grad_norm: null
+
+use_length_condition: true
+jvp_attn: false
+weighted_rigid_align_pos: true
+weighted_rigid_align_frac_coords: false
+continuous_x_1_prediction: false
+logit_normal_time: false
+unified_modal_time: true
+remove_t_conditioning: false
+enable_eqm_mode: false
+add_mask_atom_type: true
+treat_discrete_modalities_as_continuous: false
+
+grad_decay_method: none # NOTE: must be `none` when `enable_eqm_mode=false`
+
+# Platonic Transformer parameters
+solid_name: octahedron # NOTE: must be one of (`trivial`, `tetrahedron`, `octahedron`, `icosahedron`, `octahedron_reflections`)

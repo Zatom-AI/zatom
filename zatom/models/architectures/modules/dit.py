@@ -5,7 +5,7 @@ Adapted from:
 """
 
 import math
-from typing import Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 import torch
 from torch import Tensor, nn
@@ -47,6 +47,7 @@ class MultimodalDiT(nn.Module):
         treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         remove_t_conditioning: Whether to remove time conditioning.
         jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
+        kwargs: Additional keyword arguments (unused).
     """
 
     def __init__(
@@ -59,8 +60,8 @@ class MultimodalDiT(nn.Module):
         trunk: Type[nn.Module],
         atom_encoder_transformer: Type[nn.Module],
         atom_decoder_transformer: Type[nn.Module],
-        hidden_size: int = 1152,
-        token_num_heads: int = 16,
+        hidden_size: int = 768,
+        token_num_heads: int = 12,
         atom_num_heads: int = 4,
         atom_hidden_size_enc: int = 256,
         atom_hidden_size_dec: int = 256,
@@ -74,6 +75,7 @@ class MultimodalDiT(nn.Module):
         treat_discrete_modalities_as_continuous: bool = False,
         remove_t_conditioning: bool = False,
         jvp_attn: bool = False,
+        **kwargs: Any,
     ):
         super().__init__()
         self.time_embedder = time_embedder

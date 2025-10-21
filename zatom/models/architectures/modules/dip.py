@@ -6,15 +6,24 @@ Adapted from:
 """
 
 import math
-from typing import Dict, List, Tuple, Type
+from typing import Dict, List, Literal, Tuple, Type
 
 import torch
+from platonic_transformers.models.platoformer.groups import PLATONIC_GROUPS
 from torch import Tensor, nn
 from torch.nn.attention import SDPBackend
 
 from zatom.models.architectures.modules.layers import FinalLayer
 from zatom.utils.training_utils import SDPA_BACKENDS
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
+
+PLATONIC_GROUP_NAMES = Literal[
+    "trivial",
+    "tetrahedron",
+    "octahedron",
+    "icosahedron",
+    "octahedron_reflections",
+]
 
 #################################################################################
 #                        Diffusion Platonic Transformer (DiP)                   #
@@ -48,6 +57,7 @@ class MultimodalDiP(nn.Module):
         treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         remove_t_conditioning: Whether to remove time conditioning.
         jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
+        solid_name: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
     """
 
     def __init__(
@@ -60,8 +70,8 @@ class MultimodalDiP(nn.Module):
         trunk: Type[nn.Module],
         atom_encoder_transformer: Type[nn.Module],
         atom_decoder_transformer: Type[nn.Module],
-        hidden_size: int = 1152,
-        token_num_heads: int = 16,
+        hidden_size: int = 768,
+        token_num_heads: int = 12,
         atom_num_heads: int = 4,
         atom_hidden_size_enc: int = 256,
         atom_hidden_size_dec: int = 256,
@@ -75,6 +85,7 @@ class MultimodalDiP(nn.Module):
         treat_discrete_modalities_as_continuous: bool = False,
         remove_t_conditioning: bool = False,
         jvp_attn: bool = False,
+        solid_name: PLATONIC_GROUP_NAMES = "octahedron",
     ):
         raise NotImplementedError(
             "MultimodalDiP is not yet implemented. Please use MultimodalDiT instead."
@@ -108,6 +119,9 @@ class MultimodalDiP(nn.Module):
         self.atom_n_keys_enc = atom_n_keys_enc
         self.atom_n_queries_dec = atom_n_queries_dec
         self.atom_n_keys_dec = atom_n_keys_dec
+
+        self.group = PLATONIC_GROUPS[solid_name.lower()]
+        self.num_G = self.group.G
 
         vocab_size = max_num_elements + int(add_mask_atom_type)
 

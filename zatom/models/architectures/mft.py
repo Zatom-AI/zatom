@@ -141,6 +141,7 @@ class MFT(nn.Module):
         add_mask_atom_type: bool = True,
         treat_discrete_modalities_as_continuous: bool = False,
         grad_decay_method: GRAD_DECAY_METHODS = "none",
+        **kwargs: Any,
     ):
         super().__init__()
 
@@ -211,6 +212,7 @@ class MFT(nn.Module):
             treat_discrete_modalities_as_continuous=treat_discrete_modalities_as_continuous,
             remove_t_conditioning=remove_t_conditioning,
             jvp_attn=jvp_attn,
+            **kwargs,
         )
 
         # Instantiate paths and losses for Flow
