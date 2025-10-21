@@ -20,7 +20,6 @@ from flow_matching.path.scheduler import (
 from flow_matching.utils import expand_tensor_like
 from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.modules.dit import MultimodalDiT
 from zatom.scheduler.scheduler import EquilibriumCondOTScheduler
 from zatom.utils import pylogger
 from zatom.utils.multimodal import Flow
@@ -91,6 +90,7 @@ class MFT(nn.Module):
         unified_modal_time: Whether to use a single (i.e., the same) time input for all modalities.
         remove_t_conditioning: Whether to remove timestep conditioning for each modality.
         enable_eqm_mode: Whether to enable Equilibrium Matching (EqM) mode.
+        enable_mean_flows: Whether to enable mean flows for each (continuous) modality.
         add_mask_atom_type: Whether to add a mask token for atom types.
         treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         grad_decay_method: Method for decaying the target gradient magnitude as a function of time.
@@ -137,6 +137,7 @@ class MFT(nn.Module):
         unified_modal_time: bool = True,
         remove_t_conditioning: bool = False,
         enable_eqm_mode: bool = False,
+        enable_mean_flows: bool = False,
         add_mask_atom_type: bool = True,
         treat_discrete_modalities_as_continuous: bool = False,
         grad_decay_method: GRAD_DECAY_METHODS = "none",
@@ -157,6 +158,17 @@ class MFT(nn.Module):
                 grad_decay_method != "none"
             ), "EqM mode requires a gradient decay method (i.e., grad_decay_method != 'none')."
 
+        if enable_mean_flows:
+            assert (
+                jvp_attn is True
+            ), "Mean flows require JVP Flash Attention (i.e., jvp_attn=True)."
+            assert (
+                not continuous_x_1_prediction
+            ), "Mean flows require continuous velocity prediction (i.e., continuous_x_1_prediction=False)."
+            assert (
+                treat_discrete_modalities_as_continuous is True
+            ), "Mean flows require treating discrete modalities as continuous (one-hot) vectors (i.e., treat_discrete_modalities_as_continuous=True)."
+
         self.batch_size_scale_factor = batch_size_scale_factor
         self.class_dropout_prob = dataset_embedder.dropout_prob
         self.atom_types_loss_weight = atom_types_loss_weight
@@ -168,8 +180,9 @@ class MFT(nn.Module):
         self.jvp_attn = jvp_attn
         self.logit_normal_time = logit_normal_time
         self.unified_modal_time = unified_modal_time
-        self.grad_decay_method = grad_decay_method
+        self.enable_mean_flows = enable_mean_flows
         self.treat_discrete_modalities_as_continuous = treat_discrete_modalities_as_continuous
+        self.grad_decay_method = grad_decay_method
 
         self.vocab_size = max_num_elements + int(add_mask_atom_type)
 
@@ -249,6 +262,7 @@ class MFT(nn.Module):
             modalities=modalities,
             model_sampling_fn="forward_with_cfg",
             early_stopping_grad_norm=early_stopping_grad_norm,
+            enable_mean_flows=enable_mean_flows,
         )
 
         self.modals = list(modalities.keys())
@@ -310,7 +324,7 @@ class MFT(nn.Module):
             modal_input_dict = {}
             for modal in self.modals:
                 assert modal in kwargs, f"Missing required modality input: {modal}"
-                t = torch.ones(batch_size, device=BEST_DEVICE)
+                t = torch.zeros(batch_size, device=BEST_DEVICE)
 
                 if modal == "atom_types" and self.treat_discrete_modalities_as_continuous:
                     # Maybe convert atom types to random continuous (one-hot) vectors
@@ -428,17 +442,30 @@ class MFT(nn.Module):
         # Sample time points and corresponding noised inputs for each modality
         modal_input_dict = {}
 
-        modal_t = None
+        modal_t, modal_r = None, None
         if self.logit_normal_time and self.unified_modal_time:
-            # Sample a single time point from a logit-normal distribution for all modalities.
+            # Sample time point(s) from a logit-normal distribution for all modalities.
             # See https://arxiv.org/abs/2509.18480 for more details.
             modal_t = 0.98 * sample_logit_normal(
                 n=batch_size, m=0.8, s=1.7, device=device
             ) + 0.02 * torch.rand(batch_size, device=device)
             modal_t = modal_t * (1 - 2 * epsilon) + epsilon
+
+            modal_r = 0.98 * sample_logit_normal(
+                n=batch_size, m=0.8, s=1.7, device=device
+            ) + 0.02 * torch.rand(batch_size, device=device)
+            modal_r = modal_r * (1 - 2 * epsilon) + epsilon
         elif self.unified_modal_time:
-            # Sample a single time point from a uniform distribution for all modalities
+            # Sample time point(s) from a uniform distribution for all modalities
             modal_t = torch.rand(batch_size, device=device) * (1 - epsilon)
+            modal_r = torch.rand(batch_size, device=device) * (1 - epsilon)
+
+        if self.enable_mean_flows and modal_t is not None and modal_r is not None:
+            # When using mean flows, ensure start and end times `r` and `t` are properly set
+            modal_r = torch.minimum(modal_t, modal_r)  # Ensure `r <= t`
+
+            mf_mask = torch.randperm(batch_size)[: int(batch_size * 0.25)]
+            modal_r[mf_mask] = modal_t[mf_mask]  # Set `r = t` for 25% of the batch
 
         for modal in self.modals:
             path = self.flow.paths[modal]
@@ -446,16 +473,30 @@ class MFT(nn.Module):
             x_0 = locals()[modal]  # Noised data
             x_1 = target_tensors[modal]  # Clean data
 
-            t = modal_t
-            if self.logit_normal_time and t is None:
-                # Sample a time point from a logit-normal distribution
+            t, r = modal_t, modal_r
+            if self.logit_normal_time and (t is None or r is None):
+                # Sample time point(s) from a logit-normal distribution
                 t = 0.98 * sample_logit_normal(
                     n=batch_size, m=0.8, s=1.7, device=device
                 ) + 0.02 * torch.rand(batch_size, device=device)
                 t = t * (1 - 2 * epsilon) + epsilon
-            elif t is None:
-                # Sample a time point from a uniform distribution
+
+                r = 0.98 * sample_logit_normal(
+                    n=batch_size, m=0.8, s=1.7, device=device
+                ) + 0.02 * torch.rand(batch_size, device=device)
+                r = r * (1 - 2 * epsilon) + epsilon
+            elif t is None or r is None:
+                # Sample time point(s) from a uniform distribution
                 t = torch.rand(batch_size, device=device) * (1 - epsilon)
+                r = torch.rand(batch_size, device=device) * (1 - epsilon)
+
+            if self.enable_mean_flows:
+                # When using mean flows, ensure start and end times `r` and `t` are properly set
+                r = torch.minimum(t, r)  # Ensure `r <= t`
+
+                if not self.unified_modal_time:
+                    mf_mask = torch.randperm(batch_size)[: int(batch_size * 0.25)]
+                    r[mf_mask] = t[mf_mask]  # Set `r = t` for 25% of the batch
 
             if modal == "atom_types" and self.treat_discrete_modalities_as_continuous:
                 # Maybe convert atom types to (random) continuous (one-hot) vectors
@@ -485,7 +526,7 @@ class MFT(nn.Module):
             # Collect inputs
             modal_input_dict[modal] = [
                 x_t,
-                t,
+                (t, r) if self.enable_mean_flows else t,
                 (
                     dx_t
                     * expand_tensor_like(
@@ -498,25 +539,124 @@ class MFT(nn.Module):
             ]
 
         # Predict velocity field for each modality
-        model_output = self.flow.model(
-            x=(
-                modal_input_dict["atom_types"][0],  # atom_types
-                modal_input_dict["pos"][0],  # pos
-                modal_input_dict["frac_coords"][0],  # frac_coords
-                modal_input_dict["lengths_scaled"][0],  # lengths_scaled
-                modal_input_dict["angles_radians"][0],  # angles_radians
-            ),
-            t=(
-                modal_input_dict["atom_types"][1],  # atom_types_t
-                modal_input_dict["pos"][1],  # pos_t
-                modal_input_dict["frac_coords"][1],  # frac_coords_t
-                modal_input_dict["lengths_scaled"][1],  # lengths_scaled_t
-                modal_input_dict["angles_radians"][1],  # angles_radians_t
-            ),
-            feats=feats,
-            mask=mask,
-            sdpa_backends=sdpa_backends,
-        )
+        model_output_dt = None
+        if self.enable_mean_flows:
+            # Average velocity prediction
+            def u_func(
+                atom_types,
+                pos,
+                frac_coords,
+                lengths_scaled,
+                angles_radians,
+                atom_types_t,
+                pos_t,
+                frac_coords_t,
+                lengths_scaled_t,
+                angles_radians_t,
+                atom_types_r,
+                pos_r,
+                frac_coords_r,
+                lengths_scaled_r,
+                angles_radians_r,
+            ):
+                """Average velocity prediction function."""
+                return self.flow.model(
+                    x=(
+                        atom_types,
+                        pos,
+                        frac_coords,
+                        lengths_scaled,
+                        angles_radians,
+                    ),
+                    t=(
+                        (atom_types_t, atom_types_r),
+                        (pos_t, pos_r),
+                        (frac_coords_t, frac_coords_r),
+                        (lengths_scaled_t, lengths_scaled_r),
+                        (angles_radians_t, angles_radians_r),
+                    ),
+                    feats=feats,
+                    mask=mask,
+                    sdpa_backends=sdpa_backends,
+                )
+
+            with torch.amp.autocast(BEST_DEVICE.type, enabled=False):
+                model_output, model_output_dt = torch.func.jvp(
+                    func=u_func,
+                    primals=(
+                        modal_input_dict["atom_types"][0],  # atom_types
+                        modal_input_dict["pos"][0],  # pos
+                        modal_input_dict["frac_coords"][0],  # frac_coords
+                        modal_input_dict["lengths_scaled"][0],  # lengths_scaled
+                        modal_input_dict["angles_radians"][0],  # angles_radians
+                        modal_input_dict["atom_types"][1][0],  # atom_types_t
+                        modal_input_dict["pos"][1][0],  # pos_t
+                        modal_input_dict["frac_coords"][1][0],  # frac_coords_t
+                        modal_input_dict["lengths_scaled"][1][0],  # lengths_scaled_t
+                        modal_input_dict["angles_radians"][1][0],  # angles_radians_t
+                        modal_input_dict["atom_types"][1][1],  # atom_types_r
+                        modal_input_dict["pos"][1][1],  # pos_r
+                        modal_input_dict["frac_coords"][1][1],  # frac_coords_r
+                        modal_input_dict["lengths_scaled"][1][1],  # lengths_scaled_r
+                        modal_input_dict["angles_radians"][1][1],  # angles_radians_r
+                    ),
+                    tangents=(
+                        modal_input_dict["atom_types"][2],  # atom_types_dt
+                        modal_input_dict["pos"][2],  # pos_dt
+                        modal_input_dict["frac_coords"][2],  # frac_coords_dt
+                        modal_input_dict["lengths_scaled"][2],  # lengths_scaled_dt
+                        modal_input_dict["angles_radians"][2],  # angles_radians_dt
+                        torch.ones_like(modal_input_dict["atom_types"][1][0]),  # atom_types_dt_dt
+                        torch.ones_like(modal_input_dict["pos"][1][0]),  # pos_dt_dt
+                        torch.ones_like(
+                            modal_input_dict["frac_coords"][1][0]
+                        ),  # frac_coords_dt_dt
+                        torch.ones_like(
+                            modal_input_dict["lengths_scaled"][1][0]
+                        ),  # lengths_scaled_dt_dt
+                        torch.ones_like(
+                            modal_input_dict["angles_radians"][1][0]
+                        ),  # angles_radians_dt_dt
+                        torch.zeros_like(modal_input_dict["atom_types"][1][1]),  # atom_types_dr_dt
+                        torch.zeros_like(modal_input_dict["pos"][1][1]),  # pos_dr_dt
+                        torch.zeros_like(
+                            modal_input_dict["frac_coords"][1][1]
+                        ),  # frac_coords_dr_dt
+                        torch.zeros_like(
+                            modal_input_dict["lengths_scaled"][1][1]
+                        ),  # lengths_scaled_dr_dt
+                        torch.zeros_like(
+                            modal_input_dict["angles_radians"][1][1]
+                        ),  # angles_radians_dr_dt
+                    ),
+                )
+        else:
+            # Instantaneous velocity prediction
+            model_output = self.flow.model(
+                x=(
+                    modal_input_dict["atom_types"][0],  # atom_types
+                    modal_input_dict["pos"][0],  # pos
+                    modal_input_dict["frac_coords"][0],  # frac_coords
+                    modal_input_dict["lengths_scaled"][0],  # lengths_scaled
+                    modal_input_dict["angles_radians"][0],  # angles_radians
+                ),
+                t=(
+                    modal_input_dict["atom_types"][1],  # atom_types_t, maybe atom_types_r as well
+                    modal_input_dict["pos"][1],  # pos_t, maybe pos_r as well
+                    modal_input_dict["frac_coords"][
+                        1
+                    ],  # frac_coords_t, maybe frac_coords_r as well
+                    modal_input_dict["lengths_scaled"][
+                        1
+                    ],  # lengths_scaled_t, maybe lengths_scaled_r as well
+                    modal_input_dict["angles_radians"][
+                        1
+                    ],  # angles_radians_t, maybe angles_radians_r as well
+                ),
+                feats=feats,
+                mask=mask,
+                sdpa_backends=sdpa_backends,
+            )
 
         # Preprocess target (velocity) tensors if requested
         for idx, modal in enumerate(self.modals):
@@ -540,12 +680,17 @@ class MFT(nn.Module):
 
             x_t = modal_input_dict[modal][0]
             t = modal_input_dict[modal][1]
+            modal_t = t[0] if self.enable_mean_flows else t
 
             # Perform a one-step Euler iteration to get predicted clean data
-            pred_modal = path.velocity_to_target(
-                velocity=pred_modal_vel,
-                x_t=x_t,
-                t=expand_tensor_like(t, x_t),
+            pred_modal = (
+                x_t - pred_modal_vel
+                if self.enable_mean_flows
+                else path.velocity_to_target(
+                    velocity=pred_modal_vel,
+                    x_t=x_t,
+                    t=expand_tensor_like(t, x_t),
+                )
             )
 
             # Align target modality to predicted modality
@@ -554,8 +699,8 @@ class MFT(nn.Module):
                 pred_modal, target_modal, mask=mask
             )  # Clean (aligned) data
 
-            # Re-sample probability path
-            path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
+            # Re-sample probability path - NOTE: alignment of `model_output_dt` is not currently handled
+            path_sample = path.sample(t=modal_t, x_0=x_0, x_1=x_1)
             modal_input_dict[modal][2] = path_sample.dx_t
 
         # Calculate the loss for each modality
@@ -595,6 +740,7 @@ class MFT(nn.Module):
                 modal_input_dict["angles_radians"][1],
             ],
             model_output=model_output,
+            model_output_dt=model_output_dt,
             detach_loss_dict=False,
         )
         training_loss.detach_()  # NOTE: Will manually re-aggregate losses below

@@ -183,9 +183,9 @@ class EfficientSelfAttentionLayer(SelfAttentionLayer):
 
         # JVP Flash Attention, with support for second-order derivatives
         if self.jvp_attn:
-            from jvp_flash_attention.jvp_attention import attention as jvp_attention
+            from jvp_flash_attention.jvp_attention import JVPAttn
 
-            x = jvp_attention(q, k, v, attn_mask=attn_mask)
+            x = JVPAttn.fwd_dual(q, k, v, attn_mask=attn_mask)
 
         # PyTorch's Scaled Dot Product Attention
         else:

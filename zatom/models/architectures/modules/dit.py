@@ -253,13 +253,13 @@ class MultimodalDiT(nn.Module):
         ),
         t: (
             Tuple[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - atom_types_t, maybe atom_types_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - pos_t, maybe pos_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - frac_coords_t, maybe frac_coords_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - lengths_scaled_t, maybe lengths_scaled_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - angles_radians_t, maybe angles_radians_r as well
             ]
-            | List[torch.Tensor]
+            | List[torch.Tensor | Tuple[torch.Tensor, torch.Tensor]]
         ),
         feats: Dict[str, Tensor],
         mask: Bool["b m"],  # type: ignore
@@ -281,11 +281,11 @@ class MultimodalDiT(nn.Module):
                 lengths_scaled: Scaled lengths tensor (B, 1, 3).
                 angles_radians: Angles in radians tensor (B, 1, 3).
             t: Tuple or list of time tensors for each modality:
-                atom_types_t: Time t for atom types (B,).
-                pos_t: Time t for positions (B,).
-                frac_coords_t: Time t for fractional coordinates (B,).
-                lengths_scaled_t: Time t for lengths (B,).
-                angles_radians_t: Time t for angles (B,).
+                atom_types_t/r: Time t (and maybe also time r) for atom types (B,).
+                pos_t/r: Time t (and maybe also time r) for positions (B,).
+                frac_coords_t/r: Time t (and maybe also time r) for fractional coordinates (B,).
+                lengths_scaled_t/r: Time t (and maybe also time r) for lengths (B,).
+                angles_radians_t/r: Time t (and maybe also time r) for angles (B,).
             feats: Features for conditioning including:
                 dataset_idx: Dataset index for each sample.
                 spacegroup: Spacegroup index for each sample.
@@ -317,11 +317,24 @@ class MultimodalDiT(nn.Module):
 
         modals_t = torch.cat(
             [
-                t.unsqueeze(-1) * 0 if self.remove_t_conditioning else t.unsqueeze(-1)
+                # Average velocity time steps
+                (
+                    torch.stack(t).unsqueeze(-1) * 0
+                    if self.remove_t_conditioning
+                    else (
+                        torch.stack(t).unsqueeze(-1)
+                        if isinstance(t, tuple)
+                        # Instantaneous velocity time steps
+                        else t.unsqueeze(-1) * 0 if self.remove_t_conditioning else t.unsqueeze(-1)
+                    )
+                )
                 for t in [atom_types_t, pos_t, frac_coords_t, lengths_scaled_t, angles_radians_t]
             ],
             dim=-1,
         )
+        if modals_t.ndim == 3:
+            # (2, B, 5) -> (B, 10) when both t and r are provided
+            modals_t = modals_t.reshape(batch_size, -1)
 
         # Create attention masks
         pairwise_mask = mask.unsqueeze(1) * mask.unsqueeze(2)  # (B, M, M)
@@ -492,13 +505,13 @@ class MultimodalDiT(nn.Module):
         ),
         t: (
             Tuple[
-                Float[" b"],  # type: ignore - atom_types_t
-                Float[" b"],  # type: ignore - pos_t
-                Float[" b"],  # type: ignore - frac_coords_t
-                Float[" b"],  # type: ignore - lengths_scaled_t
-                Float[" b"],  # type: ignore - angles_radians_t
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - atom_types_t, maybe atom_types_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - pos_t, maybe pos_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - frac_coords_t, maybe frac_coords_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - lengths_scaled_t, maybe lengths_scaled_r as well
+                Float[" b"] | Tuple[Float[" b"], Float[" b"]],  # type: ignore - angles_radians_t, maybe angles_radians_r as well
             ]
-            | List[torch.Tensor]
+            | List[torch.Tensor | Tuple[torch.Tensor, torch.Tensor]]
         ),
         feats: Dict[str, Tensor],
         mask: Bool["b m"],  # type: ignore
@@ -525,11 +538,11 @@ class MultimodalDiT(nn.Module):
                 lengths_scaled: Scaled lengths tensor (B, 1, 3).
                 angles_radians: Angles in radians tensor (B, 1, 3).
             t: Tuple or list of time tensors for each modality:
-                atom_types_t: Time t for atom types (B,).
-                pos_t: Time t for positions (B,).
-                frac_coords_t: Time t for fractional coordinates (B,).
-                lengths_scaled_t: Time t for lengths (B,).
-                angles_radians_t: Time t for angles (B,).
+                atom_types_t/r: Time t (and maybe also time r) for atom types (B,).
+                pos_t/r: Time t (and maybe also time r) for positions (B,).
+                frac_coords_t/r: Time t (and maybe also time r) for fractional coordinates (B,).
+                lengths_scaled_t/r: Time t (and maybe also time r) for lengths (B,).
+                angles_radians_t/r: Time t (and maybe also time r) for angles (B,).
             feats: Features for conditioning including:
                 dataset_idx: Dataset index for each sample.
                 spacegroup: Spacegroup index for each sample.

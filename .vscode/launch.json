@@ -178,6 +178,7 @@
                 // "name='debug_mft_180M_joint_debugging_molecule-and-material'",
                 // "model.architecture.continuous_x_1_prediction=false",
                 // "model.architecture.early_stopping_grad_norm=10.0",
+                // "model.architecture.enable_mean_flows=true",
                 // "model.architecture.jvp_attn=true",
                 // "model.architecture.logit_normal_time=false",
                 // "model.architecture.multimodal_model._target_='zatom.models.architectures.modules.dip.MultimodalDiP'",

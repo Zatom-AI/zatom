@@ -62,6 +62,10 @@ class MultimodalSolver(Solver):
             norm with respect to each modality falls below this value. This
             effectively enables adaptive compute for sampling. Defaults to
             ``None``.
+        enable_mean_flows (bool, optional): If ``True``, enables mean flows for continuous modalities.
+            Defaults to ``False``. If enabled, the model is expected to predict the average velocity
+            field for each continuous modality, and discrete modalities must be treated as continuous
+            (one-hot) vectors via preprocessing preceding this module.
 
     Raises:
         TypeError: If ``model`` is not callable or if ``modality_configs``
@@ -75,6 +79,7 @@ class MultimodalSolver(Solver):
         source_distribution_p: Optional[Tensor] = None,
         model_sampling_fn: str = "forward",
         early_stopping_grad_norm: Optional[float] = None,
+        enable_mean_flows: bool = False,
     ):
         super().__init__()
         if not callable(model):
@@ -84,6 +89,7 @@ class MultimodalSolver(Solver):
         self.source_distribution_p = source_distribution_p
         self.model_sampling_fn = model_sampling_fn
         self.early_stopping_grad_norm = early_stopping_grad_norm
+        self.enable_mean_flows = enable_mean_flows
 
         self._validate_configs()
 
@@ -187,9 +193,11 @@ class MultimodalSolver(Solver):
             # If step_size is float then t discretization is uniform with step size set by step_size.
             t_init = time_grid[0].item()
             t_final = time_grid[-1].item()
-            assert (
-                t_final - t_init
-            ) > step_size, f"Time interval [time_grid[0], time_grid[-1]] must be larger than step_size. Got a time interval [{t_init}, {t_final}] and step_size {step_size}."
+
+            if not self.enable_mean_flows:
+                assert (
+                    t_final - t_init
+                ) > step_size, f"Time interval [time_grid[0], time_grid[-1]] must be larger than step_size. Got a time interval [{t_init}, {t_final}] and step_size {step_size}."
 
             n_steps = ceil((t_final - t_init) / step_size)
             t_discretization = torch.tensor(
@@ -234,11 +242,23 @@ class MultimodalSolver(Solver):
                     }
 
                 # NOTE: For now, all modalities share the same time
-                t = [t_discretization[i : i + 1].repeat(batch_size)] * len(states)
-                h = t_discretization[i + 1 : i + 2] - t_discretization[i : i + 1]
+                t = t_discretization[i : i + 1]
+                t_next = t_discretization[i + 1 : i + 2]
+
+                h = t_next - t
 
                 model_fn = getattr(self.model, self.model_sampling_fn, self.model)
-                outputs = model_fn(states, t, **model_extras)
+                outputs = model_fn(
+                    states,
+                    (
+                        [(t_next.repeat(batch_size), t.repeat(batch_size))] * len(states)
+                        if self.enable_mean_flows
+                        else [t.repeat(batch_size)] * len(states)
+                    ),
+                    **model_extras,
+                )
+
+                t = [t.repeat(batch_size)] * len(states)
 
                 if not isinstance(outputs, (list, tuple)) or len(outputs) != len(states):
                     raise TypeError(
@@ -264,7 +284,11 @@ class MultimodalSolver(Solver):
                             else model_output
                         )
 
-                        states[idx] = states[idx] + h * velocity_output
+                        states[idx] = (
+                            states[idx] - h * velocity_output
+                            if self.enable_mean_flows
+                            else states[idx] + h * velocity_output
+                        )
 
                         if self.early_stopping_grad_norm is not None:
                             early_stopping_state_dict[idx] = (
