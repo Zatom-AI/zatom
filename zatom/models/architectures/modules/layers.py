@@ -10,6 +10,8 @@ import warnings
 import torch
 import torch.nn.functional as F
 from einops import rearrange
+from platonic_transformers.models.platoformer.groups import PLATONIC_GROUPS
+from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn
 from torch.nn.attention import sdpa_kernel
 
@@ -45,6 +47,61 @@ def modulate(x: Tensor, shift: Tensor, scale: Tensor) -> Tensor:
         Modulated tensor of shape (B, N, C).
     """
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+
+
+class RMSNorm(nn.Module):
+    """Root Mean Square Layer Normalization.
+
+    Args:
+        d: Model size.
+        p: Partial RMSNorm, valid value [0, 1], default -1.0 (disabled).
+        eps: Epsilon value, default 1e-8.
+        bias: Whether to use bias term for RMSNorm, disabled by
+              default because RMSNorm doesn't enforce re-centering invariance.
+    """
+
+    def __init__(self, d: int, p: float = -1.0, eps: float = 1e-8, bias: bool = False):
+        super().__init__()
+
+        self.eps = eps
+        self.d = d
+        self.p = p
+        self.bias = bias
+
+        self.scale = nn.Parameter(torch.ones(d))
+        self.register_parameter("scale", self.scale)
+
+        if self.bias:
+            self.offset = nn.Parameter(torch.zeros(d))
+            self.register_parameter("offset", self.offset)
+
+    @typecheck
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass for RMSNorm.
+
+        Args:
+            x: Input tensor of shape (..., d).
+
+        Returns:
+            Normalized tensor of the same shape as input.
+        """
+        if self.p < 0.0 or self.p > 1.0:
+            norm_x = x.norm(2, dim=-1, keepdim=True, dtype=x.dtype)
+            d_x = self.d
+        else:
+            partial_size = int(self.d * self.p)
+            partial_x, _ = torch.split(x, [partial_size, self.d - partial_size], dim=-1)
+
+            norm_x = partial_x.norm(2, dim=-1, keepdim=True, dtype=x.dtype)
+            d_x = partial_size
+
+        rms_x = norm_x * d_x ** (-1.0 / 2)
+        x_normed = x / (rms_x + self.eps)
+
+        if self.bias:
+            return self.scale * x_normed + self.offset
+
+        return self.scale * x_normed
 
 
 #################################################################################
@@ -143,7 +200,7 @@ class SelfAttentionLayer(nn.Module):
 
 
 class EfficientSelfAttentionLayer(SelfAttentionLayer):
-    """Efficient Multi-head Self-Attention Layer using PyTorch's scaled_dot_product_attention.
+    """Efficient Multi-head Self-Attention Layer using FlashAttention.
 
     Started from
     https://github.com/facebookresearch/dinov2/blob/main/dinov2/layers/attention.py.
@@ -205,6 +262,145 @@ class EfficientSelfAttentionLayer(SelfAttentionLayer):
         return x
 
 
+class PlatonicEfficientSelfAttentionLayer(nn.Module):
+    """Platonic Efficient Multi-head Self-Attention Layer using FlashAttention.
+
+    Started from
+    https://github.com/facebookresearch/dinov2/blob/main/dinov2/layers/attention.py.
+
+    Args:
+        hidden_size: The dimension of the input and output embeddings.
+        solid: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
+        num_heads: Number of attention heads.
+        qkv_bias: If True, add a learnable bias to query, key, value projections.
+        qk_scale: Override default scaling of QK^T.
+        attn_drop: Dropout probability for attention weights.
+        proj_drop: Dropout probability for output projection.
+        use_bias: If True, add a learnable bias to the output projection.
+        qk_norm: If True, apply RMSNorm to queries and keys.
+        jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
+        pos_embedder: Optional positional embedding module.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        solid: str,
+        num_heads: int = 8,
+        qkv_bias: bool = False,
+        qk_scale: float | None = None,
+        attn_drop: float = 0.0,
+        proj_drop: float = 0.0,
+        use_bias: bool = True,
+        qk_norm: bool = True,
+        jvp_attn: bool = False,
+        pos_embedder: nn.Module | None = None,
+    ):
+        super().__init__()
+
+        if solid.lower() not in PLATONIC_GROUPS:
+            raise ValueError(
+                f"Solid '{solid}' not recognized. Available groups are: {list(PLATONIC_GROUPS.keys())}"
+            )
+
+        group = PLATONIC_GROUPS[solid.lower()]
+        self.num_G = group.G
+
+        self.num_heads = num_heads
+        self.jvp_attn = jvp_attn
+
+        head_dim = hidden_size // num_heads
+        self.scale = qk_scale or head_dim**-0.5
+
+        self.qkv = PlatonicLinear(hidden_size, hidden_size * 3, solid=solid, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = PlatonicLinear(hidden_size, hidden_size, solid=solid, bias=use_bias)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        self.q_norm = RMSNorm(head_dim) if qk_norm else nn.Identity()
+        self.k_norm = RMSNorm(head_dim) if qk_norm else nn.Identity()
+
+        head_dim_G = head_dim // self.num_G
+        num_heads_G = num_heads // self.num_G
+        pos_embedder_head_dim = head_dim_G // num_heads_G
+
+        self.pos_embedder = pos_embedder(
+            num_heads=num_heads_G,
+            head_dim=pos_embedder_head_dim,
+        )
+
+    @typecheck
+    def group_normalize(self, x: Tensor, norm_layer: RMSNorm) -> Tensor:
+        """Helper to apply RMSNorm on the per-group-element dimension.
+
+        Args:
+            x: Input tensor of shape [..., G*C]
+            norm_layer: RMSNorm module to apply on the per-group-element dimension.
+
+        Returns:
+            Normalized tensor of the same shape as input [..., G*C].
+        """
+        leading_dims = x.shape[:-1]
+
+        # Reshape to expose group axis: [..., G*C] -> [..., G, C]
+        x_reshaped = x.view(*leading_dims, self.num_G, -1)
+
+        # Apply normalization
+        normed_reshaped = norm_layer(x_reshaped)
+
+        # Reshape back to original convention
+        return normed_reshaped.view(*leading_dims, -1)
+
+    @typecheck
+    def forward(self, x: Tensor, **kwargs) -> Tensor:
+        """Forward pass of the Efficient Self-Attention Layer.
+
+        Args:
+            x: Input tensor of shape (B, N, C).
+            kwargs: Additional arguments, e.g., positional embeddings.
+
+        Returns:
+            Output tensor of shape (B, N, C).
+        """
+        B, N, C = x.shape
+        attn_mask = kwargs.get("attention_mask")
+        pos = kwargs.get("pos")
+        sdpa_backends = kwargs.get("sdpa_backends", SDPA_BACKENDS)
+
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
+        qkv = rearrange(qkv, "b n t h c -> t b h n c")
+        q, k, v = qkv.unbind(0)
+
+        if self.pos_embedder and pos is not None:
+            q = self.pos_embedder(q, pos)
+            k = self.pos_embedder(k, pos)
+
+        q, k = self.group_normalize(q, self.q_norm), self.group_normalize(k, self.k_norm)
+
+        # JVP Flash Attention, with support for second-order derivatives
+        if self.jvp_attn:
+            from jvp_flash_attention.jvp_attention import JVPAttn
+
+            x = JVPAttn.fwd_dual(q, k, v, attn_mask=attn_mask)
+
+        # PyTorch's Scaled Dot Product Attention
+        else:
+            with sdpa_kernel(sdpa_backends):
+                x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+
+            if not self.training:
+                # Ensure no NaNs appear during eval if a (padding) row is (fully) masked
+                # NOTE: This appears to be a bug in PyTorch's fused attention: https://github.com/pytorch/pytorch/issues/163997
+                fully_masked = (~attn_mask).all(dim=-1, keepdim=True)
+                x = torch.where(fully_masked, torch.zeros_like(x), x)
+
+        x = x.transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+
+        return x
+
+
 #################################################################################
 #                              FeedForward Layer                                #
 #################################################################################
@@ -235,6 +431,58 @@ class SwiGLUFeedForward(nn.Module):
         torch.nn.init.xavier_uniform_(self.w1.weight)
         torch.nn.init.xavier_uniform_(self.w2.weight)
         torch.nn.init.xavier_uniform_(self.w3.weight)
+        if self.w1.bias is not None:
+            torch.nn.init.constant_(self.w1.bias, 0)
+        if self.w2.bias is not None:
+            torch.nn.init.constant_(self.w2.bias, 0)
+        if self.w3.bias is not None:
+            torch.nn.init.constant_(self.w3.bias, 0)
+
+    @typecheck
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass of the SwiGLU Feed Forward Layer.
+
+        Args:
+            x: Input tensor of shape (B, N, C).
+
+        Returns:
+            Output tensor of shape (B, N, C).
+        """
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+
+
+class PlatonicSwiGLUFeedForward(nn.Module):
+    """Platonic SwiGLU Feed Forward Layer.
+
+    Args:
+        dim: Input and output dimension.
+        hidden_dim: Hidden dimension.
+        solid: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
+        multiple_of: Ensure the hidden dimension is a multiple of this value.
+    """
+
+    def __init__(self, dim: int, hidden_dim: int, solid: str, multiple_of: int = 256):
+        super().__init__()
+
+        if solid.lower() not in PLATONIC_GROUPS:
+            raise ValueError(
+                f"Solid '{solid}' not recognized. Available groups are: {list(PLATONIC_GROUPS.keys())}"
+            )
+
+        hidden_dim = int(2 * hidden_dim / 3)
+        hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+
+        self.w1 = PlatonicLinear(dim, hidden_dim, solid=solid, bias=False)
+        self.w2 = PlatonicLinear(hidden_dim, dim, solid=solid, bias=True)
+        self.w3 = PlatonicLinear(dim, hidden_dim, solid=solid, bias=False)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Initialize weights."""
+        torch.nn.init.xavier_uniform_(self.w1.kernel)
+        torch.nn.init.xavier_uniform_(self.w2.kernel)
+        torch.nn.init.xavier_uniform_(self.w3.kernel)
         if self.w1.bias is not None:
             torch.nn.init.constant_(self.w1.bias, 0)
         if self.w2.bias is not None:
@@ -440,56 +688,89 @@ class FinalLayer(nn.Module):
         return x
 
 
-class RMSNorm(nn.Module):
-    """Root Mean Square Layer Normalization.
+class PlatonicFinalLayer(nn.Module):
+    """The final layer of DiP.
 
     Args:
-        d: Model size.
-        p: Partial RMSNorm, valid value [0, 1], default -1.0 (disabled).
-        eps: Epsilon value, default 1e-8.
-        bias: Whether to use bias term for RMSNorm, disabled by
-              default because RMSNorm doesn't enforce re-centering invariance.
+        hidden_size: The input dimension.
+        out_channels: The output dimension.
+        solid: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
+        c_dim: The dimension of the conditioning vector.
     """
 
-    def __init__(self, d: int, p: float = -1.0, eps: float = 1e-8, bias: bool = False):
+    def __init__(self, hidden_size: int, out_channels: int, solid: str, c_dim: int | None = None):
         super().__init__()
 
-        self.eps = eps
-        self.d = d
-        self.p = p
-        self.bias = bias
+        if solid.lower() not in PLATONIC_GROUPS:
+            raise ValueError(
+                f"Solid '{solid}' not recognized. Available groups are: {list(PLATONIC_GROUPS.keys())}"
+            )
 
-        self.scale = nn.Parameter(torch.ones(d))
-        self.register_parameter("scale", self.scale)
+        group = PLATONIC_GROUPS[solid.lower()]
+        self.num_G = group.G
 
-        if self.bias:
-            self.offset = nn.Parameter(torch.zeros(d))
-            self.register_parameter("offset", self.offset)
+        self.norm_final = nn.LayerNorm(
+            hidden_size // self.num_G, elementwise_affine=False, eps=1e-6
+        )
+        self.linear = PlatonicLinear(hidden_size, out_channels, solid=solid, bias=True)
+        self.adaLN_modulation = nn.Sequential(
+            nn.SiLU(), PlatonicLinear(c_dim, 2 * hidden_size, solid=solid, bias=True)
+        )
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        """Initialize weights."""
+
+        def _basic_init(module):
+            """Initialize Linear layers with Xavier uniform."""
+            if isinstance(module, nn.Linear):
+                torch.nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
+        # Initialize transformer layers
+        self.apply(_basic_init)
+
+        # Zero-out output layers
+        nn.init.constant_(self.adaLN_modulation[-1].kernel, 0)
+        nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
+        nn.init.constant_(self.linear.kernel, 0)
+        nn.init.constant_(self.linear.bias, 0)
 
     @typecheck
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward pass for RMSNorm.
+    def group_normalize(self, x: Tensor, norm_layer: nn.LayerNorm) -> Tensor:
+        """Helper to apply LayerNorm on the per-group-element dimension.
 
         Args:
-            x: Input tensor of shape (..., d).
+            x: Input tensor of shape [..., G*C]
+            norm_layer: LayerNorm module to apply on the per-group-element dimension.
 
         Returns:
-            Normalized tensor of the same shape as input.
+            Normalized tensor of the same shape as input [..., G*C].
         """
-        if self.p < 0.0 or self.p > 1.0:
-            norm_x = x.norm(2, dim=-1, keepdim=True, dtype=x.dtype)
-            d_x = self.d
-        else:
-            partial_size = int(self.d * self.p)
-            partial_x, _ = torch.split(x, [partial_size, self.d - partial_size], dim=-1)
+        leading_dims = x.shape[:-1]
 
-            norm_x = partial_x.norm(2, dim=-1, keepdim=True, dtype=x.dtype)
-            d_x = partial_size
+        # Reshape to expose group axis: [..., G*C] -> [..., G, C]
+        x_reshaped = x.view(*leading_dims, self.num_G, -1)
 
-        rms_x = norm_x * d_x ** (-1.0 / 2)
-        x_normed = x / (rms_x + self.eps)
+        # Apply normalization
+        normed_reshaped = norm_layer(x_reshaped)
 
-        if self.bias:
-            return self.scale * x_normed + self.offset
+        # Reshape back to original convention
+        return normed_reshaped.view(*leading_dims, -1)
 
-        return self.scale * x_normed
+    @typecheck
+    def forward(self, x: Tensor, c: Tensor) -> Tensor:
+        """Forward pass of the Final Layer.
+
+        Args:
+            x: Input tensor of shape (B, N, C).
+            c: Conditioning tensor of shape (B, c_dim).
+
+        Returns:
+            Output tensor of shape (B, N, out_channels).
+        """
+        shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
+        x = modulate(self.group_normalize(x, self.norm_final), shift, scale)
+        x = self.linear(x)
+        return x

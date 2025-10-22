@@ -42,21 +42,25 @@ atom_encoder_transformer:
     _target_: zatom.models.architectures.modules.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.atom_hidden_size_enc}
+    solid: ${model.architecture.solid_name}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer # NOTE: this may require a Platonic alternative
+      _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_enc}
       num_heads: ${model.architecture.atom_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
       pos_embedder:
-        _target_: zatom.models.architectures.modules.pos_embed.PlatonicAxialRotaryPositionEncoding
-        in_dim: 4
+        _target_: platonic_transformers.models.platoformer.rope.PlatonicRoPE
+        _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.atom_hidden_size_enc}
-        num_heads: ${model.architecture.atom_num_heads}
-        base: 100.0
+        solid: ${model.architecture.solid_name}
+        spatial_dims: 4
+        freq_sigma: 1.0
+        learned_freqs: True
+        freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
 trunk:
   _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
@@ -65,21 +69,25 @@ trunk:
     _target_: zatom.models.architectures.modules.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.hidden_size}
+    solid: ${model.architecture.solid_name}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer # NOTE: this may require a Platonic alternative
+      _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.hidden_size}
       num_heads: ${model.architecture.token_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
       pos_embedder:
-        _target_: zatom.models.architectures.modules.pos_embed.PlatonicAxialRotaryPositionEncoding
-        in_dim: 1
+        _target_: platonic_transformers.models.platoformer.rope.PlatonicRoPE
+        _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.hidden_size}
-        num_heads: ${model.architecture.token_num_heads}
-        base: 100.0
+        solid: ${model.architecture.solid_name}
+        spatial_dims: 4
+        freq_sigma: 1.0
+        learned_freqs: True
+        freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
 atom_decoder_transformer:
   _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
@@ -88,21 +96,25 @@ atom_decoder_transformer:
     _target_: zatom.models.architectures.modules.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.atom_hidden_size_dec}
+    solid: ${model.architecture.solid_name}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer # NOTE: this may require a Platonic alternative
+      _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_dec}
       num_heads: ${model.architecture.atom_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
       pos_embedder:
-        _target_: zatom.models.architectures.modules.pos_embed.PlatonicAxialRotaryPositionEncoding
-        in_dim: 4
+        _target_: platonic_transformers.models.platoformer.rope.PlatonicRoPE
+        _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.atom_hidden_size_dec}
-        num_heads: ${model.architecture.atom_num_heads}
-        base: 100.0
+        solid: ${model.architecture.solid_name}
+        spatial_dims: 4
+        freq_sigma: 1.0
+        learned_freqs: True
+        freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
 # General architecture parameters
 hidden_size: 768

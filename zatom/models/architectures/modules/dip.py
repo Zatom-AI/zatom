@@ -15,6 +15,7 @@ from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn
 from torch.nn.attention import SDPBackend
 
+from zatom.models.architectures.modules.layers import PlatonicFinalLayer
 from zatom.utils.training_utils import SDPA_BACKENDS
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
@@ -130,7 +131,7 @@ class MultimodalDiP(nn.Module):
             nn.Sequential(
                 nn.Linear(self.vocab_size, hidden_size, bias=False),
                 nn.LayerNorm(hidden_size),
-                nn.GELU(),
+                nn.SiLU(),
             )
             if treat_discrete_modalities_as_continuous
             else nn.Embedding(self.vocab_size, hidden_size)
@@ -138,19 +139,19 @@ class MultimodalDiP(nn.Module):
         self.lengths_scaled_embedder = nn.Sequential(
             nn.Linear(3, hidden_size, bias=False),
             nn.LayerNorm(hidden_size),
-            nn.GELU(),
+            nn.SiLU(),
         )
         self.angles_radians_embedder = nn.Sequential(
             nn.Linear(3, hidden_size, bias=False),
             nn.LayerNorm(hidden_size),
-            nn.GELU(),
+            nn.SiLU(),
         )
 
         atom_feat_dim = token_pos_embed_channels + hidden_size * 3 + 1
         self.atom_feat_proj = nn.Sequential(
             nn.Linear(atom_feat_dim, hidden_size),
             nn.LayerNorm(hidden_size),
-            nn.GELU(),
+            nn.SiLU(),
         )
 
         if self.use_length_condition:
@@ -182,17 +183,16 @@ class MultimodalDiP(nn.Module):
 
         self.latent2atom_proj = nn.Sequential(
             PlatonicLinear(hidden_size, hidden_size, solid=solid_name),
-            nn.GELU(),
+            nn.SiLU(),
             nn.LayerNorm(hidden_size // self.num_G),
             PlatonicLinear(hidden_size, self.atom_hidden_size_dec, solid=solid_name),
         )
 
-        self.final_layer_cond = PlatonicLinear(
-            hidden_size * self.num_G, self.atom_hidden_size_dec, solid=solid_name
-        )
-        self.final_layer = nn.Sequential(
-            PlatonicLinear(self.atom_hidden_size_dec, hidden_size, solid=solid_name),
-            nn.LayerNorm(hidden_size // self.num_G),
+        self.final_layer = PlatonicFinalLayer(
+            self.atom_hidden_size_dec,
+            hidden_size,
+            solid=solid_name,
+            c_dim=hidden_size * self.num_G,
         )
 
         self.atom_types_head = PlatonicLinear(
@@ -539,12 +539,8 @@ class MultimodalDiP(nn.Module):
             pos=atom_pe_pos,
             sdpa_backends=sdpa_backends,
         )
-
-        output = output + self.final_layer_cond(c_emb)
-        output = self.group_normalize(self.final_layer[0](output), self.final_layer[1])
-
+        output = self.final_layer(output, c=c_emb)
         output = output * mask.unsqueeze(-1)  # Mask out padding atoms
-        global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
 
         # Collect predictions
         pred_atom_types = to_scalars_vectors(
@@ -561,6 +557,7 @@ class MultimodalDiP(nn.Module):
             self.angles_radians_head(output.mean(-2, keepdim=True)), 3, 0, self.group
         )[0]
 
+        global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
         pred_modals = (
             # NOTE: For atom types, we predict using scalar features
             pred_atom_types * mask.unsqueeze(-1),  # (B, M, V=self.vocab_size)
