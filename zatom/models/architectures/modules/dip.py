@@ -10,10 +10,11 @@ from typing import Dict, List, Literal, Tuple, Type
 
 import torch
 from platonic_transformers.models.platoformer.groups import PLATONIC_GROUPS
+from platonic_transformers.models.platoformer.io import lift
+from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn
 from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.modules.layers import FinalLayer
 from zatom.utils.training_utils import SDPA_BACKENDS
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
@@ -87,17 +88,12 @@ class MultimodalDiP(nn.Module):
         jvp_attn: bool = False,
         solid_name: PLATONIC_GROUP_NAMES = "octahedron",
     ):
-        raise NotImplementedError(
-            "MultimodalDiP is not yet implemented. Please use MultimodalDiT instead."
-        )
-
         super().__init__()
         self.time_embedder = time_embedder
         self.dataset_embedder = dataset_embedder
         self.spacegroup_embedder = spacegroup_embedder
 
         self.atom_pos_embedder = atom_pos_embedder
-        atom_pos_embed_channels = atom_pos_embedder.embed_dim
         self.token_pos_embedder = token_pos_embedder
         token_pos_embed_channels = token_pos_embedder.embed_dim
 
@@ -120,16 +116,22 @@ class MultimodalDiP(nn.Module):
         self.atom_n_queries_dec = atom_n_queries_dec
         self.atom_n_keys_dec = atom_n_keys_dec
 
+        vocab_size = max_num_elements + int(add_mask_atom_type)
+
+        if solid_name.lower() not in PLATONIC_GROUPS:
+            raise ValueError(
+                f"Invalid solid_name '{solid_name}'. Must be one of: {list(PLATONIC_GROUPS.keys())}."
+            )
+
         self.group = PLATONIC_GROUPS[solid_name.lower()]
         self.num_G = self.group.G
-
-        vocab_size = max_num_elements + int(add_mask_atom_type)
+        self.dim_per_g = hidden_size // self.num_G
 
         self.atom_type_embedder = (
             nn.Sequential(
                 nn.Linear(vocab_size, hidden_size, bias=False),
                 nn.LayerNorm(hidden_size),
-                nn.SiLU(),
+                nn.GELU(),
             )
             if treat_discrete_modalities_as_continuous
             else nn.Embedding(vocab_size, hidden_size)
@@ -137,23 +139,20 @@ class MultimodalDiP(nn.Module):
         self.lengths_scaled_embedder = nn.Sequential(
             nn.Linear(3, hidden_size, bias=False),
             nn.LayerNorm(hidden_size),
-            nn.SiLU(),
+            nn.GELU(),
         )
         self.angles_radians_embedder = nn.Sequential(
             nn.Linear(3, hidden_size, bias=False),
             nn.LayerNorm(hidden_size),
-            nn.SiLU(),
+            nn.GELU(),
         )
 
-        atom_feat_dim = atom_pos_embed_channels + token_pos_embed_channels + hidden_size * 3 + 1
+        atom_feat_dim = token_pos_embed_channels + hidden_size * 3 + 1
         self.atom_feat_proj = nn.Sequential(
             nn.Linear(atom_feat_dim, hidden_size),
             nn.LayerNorm(hidden_size),
-            nn.SiLU(),
+            nn.GELU(),
         )
-
-        self.atom_pos_proj = nn.Linear(atom_pos_embed_channels, hidden_size, bias=False)
-        self.frac_coords_proj = nn.Linear(atom_pos_embed_channels, hidden_size, bias=False)
 
         if self.use_length_condition:
             self.length_embedder = nn.Sequential(
@@ -161,39 +160,44 @@ class MultimodalDiP(nn.Module):
                 nn.LayerNorm(hidden_size),
             )
 
-        self.atom_in_proj = nn.Linear(hidden_size * 3, hidden_size, bias=False)
+        self.atom_in_proj = PlatonicLinear(
+            hidden_size * self.num_G, hidden_size, solid=solid_name, bias=False
+        )
 
         self.context2atom_proj = nn.Sequential(
-            nn.Linear(hidden_size, self.atom_hidden_size_enc),
+            PlatonicLinear(hidden_size, self.atom_hidden_size_enc, solid=solid_name),
             nn.LayerNorm(self.atom_hidden_size_enc),
         )
         self.atom2latent_proj = nn.Sequential(
-            nn.Linear(self.atom_hidden_size_enc, hidden_size),
+            PlatonicLinear(self.atom_hidden_size_enc, hidden_size, solid=solid_name),
             nn.LayerNorm(hidden_size),
         )
         self.atom_enc_cond_proj = nn.Sequential(
-            nn.Linear(hidden_size, self.atom_hidden_size_enc),
+            PlatonicLinear(hidden_size * self.num_G, self.atom_hidden_size_enc, solid=solid_name),
             nn.LayerNorm(self.atom_hidden_size_enc),
         )
         self.atom_dec_cond_proj = nn.Sequential(
-            nn.Linear(hidden_size, self.atom_hidden_size_dec),
+            PlatonicLinear(hidden_size * self.num_G, self.atom_hidden_size_dec, solid=solid_name),
             nn.LayerNorm(self.atom_hidden_size_dec),
         )
 
         self.latent2atom_proj = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.SiLU(),
+            PlatonicLinear(hidden_size, hidden_size, solid=solid_name),
+            nn.GELU(),
             nn.LayerNorm(hidden_size),
-            nn.Linear(hidden_size, self.atom_hidden_size_dec),
+            PlatonicLinear(hidden_size, self.atom_hidden_size_dec, solid=solid_name),
         )
 
-        self.final_layer = FinalLayer(self.atom_hidden_size_dec, hidden_size, c_dim=hidden_size)
+        self.final_layer = PlatonicLinear(self.atom_hidden_size_dec, hidden_size, solid=solid_name)
+        self.final_layer_cond = PlatonicLinear(
+            hidden_size * self.num_G, hidden_size, solid=solid_name
+        )
 
-        self.atom_types_head = nn.Linear(hidden_size, vocab_size, bias=True)
-        self.pos_head = nn.Linear(hidden_size, 3, bias=False)
-        self.frac_coords_head = nn.Linear(hidden_size, 3, bias=False)
-        self.lengths_scaled_head = nn.Linear(hidden_size, 3, bias=True)
-        self.angles_radians_head = nn.Linear(hidden_size, 3, bias=True)
+        self.atom_types_head = PlatonicLinear(hidden_size, vocab_size, solid=solid_name, bias=True)
+        self.pos_head = PlatonicLinear(hidden_size, 3, solid=solid_name, bias=False)
+        self.frac_coords_head = PlatonicLinear(hidden_size, 3, solid=solid_name, bias=False)
+        self.lengths_scaled_head = PlatonicLinear(hidden_size, 3, solid=solid_name, bias=True)
+        self.angles_radians_head = PlatonicLinear(hidden_size, 3, solid=solid_name, bias=True)
 
     @typecheck
     def create_local_attn_mask(
@@ -256,6 +260,28 @@ class MultimodalDiP(nn.Module):
             atom_attn_mask = None
 
         return atom_attn_mask
+
+    @typecheck
+    def group_normalize(self, x: Tensor, norm_layer: nn.LayerNorm) -> Tensor:
+        """Helper to apply LayerNorm on the per-group-element dimension.
+
+        Args:
+            x: Input tensor of shape [..., G*C]
+            norm_layer: LayerNorm module to apply on the per-group-element dimension.
+
+        Returns:
+            Normalized tensor of the same shape as input [..., G*C].
+        """
+        leading_dims = x.shape[:-1]
+
+        # Reshape to expose group axis: [..., G*C] -> [..., G, C]
+        x_reshaped = x.view(*leading_dims, self.num_G, self.dim_per_g)
+
+        # Apply normalization
+        normed_reshaped = norm_layer(x_reshaped)
+
+        # Reshape back to original convention
+        return normed_reshaped.view(*leading_dims, -1)
 
     @typecheck
     def forward(
@@ -402,8 +428,10 @@ class MultimodalDiP(nn.Module):
             length = feats["max_num_tokens"].float().unsqueeze(-1)
             c_emb = c_emb + self.length_embedder(torch.log(length))
 
+        # Lift condition embeddings to be G-equivariant
+        c_emb = lift(c_emb.unsqueeze(-2), None, self.group)  # (B, 1, G*C)
+
         # Create atom features
-        ref_pos_emb = self.atom_pos_embedder(pos=feats["ref_pos"])
         atom_token_pos = self.token_pos_embedder(pos=atom_to_token_idx.unsqueeze(-1).float())
         atom_types_emb = self.atom_type_embedder(atom_types)
         lengths_scaled_emb = self.lengths_scaled_embedder(lengths_scaled).expand(
@@ -414,28 +442,25 @@ class MultimodalDiP(nn.Module):
         )  # (B, M, D)
         atom_feat = torch.cat(
             [
-                ref_pos_emb,  # (B, M, PE1)
-                atom_token_pos,  # (B, M, PE2)
+                # Invariant features only
+                atom_token_pos,  # (B, M, PE)
                 atom_types_emb,  # (B, M, C)
                 lengths_scaled_emb,  # (B, M, C)
                 angles_radians_emb,  # (B, M, C)
                 mask.float().unsqueeze(-1),  # (B, M, 1)
             ],
             dim=-1,
-        )  # (B, M, C * 5 + 1)
+        )  # (B, M, PE + C * 3 + 1)
         atom_feat = self.atom_feat_proj(atom_feat)  # (B, M, D)
 
-        atom_coord = self.atom_pos_embedder(pos=pos)  # (B, M, C)
-        atom_coord = self.atom_pos_proj(atom_coord)  # (B, M, D)
+        ref_pos = self.atom_pos_embedder(pos=feats["ref_pos"])  # (B, M, D)
+        atom_coord = self.atom_pos_embedder(pos=pos)  # (B, M, D)
+        atom_frac_coord = self.atom_pos_embedder(pos=frac_coords)  # (B, M, D)
 
-        atom_frac_coord = self.atom_pos_embedder(pos=frac_coords)  # (B, M, C)
-        atom_frac_coord = self.frac_coords_proj(atom_frac_coord)  # (B, M, D)
-
-        atom_in = torch.cat(
-            [atom_feat, atom_coord, atom_frac_coord],
-            dim=-1,
-        )
-        atom_in = self.atom_in_proj(atom_in)  # (B, M, D)
+        # Lift atom inputs to be G-equivariant
+        atom_in = lift(atom_feat, None, self.group)
+        atom_in = self.atom_in_proj(atom_in)
+        atom_in = atom_in + ref_pos + atom_coord + atom_frac_coord  # (B, M, D)
 
         # Curate position embeddings for Axial RoPE
         atom_pe_pos = torch.cat(
@@ -448,8 +473,12 @@ class MultimodalDiP(nn.Module):
         token_pe_pos = feats["token_index"].unsqueeze(-1).float()  # (B, N, 1)
 
         # Run atom encoder
-        atom_c_emb_enc = self.atom_enc_cond_proj(c_emb)
-        atom_latent = self.context2atom_proj(atom_in)
+        atom_c_emb_enc = self.group_normalize(
+            self.atom_enc_cond_proj[0](c_emb), self.atom_enc_cond_proj[1]
+        )
+        atom_latent = self.group_normalize(
+            self.context2atom_proj[0](atom_in), self.context2atom_proj[1]
+        )
         atom_latent = self.atom_encoder_transformer(
             latents=atom_latent,
             c=atom_c_emb_enc,
@@ -457,7 +486,9 @@ class MultimodalDiP(nn.Module):
             pos=atom_pe_pos,
             sdpa_backends=sdpa_backends,
         )
-        atom_latent = self.atom2latent_proj(atom_latent)
+        atom_latent = self.group_normalize(
+            self.atom2latent_proj[0](atom_latent), self.atom2latent_proj[1]
+        )
 
         # Grouping: aggregate atoms to tokens
         atom_to_token_mean = atom_to_token / (atom_to_token.sum(dim=1, keepdim=True) + 1e-6)
@@ -483,10 +514,14 @@ class MultimodalDiP(nn.Module):
 
         # Add skip connection
         output = output + atom_latent
-        output = self.latent2atom_proj(output)
+        output = self.latent2atom_proj[3](
+            self.group_normalize(self.latent2atom_proj[:2](output), self.latent2atom_proj[2])
+        )
 
         # Run atom decoder
-        atom_c_emb_dec = self.atom_dec_cond_proj(c_emb)
+        atom_c_emb_dec = self.group_normalize(
+            self.atom_dec_cond_proj[0](c_emb), self.atom_dec_cond_proj[1]
+        )
         output = self.atom_decoder_transformer(
             latents=output,
             c=atom_c_emb_dec,
@@ -494,7 +529,7 @@ class MultimodalDiP(nn.Module):
             pos=atom_pe_pos,
             sdpa_backends=sdpa_backends,
         )
-        output = self.final_layer(output, c=c_emb)
+        output = self.final_layer(output) + self.final_layer_cond(c_emb.unsqueeze(-2))
         output = output * mask.unsqueeze(-1)  # Mask out padding atoms
 
         # Collect predictions

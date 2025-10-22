@@ -29,7 +29,7 @@ token_pos_embedder:
 
 atom_pos_embedder:
   _target_: platonic_transformers.models.platoformer.ape.PlatonicAPE
-  embed_dim: 128
+  embed_dim: ${model.architecture.hidden_size}
   solid_name: ${model.architecture.solid_name}
   freq_sigma: 0.5
   spatial_dims: 3
