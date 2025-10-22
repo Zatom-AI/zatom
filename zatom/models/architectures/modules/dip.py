@@ -176,6 +176,9 @@ class MultimodalDiP(nn.Module):
             PlatonicLinear(hidden_size * self.num_G, self.atom_hidden_size_enc, solid=solid_name),
             nn.LayerNorm(self.atom_hidden_size_enc // self.num_G),
         )
+        self.token_trunk_cond_proj = PlatonicLinear(
+            hidden_size * self.num_G, hidden_size, solid=solid_name
+        )
         self.atom_dec_cond_proj = nn.Sequential(
             PlatonicLinear(hidden_size * self.num_G, self.atom_hidden_size_dec, solid=solid_name),
             nn.LayerNorm(self.atom_hidden_size_dec // self.num_G),
@@ -368,7 +371,6 @@ class MultimodalDiP(nn.Module):
 
         atom_to_token = feats["atom_to_token"]
         atom_to_token_idx = feats["atom_to_token_idx"]
-        ref_space_uid = feats["ref_space_uid"]
 
         modals_t = torch.cat(
             [
@@ -472,15 +474,13 @@ class MultimodalDiP(nn.Module):
         atom_in = self.atom_in_proj(atom_in)
         atom_in = atom_in + ref_pos + atom_coord + atom_frac_coord  # (B, M, D)
 
-        # Curate position embeddings for Axial RoPE
-        atom_pe_pos = torch.cat(
-            [
-                ref_space_uid.unsqueeze(-1).float(),  # (B, M, 1)
-                feats["ref_pos"],  # (B, M, 3)
-            ],
-            dim=-1,
-        )  # (B, M, 4)
-        token_pe_pos = feats["token_index"].unsqueeze(-1).float()  # (B, N, 1)
+        # Curate position embeddings for RoPE
+        atom_pe_pos = feats["ref_pos"]  # (B, M, 3)
+
+        atom_to_token_mean = atom_to_token / (atom_to_token.sum(dim=1, keepdim=True) + 1e-6)
+        token_pe_pos = torch.bmm(
+            atom_to_token_mean.transpose(1, 2), feats["ref_pos"]
+        )  # tokenwise_mean(B, M, 3) -> (B, N, 3)
 
         # Run atom encoder
         atom_c_emb_enc = self.group_normalize(
@@ -491,7 +491,7 @@ class MultimodalDiP(nn.Module):
         )
         atom_latent = self.atom_encoder_transformer(
             latents=atom_latent,
-            c=atom_c_emb_enc,
+            c=atom_c_emb_enc.squeeze(-2),
             attention_mask=atom_attn_mask_enc,
             pos=atom_pe_pos,
             sdpa_backends=sdpa_backends,
@@ -501,16 +501,16 @@ class MultimodalDiP(nn.Module):
         )
 
         # Grouping: aggregate atoms to tokens
-        atom_to_token_mean = atom_to_token / (atom_to_token.sum(dim=1, keepdim=True) + 1e-6)
         latent = torch.bmm(atom_to_token_mean.transpose(1, 2), atom_latent)
         assert (
             latent.shape[1] == num_tokens
         ), f"Latent must have {num_tokens} tokens, but got {latent.shape[1]}."
 
         # Run token trunk
+        token_c_emb_trunk = self.token_trunk_cond_proj(c_emb)
         latent = self.trunk(
             latents=latent,
-            c=c_emb,
+            c=token_c_emb_trunk.squeeze(-2),
             attention_mask=attention_mask,
             pos=token_pe_pos,
             sdpa_backends=sdpa_backends,
@@ -534,12 +534,12 @@ class MultimodalDiP(nn.Module):
         )
         output = self.atom_decoder_transformer(
             latents=output,
-            c=atom_c_emb_dec,
+            c=atom_c_emb_dec.squeeze(-2),
             attention_mask=atom_attn_mask_dec,
             pos=atom_pe_pos,
             sdpa_backends=sdpa_backends,
         )
-        output = self.final_layer(output, c=c_emb)
+        output = self.final_layer(output, c=c_emb.squeeze(-2))
         output = output * mask.unsqueeze(-1)  # Mask out padding atoms
 
         # Collect predictions

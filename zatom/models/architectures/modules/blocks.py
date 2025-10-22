@@ -343,7 +343,7 @@ class DiPBlock(nn.Module):
         self.norm2 = nn.LayerNorm(hidden_size // self.num_G, elementwise_affine=False, eps=1e-6)
         mlp_hidden_dim = int(hidden_size * mlp_ratio)
         if use_swiglu:
-            self.mlp = PlatonicSwiGLUFeedForward(hidden_size, mlp_hidden_dim)
+            self.mlp = PlatonicSwiGLUFeedForward(hidden_size, mlp_hidden_dim, solid=solid)
         else:
             approx_gelu = lambda: nn.GELU(approximate="tanh")
             self.mlp = PlatonicMlp(

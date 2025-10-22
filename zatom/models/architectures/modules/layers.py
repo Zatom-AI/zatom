@@ -317,16 +317,17 @@ class PlatonicEfficientSelfAttentionLayer(nn.Module):
         self.proj = PlatonicLinear(hidden_size, hidden_size, solid=solid, bias=use_bias)
         self.proj_drop = nn.Dropout(proj_drop)
 
-        self.q_norm = RMSNorm(head_dim) if qk_norm else nn.Identity()
-        self.k_norm = RMSNorm(head_dim) if qk_norm else nn.Identity()
+        self.q_norm = RMSNorm(hidden_size // self.num_G) if qk_norm else nn.Identity()
+        self.k_norm = RMSNorm(hidden_size // self.num_G) if qk_norm else nn.Identity()
 
-        head_dim_G = head_dim // self.num_G
-        num_heads_G = num_heads // self.num_G
-        pos_embedder_head_dim = head_dim_G // num_heads_G
+        head_dim_G = hidden_size // self.num_G
+
+        self.num_heads_G = num_heads // self.num_G
+        self.pos_embedder_head_dim = head_dim_G // self.num_heads_G
 
         self.pos_embedder = pos_embedder(
-            num_heads=num_heads_G,
-            head_dim=pos_embedder_head_dim,
+            num_heads=self.num_heads_G,
+            head_dim=self.pos_embedder_head_dim,
         )
 
     @typecheck
@@ -363,6 +364,8 @@ class PlatonicEfficientSelfAttentionLayer(nn.Module):
             Output tensor of shape (B, N, C).
         """
         B, N, C = x.shape
+        G, H, D_h = self.num_G, self.num_heads_G, self.pos_embedder_head_dim
+
         attn_mask = kwargs.get("attention_mask")
         pos = kwargs.get("pos")
         sdpa_backends = kwargs.get("sdpa_backends", SDPA_BACKENDS)
@@ -372,10 +375,15 @@ class PlatonicEfficientSelfAttentionLayer(nn.Module):
         q, k, v = qkv.unbind(0)
 
         if self.pos_embedder and pos is not None:
-            q = self.pos_embedder(q, pos)
-            k = self.pos_embedder(k, pos)
+            q = self.pos_embedder(q.reshape(B, N, G, H, D_h), pos).reshape(B, G * H, N, D_h)
+            k = self.pos_embedder(k.reshape(B, N, G, H, D_h), pos).reshape(B, G * H, N, D_h)
 
-        q, k = self.group_normalize(q, self.q_norm), self.group_normalize(k, self.k_norm)
+        q = self.group_normalize(q.reshape(B, N, G * H * D_h), self.q_norm).reshape(
+            B, G * H, N, D_h
+        )
+        k = self.group_normalize(k.reshape(B, N, G * H * D_h), self.k_norm).reshape(
+            B, G * H, N, D_h
+        )
 
         # JVP Flash Attention, with support for second-order derivatives
         if self.jvp_attn:
@@ -461,7 +469,7 @@ class PlatonicSwiGLUFeedForward(nn.Module):
         multiple_of: Ensure the hidden dimension is a multiple of this value.
     """
 
-    def __init__(self, dim: int, hidden_dim: int, solid: str, multiple_of: int = 256):
+    def __init__(self, dim: int, hidden_dim: int, solid: str, multiple_of: int = 192):
         super().__init__()
 
         if solid.lower() not in PLATONIC_GROUPS:

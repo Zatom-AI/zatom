@@ -49,6 +49,7 @@ atom_encoder_transformer:
       _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_enc}
+      solid: ${model.architecture.solid_name}
       num_heads: ${model.architecture.atom_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
@@ -56,8 +57,8 @@ atom_encoder_transformer:
         _target_: platonic_transformers.models.platoformer.rope.PlatonicRoPE
         _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.atom_hidden_size_enc}
-        solid: ${model.architecture.solid_name}
-        spatial_dims: 4
+        solid_name: ${model.architecture.solid_name}
+        spatial_dims: 3
         freq_sigma: 1.0
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
@@ -76,6 +77,7 @@ trunk:
       _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.hidden_size}
+      solid: ${model.architecture.solid_name}
       num_heads: ${model.architecture.token_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
@@ -83,8 +85,8 @@ trunk:
         _target_: platonic_transformers.models.platoformer.rope.PlatonicRoPE
         _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.hidden_size}
-        solid: ${model.architecture.solid_name}
-        spatial_dims: 4
+        solid_name: ${model.architecture.solid_name}
+        spatial_dims: 3
         freq_sigma: 1.0
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
@@ -103,6 +105,7 @@ atom_decoder_transformer:
       _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_dec}
+      solid: ${model.architecture.solid_name}
       num_heads: ${model.architecture.atom_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
@@ -110,16 +113,16 @@ atom_decoder_transformer:
         _target_: platonic_transformers.models.platoformer.rope.PlatonicRoPE
         _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.atom_hidden_size_dec}
-        solid: ${model.architecture.solid_name}
-        spatial_dims: 4
+        solid_name: ${model.architecture.solid_name}
+        spatial_dims: 3
         freq_sigma: 1.0
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
 # General architecture parameters
 hidden_size: 768
-token_num_heads: 12
-atom_num_heads: 4
+token_num_heads: 192
+atom_num_heads: 48
 atom_hidden_size_enc: 192
 atom_hidden_size_dec: 192
 atom_n_queries_enc: null # NOTE: if null, user-provided `mask` will be used instead
