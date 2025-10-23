@@ -534,6 +534,46 @@ def scatter_mean_torch(src: torch.Tensor, index: torch.Tensor, dim: int = 0) -> 
 
 
 @typecheck
+def masked_mean(
+    x: torch.Tensor,
+    mask: torch.Tensor,
+    dim: int,
+    keepdim: bool = False,
+    nan_if_all_masked: bool = False,
+) -> torch.Tensor:
+    """Compute the mean along `dim` using a custom boolean mask.
+
+    Args:
+        x: Input tensor of any shape.
+        mask: Boolean tensor of the same shape as `x`, where True means "include value".
+        dim: Dimension along which to take the mean.
+        keepdim: If True, retains `dim` with size 1 in the output.
+        nan_if_all_masked:
+            If True, positions where all mask entries along `dim` are False will be NaN.
+            If False, returns 0 in those cases.
+
+    Returns:
+        torch.Tensor with mean values computed using only masked elements.
+    """
+    # Ensure mask is boolean
+    mask = mask.bool()
+
+    # Sum only masked values
+    sum_masked = torch.sum(x * mask, dim=dim, keepdim=keepdim)
+
+    # Count of True mask entries along the reduction dimension
+    count_masked = torch.sum(mask, dim=dim, keepdim=keepdim)
+
+    # Avoid division by zero
+    mean_masked = sum_masked / count_masked.clamp(min=1)
+
+    if nan_if_all_masked:
+        mean_masked[count_masked == 0] = float("nan")
+
+    return mean_masked
+
+
+@typecheck
 def sample_logit_normal(
     n: int = 1, m: float = 0.0, s: float = 1.0, device: torch.device | None = None
 ) -> torch.Tensor:

@@ -10,6 +10,8 @@ from flow_matching.utils import ModelWrapper, categorical, expand_tensor_like
 from torch import Tensor
 from torch.nn import functional as F
 
+from zatom.utils.training_utils import masked_mean
+
 try:
     from tqdm import tqdm
 
@@ -218,6 +220,9 @@ class MultimodalSolver(Solver):
             [[x if enable_grad else x.clone()] for x in x_init] if return_intermediates else []
         )
 
+        # NOTE: Assumes presence of (initial) zero padding in continuous modalities
+        masks: Sequence[Optional[Tensor]] = [x != 0 for x in x_init]
+
         steps_counter = 0
 
         if verbose:
@@ -289,6 +294,11 @@ class MultimodalSolver(Solver):
                             if self.enable_mean_flows
                             else states[idx] + h * velocity_output
                         )
+
+                        if config.get("should_center_during_sampling", False):
+                            states[idx] = states[idx] - masked_mean(
+                                states[idx], masks[idx], dim=-2, keepdim=True
+                            )
 
                         if self.early_stopping_grad_norm is not None:
                             early_stopping_state_dict[idx] = (

@@ -245,6 +245,7 @@ class MFT(nn.Module):
                 "weight": self.pos_loss_weight,
                 "x_1_prediction": continuous_x_1_prediction,
                 "should_rigid_align": weighted_rigid_align_pos,
+                "should_center_during_sampling": True,
             },
             "frac_coords": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
