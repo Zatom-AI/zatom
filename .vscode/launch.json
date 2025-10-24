@@ -129,9 +129,9 @@
                 // "trainer=ddp",
                 "trainer=mps",
                 // "trainer.accumulate_grad_batches=4",
-                "trainer.check_val_every_n_epoch=500",
+                // "trainer.check_val_every_n_epoch=500",
                 // "trainer.gradient_clip_val=0.5",
-                "trainer.max_epochs=50000",
+                // "trainer.max_epochs=50000",
                 // "trainer.overfit_batches=1"
                 // "trainer.precision=32-true",
             ]

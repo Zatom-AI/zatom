@@ -23,8 +23,8 @@ seed: 42
 task_name: overfit_fm
 
 trainer:
-  check_val_every_n_epoch: 1000
-  max_epochs: 10000
+  check_val_every_n_epoch: 500
+  max_epochs: 30000
   overfit_batches: 1
 
 data:
