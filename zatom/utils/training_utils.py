@@ -1,7 +1,9 @@
 import math
-from typing import Any, Callable
+from math import prod
+from typing import Callable
 
 import torch
+from scipy.spatial.transform import Rotation
 from torch.nn.attention import SDPBackend
 
 from zatom.utils.pylogger import RankedLogger
@@ -462,52 +464,27 @@ def roto_translate(
 
 
 @typecheck
-def random_rotation_matrix(validate: bool = False, **tensor_kwargs: Any) -> torch.Tensor:
-    """Generate a random (3,3) rotation matrix.
+def sample_uniform_rotation(
+    shape: torch.Size, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    """Sample uniform random rotation matrices.
+
+    Reference: NVIDIA-Digital-Bio/proteina implementation.
 
     Args:
-        tensor_kwargs: Keyword arguments to pass to the tensor constructor. E.g. `device`, `dtype`.
+        shape: The shape of the output tensor, excluding the last two dimensions
+            which will be (3, 3) for rotation matrices.
+        dtype: The data type of the output tensor.
+        device: The device on which to create the tensor.
 
     Returns:
-        A tensor of shape (3, 3) representing the rotation matrix.
+        A tensor of shape `(*shape, 3, 3)` containing random rotation matrices.
     """
-    # Generate a random quaternion
-    q = torch.rand(4, **tensor_kwargs)
-    q /= torch.linalg.norm(q)
-
-    # Compute the rotation matrix from the quaternion
-    rot_mat = torch.tensor(
-        [
-            [
-                1 - 2 * q[2] ** 2 - 2 * q[3] ** 2,
-                2 * q[1] * q[2] - 2 * q[0] * q[3],
-                2 * q[1] * q[3] + 2 * q[0] * q[2],
-            ],
-            [
-                2 * q[1] * q[2] + 2 * q[0] * q[3],
-                1 - 2 * q[1] ** 2 - 2 * q[3] ** 2,
-                2 * q[2] * q[3] - 2 * q[0] * q[1],
-            ],
-            [
-                2 * q[1] * q[3] - 2 * q[0] * q[2],
-                2 * q[2] * q[3] + 2 * q[0] * q[1],
-                1 - 2 * q[1] ** 2 - 2 * q[2] ** 2,
-            ],
-        ],
-        **tensor_kwargs,
-    )
-
-    if validate:
-        rot_identity_mat = rot_mat @ rot_mat.T
-        identity_mat = torch.eye(3, device=rot_mat.device, dtype=rot_identity_mat.dtype)
-        assert torch.allclose(
-            rot_identity_mat,
-            identity_mat,
-            atol=1e-5,
-            rtol=1e-5,
-        ), "Not a rotation matrix."
-
-    return rot_mat
+    return torch.tensor(
+        Rotation.random(prod(shape)).as_matrix(),
+        device=device,
+        dtype=dtype,
+    ).reshape(*shape, 3, 3)
 
 
 @typecheck

@@ -26,8 +26,8 @@ from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
     BEST_DEVICE,
     SDPA_BACKENDS,
-    random_rotation_matrix,
     sample_logit_normal,
+    sample_uniform_rotation,
     weighted_rigid_align,
 )
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
@@ -678,11 +678,13 @@ class MFT(nn.Module):
 
             # Unit test for SO(3) equivariance
             if self.test_so3_equivariance:
-                rand_rot_mat = random_rotation_matrix(validate=False, device=device)
+                output_modal = model_output[idx]
+                rand_rot_mat = sample_uniform_rotation(
+                    shape=output_modal.shape[:-2], dtype=output_modal.dtype, device=device
+                )
 
                 # Augment (original) output modality
-                output_modal = model_output[idx]
-                expected_output_modal_aug = output_modal @ rand_rot_mat.T
+                expected_output_modal_aug = torch.bmm(output_modal, rand_rot_mat.transpose(-2, -1))
 
                 # Augment input modality for new forward pass
                 model_output_aug = self.flow.model(

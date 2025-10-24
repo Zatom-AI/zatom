@@ -20,7 +20,7 @@ from zatom.eval.crystal_generation import CrystalGenerationEvaluator
 from zatom.eval.mof_generation import MOFGenerationEvaluator
 from zatom.eval.molecule_generation import MoleculeGenerationEvaluator
 from zatom.utils import pylogger
-from zatom.utils.training_utils import random_rotation_matrix, scatter_mean_torch
+from zatom.utils.training_utils import sample_uniform_rotation, scatter_mean_torch
 from zatom.utils.typing_utils import typecheck
 
 log = pylogger.RankedLogger(__name__)
@@ -466,10 +466,8 @@ class Zatom(LightningModule):
             batch.sample_is_periodic = sample_is_periodic
             batch.node_is_periodic = sample_is_periodic[batch.batch]
 
-            # Center non-periodic molecules at origin before any augmentations
-            batch.pos[~batch.node_is_periodic] -= scatter_mean_torch(
-                src=batch.pos, index=batch.batch, dim=0
-            )[batch.batch][~batch.node_is_periodic]
+            # Center molecules at origin before any augmentations
+            batch.pos -= scatter_mean_torch(src=batch.pos, index=batch.batch, dim=0)[batch.batch]
 
             if self.hparams.augmentations.multiplicity > 1:
                 # Augment batch by random rotations and translations multiple times
@@ -485,10 +483,15 @@ class Zatom(LightningModule):
                 # ])
 
             if self.hparams.augmentations.pos is True:
-                rot_mat = random_rotation_matrix(validate=False, device=self.device)
-                pos_aug = batch.pos @ rot_mat.T
+                rot_mat = sample_uniform_rotation(
+                    shape=batch.cell.shape[:-2],
+                    dtype=batch.pos.dtype,
+                    device=self.device,
+                )
+                rot_for_nodes = rot_mat[batch.batch]
+                pos_aug = torch.bmm(rot_for_nodes, batch.pos.unsqueeze(-1)).squeeze(-1)
                 batch.pos = pos_aug
-                cell_aug = batch.cell @ rot_mat.T
+                cell_aug = torch.bmm(rot_mat, batch.cell)
                 batch.cell = cell_aug
                 # # NOTE: Fractional coordinates are rotation-invariant
                 # cell_per_node_inv = torch.linalg.inv(
@@ -515,14 +518,13 @@ class Zatom(LightningModule):
                     )
                     # Apply same random translation to all (periodic) Cartesian coordinates
                     pos_aug = batch.pos + random_translation
-                    batch.pos[batch.node_is_periodic] = pos_aug[batch.node_is_periodic]
                     # Compute new fractional coordinates for periodic samples
                     cell_per_node_inv = torch.linalg.inv(
                         # NOTE: `torch.linalg.inv` does not support low precision dtypes
                         batch.cell[batch.batch][batch.node_is_periodic].float()
                     )
                     frac_coords_aug = torch.einsum(
-                        "bi,bij->bj", batch.pos[batch.node_is_periodic], cell_per_node_inv
+                        "bi,bij->bj", pos_aug[batch.node_is_periodic], cell_per_node_inv
                     )
                     frac_coords_aug = frac_coords_aug % 1.0
                     batch.frac_coords[batch.node_is_periodic] = frac_coords_aug.type(
