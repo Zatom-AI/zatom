@@ -918,7 +918,7 @@ class Zatom(LightningModule):
             mask=token_mask,
             steps=steps,
             cfg_scale=cfg_scale,
-            # NOTE: For non-periodic samples, we may center positions at origin after each denoising step
+            # NOTE: For non-periodic samples only, we may center positions at origin after each denoising step
             enable_zero_centering=not sample_is_periodic.any().item(),
         )
 
