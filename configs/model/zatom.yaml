@@ -8,6 +8,7 @@ interpolant:
   _target_: zatom.models.interpolants.flow_matching.FlowMatchingInterpolant
   disc_feats: [atom_types]
   cont_feats: [pos, frac_coords, lengths_scaled, angles_radians]
+  cont_feats_distributions: [centered_gaussian, uniform, uniform, uniform]
   mask_token_index: ${model.architecture.max_num_elements}
   min_t: 0
   max_t: 0

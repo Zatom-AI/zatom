@@ -845,15 +845,17 @@ class Zatom(LightningModule):
             atom_types=self.interpolant._corrupt_disc_x(
                 atom_types, t, token_long_mask, token_long_mask
             ),
-            pos=self.interpolant._corrupt_cont_x(pos, t, token_long_mask, token_long_mask),
+            pos=self.interpolant._corrupt_cont_x(
+                pos, t, token_long_mask, token_long_mask, feat="pos"
+            ),
             frac_coords=self.interpolant._corrupt_cont_x(
-                frac_coords, t, token_long_mask, token_long_mask
+                frac_coords, t, token_long_mask, token_long_mask, feat="frac_coords"
             ),
             lengths_scaled=self.interpolant._corrupt_cont_x(
-                lengths_scaled, t, token_full_mask, token_full_mask
+                lengths_scaled, t, token_full_mask, token_full_mask, feat="lengths_scaled"
             ),
             angles_radians=self.interpolant._corrupt_cont_x(
-                angles_radians, t, token_full_mask, token_full_mask
+                angles_radians, t, token_full_mask, token_full_mask, feat="angles_radians"
             ),
         )
 
