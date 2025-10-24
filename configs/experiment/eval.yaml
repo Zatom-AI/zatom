@@ -3,14 +3,15 @@
 # Options for evaluation:
 # - /model/architecture:
 #         [mft_80M, mft_180M, mft_500M,
-#          met_80M, met_180M, met_500M]
+#          met_80M, met_180M, met_500M,
+#          mfp_80M, mfp_180M, mfp_500M]
 # - /logger: [null, wandb]
 # - /trainer: [default, mps, ddp, fsdp]
 
 defaults:
   - override /data: joint
   - override /model: zatom
-  - override /model/architecture: mft_180M
+  - override /model/architecture: mft_80M
   - override /callbacks: default
   - override /logger: wandb
   - override /trainer: ddp

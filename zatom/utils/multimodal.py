@@ -127,6 +127,9 @@ class Flow(nn.Module):
                 "path": path,
                 "x_1_prediction": modalities[name].get("x_1_prediction", False),
                 "should_rigid_align": modalities[name].get("should_rigid_align", None),
+                "should_center_during_sampling": modalities[name].get(
+                    "should_center_during_sampling", False
+                ),
             }
             for name, path in self.paths.items()
         ]
@@ -263,6 +266,7 @@ class Flow(nn.Module):
         step_size: Optional[float] = None,
         div_free: Union[float, Callable[[float], float]] = 0.0,
         method: MULTIMODAL_METHOD = "euler",
+        enable_zero_centering: bool = True,
         return_intermediates: bool = False,
         enable_grad: bool = False,
         verbose: bool = False,
@@ -287,6 +291,8 @@ class Flow(nn.Module):
                 dependent function. Defaults to 0.0.
             method (MULTIMODAL_METHOD): Numerical integration method. Currently only ``"euler"`` is
                 supported, representing a single forward step.
+            enable_zero_centering (bool): Whether to allow centering of continuous modalities
+                at the origin after each denoising step. Defaults to ``True``.
             return_intermediates (bool): If ``True``, returns a list of tensors for
                 each modality containing the state at each intermediate time step.
             enable_grad (bool): Whether to enable gradient tracking during integration.
@@ -333,6 +339,7 @@ class Flow(nn.Module):
             div_free=div_free,
             method=method,
             time_grid=time_grid,
+            enable_zero_centering=enable_zero_centering,
             return_intermediates=return_intermediates,
             enable_grad=enable_grad,
             verbose=verbose,

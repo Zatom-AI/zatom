@@ -1,7 +1,9 @@
 import math
-from typing import Any, Callable
+from math import prod
+from typing import Callable
 
 import torch
+from scipy.spatial.transform import Rotation
 from torch.nn.attention import SDPBackend
 
 from zatom.utils.pylogger import RankedLogger
@@ -462,52 +464,27 @@ def roto_translate(
 
 
 @typecheck
-def random_rotation_matrix(validate: bool = False, **tensor_kwargs: Any) -> torch.Tensor:
-    """Generate a random (3,3) rotation matrix.
+def sample_uniform_rotation(
+    shape: torch.Size, dtype: torch.dtype, device: torch.device
+) -> torch.Tensor:
+    """Sample uniform random rotation matrices.
+
+    Reference: NVIDIA-Digital-Bio/proteina implementation.
 
     Args:
-        tensor_kwargs: Keyword arguments to pass to the tensor constructor. E.g. `device`, `dtype`.
+        shape: The shape of the output tensor, excluding the last two dimensions
+            which will be (3, 3) for rotation matrices.
+        dtype: The data type of the output tensor.
+        device: The device on which to create the tensor.
 
     Returns:
-        A tensor of shape (3, 3) representing the rotation matrix.
+        A tensor of shape `(*shape, 3, 3)` containing random rotation matrices.
     """
-    # Generate a random quaternion
-    q = torch.rand(4, **tensor_kwargs)
-    q /= torch.linalg.norm(q)
-
-    # Compute the rotation matrix from the quaternion
-    rot_mat = torch.tensor(
-        [
-            [
-                1 - 2 * q[2] ** 2 - 2 * q[3] ** 2,
-                2 * q[1] * q[2] - 2 * q[0] * q[3],
-                2 * q[1] * q[3] + 2 * q[0] * q[2],
-            ],
-            [
-                2 * q[1] * q[2] + 2 * q[0] * q[3],
-                1 - 2 * q[1] ** 2 - 2 * q[3] ** 2,
-                2 * q[2] * q[3] - 2 * q[0] * q[1],
-            ],
-            [
-                2 * q[1] * q[3] - 2 * q[0] * q[2],
-                2 * q[2] * q[3] + 2 * q[0] * q[1],
-                1 - 2 * q[1] ** 2 - 2 * q[2] ** 2,
-            ],
-        ],
-        **tensor_kwargs,
-    )
-
-    if validate:
-        rot_identity_mat = rot_mat @ rot_mat.T
-        identity_mat = torch.eye(3, device=rot_mat.device, dtype=rot_identity_mat.dtype)
-        assert torch.allclose(
-            rot_identity_mat,
-            identity_mat,
-            atol=1e-5,
-            rtol=1e-5,
-        ), "Not a rotation matrix."
-
-    return rot_mat
+    return torch.tensor(
+        Rotation.random(prod(shape)).as_matrix(),
+        device=device,
+        dtype=dtype,
+    ).reshape(*shape, 3, 3)
 
 
 @typecheck
@@ -531,6 +508,46 @@ def scatter_mean_torch(src: torch.Tensor, index: torch.Tensor, dim: int = 0) -> 
         expanded_index = index.unsqueeze(-1).expand_as(src)
     out.scatter_reduce_(dim, expanded_index, src, reduce="mean")
     return out
+
+
+@typecheck
+def masked_mean(
+    x: torch.Tensor,
+    mask: torch.Tensor,
+    dim: int,
+    keepdim: bool = False,
+    nan_if_all_masked: bool = False,
+) -> torch.Tensor:
+    """Compute the mean along `dim` using a custom boolean mask.
+
+    Args:
+        x: Input tensor of any shape.
+        mask: Boolean tensor of the same shape as `x`, where True means "include value".
+        dim: Dimension along which to take the mean.
+        keepdim: If True, retains `dim` with size 1 in the output.
+        nan_if_all_masked:
+            If True, positions where all mask entries along `dim` are False will be NaN.
+            If False, returns 0 in those cases.
+
+    Returns:
+        torch.Tensor with mean values computed using only masked elements.
+    """
+    # Ensure mask is boolean
+    mask = mask.bool()
+
+    # Sum only masked values
+    sum_masked = torch.sum(x * mask, dim=dim, keepdim=keepdim)
+
+    # Count of True mask entries along the reduction dimension
+    count_masked = torch.sum(mask, dim=dim, keepdim=keepdim)
+
+    # Avoid division by zero
+    mean_masked = sum_masked / count_masked.clamp(min=1)
+
+    if nan_if_all_masked:
+        mean_masked[count_masked == 0] = float("nan")
+
+    return mean_masked
 
 
 @typecheck

@@ -36,7 +36,7 @@ def instantiate_callbacks(callbacks_cfg: DictConfig, using_logger: bool = True) 
         raise TypeError("Callbacks config must be a DictConfig!")
 
     for _, cb_conf in callbacks_cfg.items():
-        if isinstance(cb_conf, DictConfig) and "_target_" in cb_conf:
+        if isinstance(cb_conf, DictConfig) and "_target_" in cb_conf and cb_conf._target_:
             if not using_logger and cb_conf._target_ in callbacks_with_logger:
                 log.warning(f"<{cb_conf._target_}> callback requires a logger! Skipping...")
                 continue

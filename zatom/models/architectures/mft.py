@@ -26,8 +26,8 @@ from zatom.utils.multimodal import Flow
 from zatom.utils.training_utils import (
     BEST_DEVICE,
     SDPA_BACKENDS,
-    random_rotation_matrix,
     sample_logit_normal,
+    sample_uniform_rotation,
     weighted_rigid_align,
 )
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
@@ -132,9 +132,9 @@ class MFT(nn.Module):
         early_stopping_grad_norm: float | None = None,
         use_length_condition: bool = True,
         jvp_attn: bool = False,
-        weighted_rigid_align_pos: bool = True,
+        weighted_rigid_align_pos: bool = False,
         weighted_rigid_align_frac_coords: bool = False,
-        continuous_x_1_prediction: bool = False,
+        continuous_x_1_prediction: bool = True,
         logit_normal_time: bool = False,
         unified_modal_time: bool = True,
         remove_t_conditioning: bool = False,
@@ -245,6 +245,7 @@ class MFT(nn.Module):
                 "weight": self.pos_loss_weight,
                 "x_1_prediction": continuous_x_1_prediction,
                 "should_rigid_align": weighted_rigid_align_pos,
+                "should_center_during_sampling": True,
             },
             "frac_coords": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
@@ -295,6 +296,7 @@ class MFT(nn.Module):
         mask: Bool["b m"],  # type: ignore
         steps: int = 100,
         cfg_scale: float = 2.0,
+        enable_zero_centering: bool = True,
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
         modal_input_dict: (
             Dict[str, Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]] | None
@@ -316,6 +318,8 @@ class MFT(nn.Module):
             mask: True if valid token, False if padding.
             steps: Number of integration steps for the multimodal ODE solver.
             cfg_scale: Classifier-free guidance scale.
+            enable_zero_centering (bool): Whether to allow centering of continuous modalities
+                at the origin after each denoising step. Defaults to ``True``.
             sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
             modal_input_dict: If not None, a dictionary specifying input modalities to use and their input metadata.
                 The keys should be a subset of `["atom_types", "pos", "frac_coords", "lengths_scaled", "angles_radians"]`,
@@ -372,6 +376,7 @@ class MFT(nn.Module):
             feats=feats,
             mask=mask,
             cfg_scale=cfg_scale,
+            enable_zero_centering=enable_zero_centering,
             sdpa_backends=sdpa_backends,
         )
 
@@ -677,11 +682,15 @@ class MFT(nn.Module):
 
             # Unit test for SO(3) equivariance
             if self.test_so3_equivariance:
-                rand_rot_mat = random_rotation_matrix(validate=False, device=device)
+                output_modal = model_output[idx]
+                rand_rot_mat = sample_uniform_rotation(
+                    shape=output_modal.shape[:-2], dtype=output_modal.dtype, device=device
+                )
 
                 # Augment (original) output modality
-                output_modal = model_output[idx]
-                expected_output_modal_aug = output_modal @ rand_rot_mat.T
+                expected_output_modal_aug = torch.einsum(
+                    "bij,bjk->bik", output_modal, rand_rot_mat.transpose(-2, -1)
+                )
 
                 # Augment input modality for new forward pass
                 model_output_aug = self.flow.model(

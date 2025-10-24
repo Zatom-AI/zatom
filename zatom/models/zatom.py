@@ -20,7 +20,7 @@ from zatom.eval.crystal_generation import CrystalGenerationEvaluator
 from zatom.eval.mof_generation import MOFGenerationEvaluator
 from zatom.eval.molecule_generation import MoleculeGenerationEvaluator
 from zatom.utils import pylogger
-from zatom.utils.training_utils import random_rotation_matrix, scatter_mean_torch
+from zatom.utils.training_utils import sample_uniform_rotation, scatter_mean_torch
 from zatom.utils.typing_utils import typecheck
 
 log = pylogger.RankedLogger(__name__)
@@ -472,7 +472,7 @@ class Zatom(LightningModule):
             )[batch.batch][~batch.node_is_periodic]
 
             if self.hparams.augmentations.multiplicity > 1:
-                # Augment batch by random rotations and translations multiple times
+                # Augment batch (e.g., by random 3D rotations and translations) multiple times
                 orig_batch_size = batch.num_graphs
                 batch = Batch.from_data_list(
                     [copy.deepcopy(batch) for _ in range(self.hparams.augmentations.multiplicity)]
@@ -485,10 +485,15 @@ class Zatom(LightningModule):
                 # ])
 
             if self.hparams.augmentations.pos is True:
-                rot_mat = random_rotation_matrix(validate=False, device=self.device)
-                pos_aug = batch.pos @ rot_mat.T
+                rot_mat = sample_uniform_rotation(
+                    shape=batch.cell.shape[:-2],
+                    dtype=batch.pos.dtype,
+                    device=self.device,
+                )
+                rot_for_nodes = rot_mat[batch.batch]
+                pos_aug = torch.einsum("bi,bij->bj", batch.pos, rot_for_nodes.transpose(-2, -1))
                 batch.pos = pos_aug
-                cell_aug = batch.cell @ rot_mat.T
+                cell_aug = torch.einsum("bij,bjk->bik", batch.cell, rot_mat.transpose(-2, -1))
                 batch.cell = cell_aug
                 # # NOTE: Fractional coordinates are rotation-invariant
                 # cell_per_node_inv = torch.linalg.inv(
@@ -513,9 +518,9 @@ class Zatom(LightningModule):
                         )
                         / 2
                     )
-                    # Apply same random translation to all Cartesian coordinates
+                    # Apply same random translation to all (periodic) Cartesian coordinates
                     pos_aug = batch.pos + random_translation
-                    batch.pos = pos_aug
+                    batch.pos[batch.node_is_periodic] = pos_aug[batch.node_is_periodic]
                     # Compute new fractional coordinates for periodic samples
                     cell_per_node_inv = torch.linalg.inv(
                         # NOTE: `torch.linalg.inv` does not support low precision dtypes
@@ -528,6 +533,16 @@ class Zatom(LightningModule):
                     batch.frac_coords[batch.node_is_periodic] = frac_coords_aug.type(
                         batch.frac_coords.dtype
                     )
+                    # # NOTE: Fractional coordinates are (still) rotation-invariant
+                    # cell_per_node_inv = torch.linalg.inv(
+                    #     batch.cell[batch.batch][batch.node_is_periodic]
+                    # )
+                    # assert torch.allclose(
+                    #     batch.frac_coords[batch.node_is_periodic],
+                    #     torch.einsum("bi,bij->bj", pos_aug[batch.node_is_periodic], cell_per_node_inv) % 1.0,
+                    #     rtol=1e-3,
+                    #     atol=1e-3,
+                    # )
 
         # Forward pass with loss calculation
         loss_dict = self.forward(batch)
@@ -786,6 +801,8 @@ class Zatom(LightningModule):
         Returns:
             A tuple containing the sampled crystal structure modalities, the original batch, and the generated sample modalities for the final sampling step.
         """
+        sample_is_periodic = torch.isin(dataset_idx, self.periodic_datasets)
+
         # Sample random lengths from distribution: (B, 1)
         sample_lengths = torch.multinomial(
             num_nodes_bincount.float(),
@@ -843,15 +860,17 @@ class Zatom(LightningModule):
             atom_types=self.interpolant._corrupt_disc_x(
                 atom_types, t, token_long_mask, token_long_mask
             ),
-            pos=self.interpolant._corrupt_cont_x(pos, t, token_long_mask, token_long_mask),
+            pos=self.interpolant._corrupt_cont_x(
+                pos, t, token_long_mask, token_long_mask, feat="pos"
+            ),
             frac_coords=self.interpolant._corrupt_cont_x(
-                frac_coords, t, token_long_mask, token_long_mask
+                frac_coords, t, token_long_mask, token_long_mask, feat="frac_coords"
             ),
             lengths_scaled=self.interpolant._corrupt_cont_x(
-                lengths_scaled, t, token_full_mask, token_full_mask
+                lengths_scaled, t, token_full_mask, token_full_mask, feat="lengths_scaled"
             ),
             angles_radians=self.interpolant._corrupt_cont_x(
-                angles_radians, t, token_full_mask, token_full_mask
+                angles_radians, t, token_full_mask, token_full_mask, feat="angles_radians"
             ),
         )
 
@@ -899,6 +918,8 @@ class Zatom(LightningModule):
             mask=token_mask,
             steps=steps,
             cfg_scale=cfg_scale,
+            # NOTE: For non-periodic samples only, we may center positions at origin after each denoising step
+            enable_zero_centering=not sample_is_periodic.any().item(),
         )
 
         # Collect final sample modalities and remove padding (to convert to PyG format)

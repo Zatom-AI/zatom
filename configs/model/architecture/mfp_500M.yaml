@@ -144,9 +144,9 @@ early_stopping_grad_norm: null
 
 use_length_condition: true
 jvp_attn: false
-weighted_rigid_align_pos: true
+weighted_rigid_align_pos: false
 weighted_rigid_align_frac_coords: false
-continuous_x_1_prediction: false
+continuous_x_1_prediction: true
 logit_normal_time: false
 unified_modal_time: true
 remove_t_conditioning: false

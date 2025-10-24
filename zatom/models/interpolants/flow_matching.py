@@ -20,6 +20,7 @@ class FlowMatchingInterpolant:
     Args:
         disc_feats: List of discrete feature names to corrupt.
         cont_feats: List of continuous feature names to corrupt.
+        cont_feats_distributions: List of distributions for continuous features.
         mask_token_index: Index of the mask token.
         min_t: Minimum time step to sample during training.
         max_t: Maximum time step to sample during training.
@@ -32,6 +33,7 @@ class FlowMatchingInterpolant:
         self,
         disc_feats: List[str],
         cont_feats: List[str],
+        cont_feats_distributions: List[Literal["centered_gaussian", "gaussian", "uniform"]],
         mask_token_index: int,
         max_num_nodes: int | None = None,
         min_t: float = 1e-2,
@@ -53,6 +55,16 @@ class FlowMatchingInterpolant:
         self.feats = disc_feats + cont_feats
         self.num_tokens = mask_token_index + int(corrupt)  # +1 for the mask token if corrupting
 
+        # Validate continuous feature distributions
+        assert len(cont_feats) == len(
+            cont_feats_distributions
+        ), "Length of `cont_feats` must match length of `cont_feats_distributions`."
+        assert all(
+            dist in ("centered_gaussian", "gaussian", "uniform")
+            for dist in cont_feats_distributions
+        ), f"Invalid distribution ({cont_feats_distributions}) in `cont_feats_distributions`."
+        self.cont_feat_to_distribution = dict(zip(cont_feats, cont_feats_distributions))
+
         # NOTE: To corrupt fractional coordinates (`frac_coords`), atom positions (`pos`) must be corrupted first
         assert len(self.feats) > 0, "No features to corrupt."
         self.feats.sort(reverse=True)
@@ -64,12 +76,12 @@ class FlowMatchingInterpolant:
         return t * (self.max_t - self.min_t) + self.min_t
 
     @typecheck
-    def _centered_gaussian(
-        self, batch_size: int, num_tokens: int, emb_dim: int = 3
+    def _gaussian(
+        self, batch_size: int, num_tokens: int, emb_dim: int = 3, center: bool = True
     ) -> torch.Tensor:
-        """Sample from a centered Gaussian distribution."""
+        """Sample from a Gaussian distribution."""
         noise = torch.randn(batch_size, num_tokens, emb_dim, device=self.device)
-        return noise - torch.mean(noise, dim=-2, keepdims=True)
+        return noise - torch.mean(noise, dim=-2, keepdims=True) if center else noise
 
     @typecheck
     def _corrupt_disc_x(
@@ -127,9 +139,15 @@ class FlowMatchingInterpolant:
         t: torch.Tensor,
         token_mask: torch.Tensor,
         diffuse_mask: torch.Tensor,
+        feat: str,
     ) -> torch.Tensor:
         """Corrupt the continuous input tensor `x_1` using the noise schedule defined by `t`."""
-        x_0 = self._centered_gaussian(*x_1.shape)
+        distribution = self.cont_feat_to_distribution[feat]
+        x_0 = (
+            torch.rand_like(x_1)
+            if distribution == "uniform"
+            else self._gaussian(*x_1.shape, center=(distribution == "centered_gaussian"))
+        )
         x_t = (1 - t[..., None]) * x_0 + t[..., None] * x_1
         x_t = x_t * diffuse_mask[..., None] + x_1 * (~diffuse_mask[..., None])
         return x_t * token_mask[..., None]
@@ -208,7 +226,7 @@ class FlowMatchingInterpolant:
                     f"Expected {feat} to be of dtype float16, bfloat16, float32 or float64, "
                     f"but got: {x_1.dtype}"
                 )
-                x_t = self._corrupt_cont_x(x_1, t, token_mask, diffuse_mask)
+                x_t = self._corrupt_cont_x(x_1, t, token_mask, diffuse_mask, feat)
 
             # Skip corruptions
             else:
