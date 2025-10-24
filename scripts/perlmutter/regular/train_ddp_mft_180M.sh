@@ -33,10 +33,10 @@ mkdir -p "$TORCH_HOME"
 mkdir -p "$HF_HOME"
 
 # Define run details
-DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`, `qm9_only`, `mp20_only`, `qmof150_only`, `omol25_only`, `geom_only`)
+DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
 DEFAULT_RUN_ID="tznc7uqw"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
 DEFAULT_RUN_DATE="2025-10-18_14-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
-DEFAULT_ARCHITECTURE="mft_180M"           # NOTE: Set the model architecture to be used, must be one of (`met_80M`, `met_180M`, `met_500M`, `mft_80M`, `mft_180M`, `mft_500M`)
+DEFAULT_ARCHITECTURE="mft_180M"           # NOTE: Set the model architecture to be used, must be one of (`{mft,met,mfp}_80M`, `{mft,met,mfp}_180M`, `{mft,met,mfp}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided
