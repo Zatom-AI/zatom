@@ -19,6 +19,7 @@ from tqdm import tqdm
 from zatom.eval.crystal_generation import CrystalGenerationEvaluator
 from zatom.eval.mof_generation import MOFGenerationEvaluator
 from zatom.eval.molecule_generation import MoleculeGenerationEvaluator
+from zatom.models.interpolants.flow_matching import FlowMatchingInterpolant
 from zatom.utils import pylogger
 from zatom.utils.training_utils import sample_uniform_rotation, scatter_mean_torch
 from zatom.utils.typing_utils import typecheck
@@ -84,7 +85,7 @@ class Zatom(LightningModule):
     def __init__(
         self,
         architecture: torch.nn.Module,
-        interpolant: DictConfig,
+        interpolant: FlowMatchingInterpolant,
         augmentations: DictConfig,
         sampling: DictConfig,
         conditioning: DictConfig,
@@ -100,6 +101,15 @@ class Zatom(LightningModule):
         # This line allows to access init params with 'self.hparams' attribute.
         # Also ensures init params will be stored in ckpt.
         self.save_hyperparameters(logger=False)
+
+        # Issue warning for troublesome configurations
+        if (
+            self.hparams.augmentations.frac_coords is True
+            and self.hparams.architecture.continuous_x_1_prediction is False
+        ):
+            log.warning(
+                "Using fractional coordinate augmentations with velocity parametrization of continuous modalities may lead to diminished performance."
+            )
 
         # Model architecture
         self.model = architecture
