@@ -13,7 +13,7 @@
 #SBATCH --job-name=sweep                                      # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/sweep%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/sweep%j.err   # error log file
-#SBATCH --array=0-8                                           # create an array of jobs for the sweep (0-8 or 9 total for training and 0-35 or 36 total for evaluation)
+#SBATCH --array=0-7                                           # create an array of jobs for the sweep (0-7 or 8 total for training and 0-35 or 36 total for evaluation)
 
 # Wait for 5-10 seconds randomly to avoid race condition
 sleep $((RANDOM % 6 + 5))
