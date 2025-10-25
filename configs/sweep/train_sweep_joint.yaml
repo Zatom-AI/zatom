@@ -1,4 +1,4 @@
-name: train-sweep_joint-qm9-mp20_loss-weights_2025-10-25_16-00-00
+name: train-sweep_joint-qm9-mp20_loss-weights_2025-10-25_16-30-00
 project: zatom
 entity: zatom
 program: zatom/train_fm.py
@@ -17,7 +17,7 @@ parameters:
     value: 4
 
   date:
-    value: "2025-10-25_16-00-00"
+    value: "2025-10-25_16-30-00"
 
   experiment:
     value: train
