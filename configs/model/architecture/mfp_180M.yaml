@@ -132,11 +132,11 @@ atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
 max_num_elements: 100
 batch_size_scale_factor: 1 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
 
-atom_types_loss_weight: 1.0
-pos_loss_weight: 10.0
-frac_coords_loss_weight: 10.0
+atom_types_loss_weight: 0.1
+pos_loss_weight: 1.0
+frac_coords_loss_weight: 1.0
 lengths_scaled_loss_weight: 1.0
-angles_radians_loss_weight: 10.0
+angles_radians_loss_weight: 1.0
 grad_decay_a: 0.8 # NOTE: only used if `enable_eqm_mode=true`
 grad_decay_b: 0.8 # NOTE: only used if `enable_eqm_mode=true`
 grad_mul: 1.0 # NOTE: only used if `enable_eqm_mode=true`
