@@ -112,6 +112,7 @@
                 // "model.architecture.enable_mean_flows=true",
                 // "model.architecture.jvp_attn=true",
                 // "model.architecture.logit_normal_time=true",
+                // "model.architecture.loss_time_fn=none",
                 // "model.architecture.treat_discrete_modalities_as_continuous=true",
                 // "model.architecture.weighted_rigid_align_pos=false",
                 // "model.architecture.unified_modal_time=true",

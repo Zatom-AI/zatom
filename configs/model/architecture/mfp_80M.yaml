@@ -155,6 +155,7 @@ add_mask_atom_type: true
 treat_discrete_modalities_as_continuous: false
 test_so3_equivariance: false
 
+loss_time_fn: beta # NOTE: must be one of (`none`, `beta`)
 grad_decay_method: none # NOTE: must be `none` when `enable_eqm_mode=false`
 
 # Platonic Transformer parameters
