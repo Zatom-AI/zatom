@@ -135,7 +135,7 @@ class MFT(nn.Module):
         weighted_rigid_align_pos: bool = False,
         weighted_rigid_align_frac_coords: bool = False,
         continuous_x_1_prediction: bool = True,
-        logit_normal_time: bool = False,
+        logit_normal_time: bool = True,
         unified_modal_time: bool = True,
         remove_t_conditioning: bool = False,
         enable_eqm_mode: bool = False,
