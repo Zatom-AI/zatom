@@ -295,7 +295,7 @@ class MFT(nn.Module):
         }[grad_decay_method]
 
         self.loss_time_fn = {
-            "none": lambda x, _: x,
+            "none": lambda x, t: x,
             "beta": lambda x, t: x
             * (torch.clamp(1 / ((1 - t + 1e-6) ** 2), min=0.05, max=100.0) * (t > 0.0)),
         }[loss_time_fn]

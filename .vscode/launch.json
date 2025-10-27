@@ -183,6 +183,7 @@
                 // "model.architecture.enable_mean_flows=true",
                 // "model.architecture.jvp_attn=true",
                 // "model.architecture.logit_normal_time=false",
+                // "model.architecture.loss_time_fn=none",
                 // "model.architecture.test_so3_equivariance=true",
                 // "model.architecture.treat_discrete_modalities_as_continuous=true",
                 // "model.architecture.unified_modal_time=true",
