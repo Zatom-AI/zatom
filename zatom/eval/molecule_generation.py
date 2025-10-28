@@ -93,6 +93,7 @@ class MoleculeGenerationEvaluator:
                 largest_frag = max(m_frags, default=m, key=lambda frag: frag.GetNumAtoms())
                 pred_smiles = Chem.MolToSmiles(largest_frag, isomericSmiles=True)
                 valid = True
+                pb_valid = True
                 valid_molecules.append(m)
                 valid_smiles.append(pred_smiles)
 
@@ -102,9 +103,10 @@ class MoleculeGenerationEvaluator:
                 pred_smiles = ""
                 pred_2d = None
                 valid = False
+                pb_valid = False
 
             # Update list (used for wandb table)
-            self.pred_rdkit_list.append((m, pred_smiles, pred_2d, valid))
+            self.pred_rdkit_list.append((m, pred_smiles, pred_2d, valid, pb_valid))
 
         # Compute validity metrics
         if len(valid_smiles) > 0:
@@ -128,6 +130,20 @@ class MoleculeGenerationEvaluator:
             pb_metrics = self.buster.bust(valid_molecules, None, None)
             pb_metrics["posebusters_rate"] = pb_metrics.all(axis=1)
             pb_metrics_dict = pb_metrics.mean().to_dict()
+
+            # Update pred_rdkit_list with PoseBusters validity after bulk screening
+            valid_idx = 0
+            for idx in range(len(self.pred_rdkit_list)):
+                if self.pred_rdkit_list[idx][3]:  # valid
+                    self.pred_rdkit_list[idx] = (
+                        self.pred_rdkit_list[idx][0],
+                        self.pred_rdkit_list[idx][1],
+                        self.pred_rdkit_list[idx][2],
+                        self.pred_rdkit_list[idx][3],
+                        bool(pb_metrics["posebusters_rate"].iloc[valid_idx]),
+                    )
+                    valid_idx += 1
+
         else:
             validity_metrics_dict = {
                 "valid_rate": torch.tensor(0.0, device=self.device),
@@ -160,6 +176,7 @@ class MoleculeGenerationEvaluator:
                 "Sample idx",
                 "Num atoms",
                 "Valid?",
+                "PoseBusters valid?",
                 "Pred atom types",
                 "Pred Smiles",
                 "Pred 2D",
@@ -182,6 +199,8 @@ class MoleculeGenerationEvaluator:
 
             valid = self.pred_rdkit_list[idx][3]
 
+            pb_valid = self.pred_rdkit_list[idx][4]
+
             pred_3d = wandb.Molecule(os.path.join(save_dir, f"molecule_{sample_idx}.pdb"))
 
             # Update table
@@ -190,6 +209,7 @@ class MoleculeGenerationEvaluator:
                 sample_idx,
                 num_atoms,
                 valid,
+                pb_valid,
                 pred_atom_types,
                 pred_smiles,
                 pred_2d,
