@@ -232,6 +232,7 @@ class Zatom(LightningModule):
                         "non-aromatic_ring_non-flatness": MeanMetric(),
                         "double_bond_flatness": MeanMetric(),
                         "internal_energy": MeanMetric(),
+                        "posebusters_rate": MeanMetric(),
                     }
                 )
             val_metrics[dataset] = ModuleDict(val_metrics[dataset])
