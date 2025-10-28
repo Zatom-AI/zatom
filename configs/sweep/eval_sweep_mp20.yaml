@@ -46,9 +46,6 @@ parameters:
   seed:
     value: 42
 
-  trainer:
-    value: gpu
-
 command:
   - ${env}
   - HYDRA_FULL_ERROR=1
