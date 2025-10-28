@@ -37,9 +37,6 @@ parameters:
   model.sampling.cfg_scale:
     values: [1.0, 2.0, 3.0, 4.0, 6.0, 8.0]
 
-  logger:
-    value: wandb
-
   name:
     value: "eval_${hydra:runtime.choices.model/architecture}_steps-${hydra:runtime.choices.model.sampling.steps}_cfg-${hydra:runtime.choices.model.sampling.cfg_scale}_mp20"
 

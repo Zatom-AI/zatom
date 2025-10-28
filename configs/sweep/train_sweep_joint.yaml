@@ -22,9 +22,6 @@ parameters:
   experiment:
     value: train
 
-  logger:
-    value: wandb
-
   model.architecture.pos_loss_weight:
     values: [1.0, 10.0]
 
