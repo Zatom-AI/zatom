@@ -34,8 +34,8 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="fxjgrv55"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-10-24_16-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="rfr3cbuv"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-10-27_18-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_ARCHITECTURE="mft_80M"            # NOTE: Set the model architecture to be used, must be one of (`{mft,met,mfp}_80M`, `{mft,met,mfp}_180M`, `{mft,met,mfp}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
