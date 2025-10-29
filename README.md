@@ -152,13 +152,31 @@ python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.trai
 
 ## Evaluation
 
-To generate Zatom's evaluation metrics for molecule and material generation
+To generate Zatom's initial evaluation metrics for molecule and material generation
 
 ```bash
 python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt trainer=gpu
 ```
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
+
+To evalute the stability of generated materials
+
+```bash
+# Change as needed
+eval_dir="logs/eval_fm/runs/eval_mft_80M_MP20_rfr3cbuv_2025-10-28_12-30-00"
+
+eval_for_dft_samples="$eval_dir/mp20_test_0"
+eval_for_dft_json="$eval_dir/mp20_test_0.json"
+eval_log_dir="$eval_dir/chgnet_log_dir"
+
+# Set other flags if you are using SLURM
+num_jobs=1
+slurm_partition=YOUR_SLURM_PARTITION
+
+# Pre-relax
+python forks/flowmm/scripts_analysis/prerelax.py "$eval_for_dft_samples" "$eval_for_dft_json" "$eval_log_dir" --num_jobs "$num_jobs" --slurm_partition "$slurm_partition"
+```
 
 ## For developers
 

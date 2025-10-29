@@ -93,6 +93,7 @@ dependencies = [
     "huggingface_hub==0.34.4",
     "importlib_resources==6.5.2",
     "setuptools==80.9.0",
+    "chgnet==0.4.2",
     "flow_matching @ git+https://github.com/amorehead/flow_matching.git@mm",
     "fairchem-core @ git+https://github.com/amorehead/fairchem.git@torch-2.6.0-plus#subdirectory=packages/fairchem-core",
     "platonic_transformers @ git+https://github.com/amorehead/PlatonicTransformers.git@packaging",
