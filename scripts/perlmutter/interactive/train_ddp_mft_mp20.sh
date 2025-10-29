@@ -74,7 +74,6 @@ bash -c "
     data=$DATASET \
     data.datamodule.datasets.qm9.proportion=0.0 \
     date=$RUN_DATE \
-    experiment=train \
     model/architecture=$ARCHITECTURE \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
