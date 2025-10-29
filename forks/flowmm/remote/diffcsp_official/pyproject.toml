@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "diffcsp/_version.py"
+
+[tool.hatch.metadata.hooks.vcs]
+
+[project]
+name = "diffcsp"
+authors = [
+  {name="diffcsp"},
+]
+description = "diffcsp"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+"Homepage" = "https://github.com/jiaor17/DiffCSP"

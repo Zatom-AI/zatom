@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -21,12 +18,12 @@ from flowmm.cfg_utils import dataset_options, init_loaders
 class NoDtypeDevice:
     @property
     def dtype(self) -> None:
-        """The manifold requires bool tensors, this disrupts introspection default."""
+        """the manifold requires bool tensors, this disrupts introspection default"""
         return None
 
     @property
     def device(self) -> None:
-        """Gets mapped to the right device as necessary, this disrupts introspection default."""
+        """gets mapped to the right device as necessary, this disrupts introspection default"""
         return None
 
 
@@ -83,7 +80,7 @@ class UnconstrainedCompact(NoDtypeDevice, Euclidean):
     ndim = 1
 
     def __init__(self, low: float | torch.Tensor, high: float | torch.Tensor):
-        """Generates in the unconstrained space since the flow lives there."""
+        """generates in the unconstrained space since the flow lives there"""
         super().__init__(ndim=1)
         self.register_buffer("low", torch.Tensor(low))
         self.register_buffer("high", torch.Tensor(high))

@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -93,7 +90,7 @@ def load_group_from_wandb(checkpoint_path: Path) -> str:
     return loaded["logging/wandb/group"].value
 
 
-def get_job_directory(file_or_checkpoint: str | dict[str, Any]) -> str:
+def get_job_directory(file_or_checkpoint: Union[str, Dict[str, Any]]) -> str:
     found = False
     if isinstance(file_or_checkpoint, dict):
         chkpnt = file_or_checkpoint
@@ -136,7 +133,7 @@ def load_model(
     eval_projx: bool = None,
     atol: float = None,
     rtol: float = None,
-) -> flowmm.model.model_pl.MaterialsRFMLitModule:
+) -> "flowmm.model.model_pl.MaterialsRFMLitModule":
     from flowmm.model.model_pl import MaterialsRFMLitModule
 
     checkpoint = str(Path(checkpoint).resolve())

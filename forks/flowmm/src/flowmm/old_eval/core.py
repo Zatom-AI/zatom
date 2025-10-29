@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -38,7 +35,7 @@ CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
 CompFP = ElementProperty.from_preset("magpie")
 
 
-class Crystal:
+class Crystal(object):
     def __init__(
         self,
         crys_array_dict,
@@ -157,7 +154,9 @@ def get_crystal_array_list(
     file_path: Path,
     batch_idx: int = 0,
 ) -> CrysArrayListType:
-    """batch_idx == -1, diffcsp format batch_idx == -2, cdvae format."""
+    """batch_idx == -1, diffcsp format
+    batch_idx == -2, cdvae format
+    """
     data = load_data(str(file_path.resolve()))
     if batch_idx == -1:
         # batch_size = data["frac_coords"].shape[0]
@@ -410,7 +409,7 @@ def save_metrics_only_overwrite_newly_computed(
 ) -> None:
     # only overwrite metrics computed in the new run.
     if Path(path).exists():
-        with open(path) as f:
+        with open(path, "r") as f:
             written_metrics = json.load(f)
             if isinstance(written_metrics, dict):
                 written_metrics.update(metrics)

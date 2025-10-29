@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from flowmm.rfm.manifolds.analog_bits import MultiAtomAnalogBits
 from flowmm.rfm.manifolds.euclidean import EuclideanWithLogProb

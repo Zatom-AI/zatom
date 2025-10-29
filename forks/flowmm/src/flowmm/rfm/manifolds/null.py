@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -82,7 +79,7 @@ class NullManifold(Manifold):
 
     @staticmethod
     def delta_logprob(x: torch.Tensor) -> torch.Tensor:
-        """This gives prob = 1 for anything."""
+        """this gives prob = 1 for anything"""
         return torch.full_like(x[..., 0], 0.0)
 
     def base_logprob(self, *args, **kwargs):

@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -54,8 +51,8 @@ class TorchPredictionWriter(BasePredictionWriter):
 
     def write_on_epoch_end(
         self,
-        trainer: pl.Trainer,
-        pl_module: pl.LightningModule,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
         predictions: Sequence[Any],
         batch_indices: Sequence[Any] | None,
     ) -> None:
@@ -725,7 +722,7 @@ def predict(
     cfg.integrate.inference_anneal_coords = inference_anneal_coords
     cfg.integrate.inference_anneal_lattice = inference_anneal_lattice
 
-    with open(atom_types_path) as f:
+    with open(atom_types_path, "r") as f:
         atom_types = f.read()
     atom_types = eval(atom_types)
     dataset = CSPDataset(atom_types)
@@ -914,7 +911,7 @@ def consolidate(
             consolidated = consolidations[task_to_save]
         elif sum(did_consolidate.values()) == 1:
             consolidated_task = list(consolidations.keys())[
-                list(did_consolidate.values()).index(True)
+                list((did_consolidate.values())).index(True)
             ]
             print(f"only {consolidated_task} was consolidated")
             consolidated = consolidations[consolidated_task]

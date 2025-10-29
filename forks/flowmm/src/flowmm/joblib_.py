@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -13,7 +10,7 @@ from joblib import Parallel, delayed, parallel_config
 
 # https://gist.github.com/tsvikas/5f859a484e53d4ef93400751d0a116de
 class ParallelTqdm(Parallel):
-    """joblib.Parallel, but with a tqdm progressbar.
+    """joblib.Parallel, but with a tqdm progressbar
 
     Additional parameters:
     ----------------------
@@ -45,6 +42,7 @@ class ParallelTqdm(Parallel):
     >>> from time import sleep
     >>> ParallelTqdm(n_jobs=-1)([delayed(sleep)(.1) for _ in range(10)])
     80%|████████  | 8/10 [00:02<00:00,  3.12tasks/s]
+
     """
 
     def __init__(
@@ -99,7 +97,7 @@ class ParallelTqdm(Parallel):
     dispatch_one_batch.__doc__ = Parallel.dispatch_one_batch.__doc__
 
     def print_progress(self):
-        """Display the process of the parallel execution using tqdm."""
+        """Display the process of the parallel execution using tqdm"""
         # if we finish dispatching, find total_tasks from the number of remaining items
         if self.total_tasks is None and self._original_iterator is None:
             self.total_tasks = self.n_dispatched_tasks

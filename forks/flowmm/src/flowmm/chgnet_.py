@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -24,10 +21,7 @@ from flowmm.joblib_ import joblib_map
 
 @dataclass
 class UnrelaxedRelaxedStructurePair:
-    """Collector of endpoints of relaxations.
-
-    values are in ase units.
-    """
+    """collector of endpoints of relaxations. values are in ase units."""
 
     structure_dicts: tuple[dict, dict]
     energies: tuple[float, float]

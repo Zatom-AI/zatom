@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -86,7 +83,7 @@ def get_e_hull_from_phase_diagram(
     phase_diagram: PhaseDiagram | PatchedPhaseDiagram,
     structure: Structure | dict,
 ) -> float:
-    """Returns e_hull_per_atom."""
+    """returns e_hull_per_atom"""
     structure = to_structure(structure)
     try:
         return phase_diagram.get_hull_energy_per_atom(structure.composition)

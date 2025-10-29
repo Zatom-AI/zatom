@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -23,12 +20,12 @@ from manifm.manifolds.spd import matrix_logarithm, normal_logprob, sqrtmh
 class AbstractSPD:
     @property
     def dtype(self) -> None:
-        """The manifold requires bool tensors, this disrupts introspection default."""
+        """the manifold requires bool tensors, this disrupts introspection default"""
         return None
 
     @property
     def device(self) -> None:
-        """Gets mapped to the right device as necessary."""
+        """gets mapped to the right device as necessary"""
         return None
 
     @staticmethod
@@ -81,7 +78,6 @@ class AbstractSPD:
     # ours takes the same shape as the other _cond_u geodesics (as opposed to the default which squeezes last t dim)
     def geodesic(self, x, y, t):
         """Computes the Riemannian geodesic A exp(t log(A^{-1}B)).
-
         x: (..., D)
         y: (..., D)
         t: (..., 1)
@@ -121,8 +117,8 @@ class SPDGivenN(AbstractSPD, manifm_SPD):
         Riem_geodesic=True,
         Riem_norm=True,
     ):
-        """`mean = (n * (1/atom_density)) ** (2/3) * torch.eye(dim)` `logmap_std = (n * std_coef)
-        ** (2/3) * torch.eye(dim)`
+        """`mean = (n * (1/atom_density)) ** (2/3) * torch.eye(dim)`
+        `logmap_std = (n * std_coef) ** (2/3) * torch.eye(dim)`
 
         note: logmap_std is the std of the data evaluated at the mean:
             i.e. `logmap(mean, data).std()`
@@ -226,7 +222,7 @@ class SPDNonIsotropicRandom(AbstractSPD, manifm_SPD):
         Riem_geodesic=True,
         Riem_norm=True,
     ):
-        """Mean and logmap_std should be in vectorized form.
+        """mean and logmap_std should be in vectorized form
 
         note: logmap_std is the std of the data evaluated at the mean:
             i.e. `logmap(mean, data).std()`
@@ -350,7 +346,7 @@ def get_spd_data(
 def compute_atom_density(
     dataset: dataset_options,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Assumes a constant spacing of atoms within the cell."""
+    """assumes a constant spacing of atoms within the cell"""
     train_loader, *_ = init_loaders(dataset=dataset)
     num_atoms, vols = [], []
     for batch in train_loader:

@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -124,7 +121,6 @@ class AnalogBits(Euclidean):
 
 class MultiAtomAnalogBits(MaskedManifold, AnalogBits):
     """Represents an integer in an 'analog' euclidean space.
-
     This one handles masking out extra dimensions due to padding to `max_num_atoms`.
     """
 

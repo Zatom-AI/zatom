@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -17,7 +14,7 @@ from flowmm.old_eval.core import (
 )
 
 
-class RecEval:
+class RecEval(object):
     def __init__(self, pred_crys, gt_crys, stol=0.5, angle_tol=10, ltol=0.3):
         assert len(pred_crys) == len(gt_crys)
         self.matcher = StructureMatcher(stol=stol, angle_tol=angle_tol, ltol=ltol)

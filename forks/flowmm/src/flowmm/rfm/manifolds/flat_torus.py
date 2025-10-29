@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -16,8 +13,7 @@ from flowmm.rfm.manifolds.masked import MaskedManifold
 class FlatTorus01(Euclidean):
     """Represents a flat torus on the [0, 1]^D subspace.
 
-    Isometric to the product of 1-D spheres.
-    """
+    Isometric to the product of 1-D spheres."""
 
     name = "FlatTorus01"
     reversible = False
@@ -55,7 +51,7 @@ class FlatTorus01(Euclidean):
         return self.uniform_logprob(*args, **kwargs)
 
     def extra_repr(self):
-        return f"ndim={self.ndim}"
+        return "ndim={}".format(self.ndim)
 
     def metric_normalized(self, _: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
         return u
@@ -91,8 +87,7 @@ class MaskedNoDriftFlatTorus01(MaskedManifold, FlatTorus01):
 
     The first atom (n=1) gets fixed to the origin.
 
-    Isometric to the product of (N-1) 1-D spheres.
-    """
+    Isometric to the product of (N-1) 1-D spheres."""
 
     name = "MaskedNoDriftFlatTorus01"
     reversible = False
@@ -148,7 +143,7 @@ class MaskedNoDriftFlatTorus01(MaskedManifold, FlatTorus01):
         return super().projx(x)
 
     def proju(self, x: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
-        """Removes drift velocity."""
+        """removes drift velocity"""
         initial_shape = u.shape
         u = self.reshape_and_mask(initial_shape, u)
 
@@ -210,8 +205,7 @@ class MaskedNoDriftFlatTorus01WrappedNormal(MaskedNoDriftFlatTorus01):
 class FlatTorus01FixFirstAtomToOrigin(MaskedNoDriftFlatTorus01):
     """Represents a flat torus on the [0, 1]^((N-1)*D) subspace.
 
-    Isometric to the product of (N-1) 1-D spheres.
-    """
+    Isometric to the product of (N-1) 1-D spheres."""
 
     name = "FlatTorus01FixFirstCoordToOrigin"
     reversible = False
@@ -246,7 +240,7 @@ class FlatTorus01FixFirstAtomToOrigin(MaskedNoDriftFlatTorus01):
         return self.mask_and_reshape(initial_shape, out)
 
     def projx(self, x: torch.Tensor) -> torch.Tensor:
-        """Translates everything so that the first coordinate is zero."""
+        """translates everything so that the first coordinate is zero"""
         x = self._translate_first_coord_to_zero(x)
         return x % 1.0
 

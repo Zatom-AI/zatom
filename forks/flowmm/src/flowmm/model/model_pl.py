@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -609,7 +606,7 @@ class MaterialsRFMLitModule(ManifoldFMLitModule):
         cond = None
         if self.cfg.model.self_cond:
             with torch.no_grad():
-                if torch.rand(1) < 0.5:
+                if torch.rand((1)) < 0.5:
                     cond = projx_integrate_xt_to_x1(
                         manifold,
                         lambda t, x: vecfield(

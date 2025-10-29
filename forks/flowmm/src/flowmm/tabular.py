@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -21,10 +18,10 @@ from flowmm.pandas_ import maybe_get_missing_columns
 from flowmm.pymatgen_ import COLUMNS_COMPUTATIONS
 
 ValidStages = Literal["train", "val", "test"]
-VALID_STAGES: tuple[ValidStages, ...] = get_args(ValidStages)
+VALID_STAGES: Tuple[ValidStages, ...] = get_args(ValidStages)
 
 ValidTabularDatasets = Literal["diffcsp_mp20", "cdvae_mp20"]
-VALID_TABULAR_DATASETS: tuple[ValidTabularDatasets, ...] = get_args(
+VALID_TABULAR_DATASETS: Tuple[ValidTabularDatasets, ...] = get_args(
     ValidTabularDatasets
 )
 

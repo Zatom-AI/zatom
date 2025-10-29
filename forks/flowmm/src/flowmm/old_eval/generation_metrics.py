@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -26,7 +23,7 @@ COV_Cutoffs = {
 }
 
 
-class GenEval:
+class GenEval(object):
     def __init__(self, pred_crys, gt_crys, n_samples=1000, eval_model_name=None):
         self.crys = pred_crys
         self.gt_crys = gt_crys

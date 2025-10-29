@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -179,7 +176,7 @@ class ManifoldGetter(torch.nn.Module):
         ]
         | tuple[torch.Tensor, VMapManifolds, Dims, torch.BoolTensor]
     ):
-        """Converts from georep to the manifold flatrep."""
+        """converts from georep to the manifold flatrep"""
         a, f, mask_a_or_f = self._to_dense(
             batch, atom_types=atom_types, frac_coords=frac_coords
         )
@@ -227,7 +224,7 @@ class ManifoldGetter(torch.nn.Module):
         ]
         | tuple[torch.Tensor, VMapManifolds, Dims, torch.BoolTensor]
     ):
-        """Converts data from the loader into the georep, then to the manifold flatrep."""
+        """converts data from the loader into the georep, then to the manifold flatrep"""
         atom_types = self._convert_atom_types(atom_types)
 
         if "spd" in self.lattice_manifold:
@@ -353,7 +350,7 @@ class ManifoldGetter(torch.nn.Module):
     def flatrep_to_georep(
         self, flat: torch.Tensor, dims: Dims, mask_a_or_f: torch.BoolTensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Converts from the manifold flatrep to the georep."""
+        """converts from the manifold flatrep to the georep"""
         max_num_atoms = self._get_max_num_atoms(mask_a_or_f)
         a, f, l = self._from_flat(flat, dims, max_num_atoms)
         a, f = self._from_dense(a, f, mask_a_or_f)
@@ -365,7 +362,7 @@ class ManifoldGetter(torch.nn.Module):
         frac_coords: torch.Tensor,
         lattices: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Converts from the georep to (one_hot / bits, frac_coords, lattice matrix)"""
+        """converts from the georep to (one_hot / bits, frac_coords, lattice matrix)"""
         if "spd" in self.lattice_manifold:
             lattices = spd_vector_to_lattice_matrix(lattices)
         elif self.lattice_manifold == "non_symmetric":
@@ -385,7 +382,7 @@ class ManifoldGetter(torch.nn.Module):
     def flatrep_to_crystal(
         self, flat: torch.Tensor, dims: Dims, mask_a_or_f: torch.BoolTensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Converts from the manifold flatrep to (one_hot / bits, frac_coords, lattice matrix)"""
+        """converts from the manifold flatrep to (one_hot / bits, frac_coords, lattice matrix)"""
         return self.georep_to_crystal(*self.flatrep_to_georep(flat, dims, mask_a_or_f))
 
     @staticmethod

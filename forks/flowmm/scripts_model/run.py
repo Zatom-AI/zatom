@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 import os
 import resource
@@ -93,7 +90,8 @@ def build_callbacks(cfg: DictConfig) -> List[Callback]:
 
 
 def run(cfg: DictConfig) -> None:
-    """Generic train loop.
+    """
+    Generic train loop
 
     :param cfg: run configuration, defined by Hydra in /conf
     """

@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -15,9 +12,8 @@ import pandas as pd
 import submitit
 import torch
 from chgnet.model import CHGNet
-
-from flowmm.chgnet_ import RelaxationData, prerelax_with_chgnet
-from flowmm.pymatgen_ import cdvae_to_structure, diffcsp_to_structure, get_get_structure
+from forks.flowmm.src.flowmm.chgnet_ import RelaxationData, prerelax_with_chgnet
+from forks.flowmm.src.flowmm.pymatgen_ import get_get_structure
 
 #
 # Here's a really nice script for CHGNet
@@ -44,7 +40,7 @@ def prerelax_multiple(
     index: np.ndarray,
     json_file: Path,
 ) -> pd.DataFrame:
-    """Cdvae structures, max relaxation steps, list of indexes -> json file."""
+    """cdvae structures, max relaxation steps, list of indexes -> json file"""
     chgnet = CHGNet.load()
     device = next(chgnet.parameters()).device
     gen = torch.load(gen_file, map_location=device)
@@ -84,10 +80,10 @@ def prerelax_multiple(
 
     # dataclasses.fields(rd) produces blank :(
     # dataclasses.asdict(rd) also produces blank
-    pre_pandas = {
-        field.name: getattr(rd, field.name)
+    pre_pandas = dict(
+        (field.name, getattr(rd, field.name))
         for field in getattr(rd, "__dataclass_fields__").values()
-    }
+    )
 
     if "batch_indices" in gen.keys():
         pre_pandas["index"] = gen["batch_indices"][index].tolist()

@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from __future__ import annotations
 
@@ -16,8 +13,7 @@ from flowmm.rfm.manifolds.masked import MaskedManifold
 
 
 class FlatDirichletSimplex(Euclidean):
-    r"""Represents a simplex with a Dirichlet distribution.
-
+    """Represents a simplex with a Dirichlet distribution.
     x = [x_1, x_2, ..., x_D], \sum_i x_i = 1 for i \in 1, 2, ... D.
     """
 
@@ -115,7 +111,9 @@ class FlatDirichletSimplex(Euclidean):
     def egrad2rgrad(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def origin(self, *size, dtype=None, device=None, seed=42) -> geoopt.ManifoldTensor:
+    def origin(
+        self, *size, dtype=None, device=None, seed=42
+    ) -> "geoopt.ManifoldTensor":
         raise NotImplementedError()
 
     def abits_clamp(self, x: torch.Tensor) -> torch.Tensor:
@@ -123,8 +121,8 @@ class FlatDirichletSimplex(Euclidean):
 
 
 class MultiAtomFlatDirichletSimplex(MaskedManifold, FlatDirichletSimplex):
-    r"""Represents a simplex with a Dirichlet distribution. x = [x_1, x_2, ..., x_D], \sum_i x_i = 1
-    for i \in 1, 2, ... D.
+    """Represents a simplex with a Dirichlet distribution.
+    x = [x_1, x_2, ..., x_D], \sum_i x_i = 1 for i \in 1, 2, ... D.
 
     This manifold can be thought of as having an extra dimension
     [..., NUM_ATOMS, NUM_CATEGORIES]
@@ -177,14 +175,14 @@ class MultiAtomFlatDirichletSimplex(MaskedManifold, FlatDirichletSimplex):
         ) / self.mask.sum().to(u)
 
     def projx(self, x: torch.Tensor) -> torch.Tensor:
-        """Project to closest point on simplex."""
+        """project to closest point on simplex"""
         initial_shape = x.shape
         x = self.reshape_and_mask(initial_shape, x)
         px = self._project_to_z_simplex(x, z=1.0)
         return self.mask_and_reshape(initial_shape, px)
 
     def proju(self, x: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
-        """Last dim sums to zero."""
+        """last dim sums to zero"""
         # one reference: https://math.stackexchange.com/questions/3593688/calculating-the-tangent-space-of-the-manifold-of-probability-measures-on-a-finit
         # how to compute the tangent space at a point generally:
         # https://math.stackexchange.com/questions/2311754/tangent-space-of-circle-at-a-point
@@ -248,7 +246,7 @@ class MultiAtomFlatDirichletSimplex(MaskedManifold, FlatDirichletSimplex):
 
 
 def usinc(theta: torch.Tensor) -> torch.Tensor:
-    """Unnormalized sinc function."""
+    """unnormalized sinc function"""
     out = theta.sin().div(theta)
     out2 = torch.where(
         theta == 0.0,

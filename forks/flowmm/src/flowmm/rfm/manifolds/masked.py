@@ -1,7 +1,4 @@
-"""Copyright (c) Meta Platforms, Inc.
-
-and affiliates.
-"""
+"""Copyright (c) Meta Platforms, Inc. and affiliates."""
 
 from abc import ABC, abstractmethod
 
@@ -17,12 +14,12 @@ class MaskedManifold(ABC):
 
     @property
     def dtype(self) -> None:
-        """The manifold requires bool tensors, this disrupts introspection default."""
+        """the manifold requires bool tensors, this disrupts introspection default"""
         return None
 
     @property
     def device(self) -> None:
-        """Gets mapped to the right device as necessary, this disrupts introspection default."""
+        """gets mapped to the right device as necessary, this disrupts introspection default"""
         return None
 
     @property
@@ -45,7 +42,8 @@ class MaskedManifold(ABC):
         initial_shape: tuple[int, ...],
         vec: torch.Tensor,
     ) -> torch.Tensor:
-        """Takes in a [..., A * B] shaped vector returns [..., A, B] shaped, masked vector."""
+        """takes in a [..., A * B] shaped vector
+        returns [..., A, B] shaped, masked vector"""
         vec = vec.reshape(*initial_shape[:-1], self.dim_m2, self.dim_m1)
         return self.mask.to(vec) * vec
 
@@ -54,7 +52,7 @@ class MaskedManifold(ABC):
         initial_shape: tuple[int, ...],
         vec: torch.Tensor,
     ) -> torch.Tensor:
-        """Takes in a [..., A, B] shaped vector returns [..., A * B] shaped, masked (output)
-        vector."""
+        """takes in a [..., A, B] shaped vector
+        returns [..., A * B] shaped, masked (output) vector"""
         vec = self.mask.to(vec) * vec
         return vec.reshape(*initial_shape)
