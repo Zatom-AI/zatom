@@ -20,11 +20,11 @@ Official repository of Zatom, a multimodal all-atom generative model
 
 ## Installation
 
-> Note: Make sure to create a `.env` file, for which you can reference `.env.example` as an example.
+> **Note:** Make sure to create a `.env` file, for which you can reference `.env.example` as an example.
 
 ### Default
 
-> Note: We recommend installing `zatom` in a clean Python environment, using `conda` or otherwise.
+> **Note:** We recommend installing `zatom` in a clean Python environment, using `conda` or otherwise.
 
 For example, to install `conda`, one can use the following commands.
 
@@ -67,7 +67,7 @@ pip install -e '.[cuda]'
 pre-commit install
 ```
 
-> Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
+> **Note:** If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
 
 ### `uv`
 
@@ -79,7 +79,7 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-> Note: To install `zatom` with `uv` on a Windows or macOS-based system, remove the `torch-scatter` installation links in `pyproject.toml` for these platforms before running `uv pip install -e .`.
+> **Note:** To install `zatom` with `uv` on a Windows or macOS-based system, remove the `torch-scatter` installation links in `pyproject.toml` for these platforms before running `uv pip install -e .`.
 
 ### Docker
 
@@ -113,7 +113,7 @@ shifterimg login registry.nersc.gov
 shifterimg -v pull registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
 ```
 
-> Note: The Docker image is ~30 GB in size. Make sure you have enough storage space beforehand to build it.
+> **Note:** The Docker image is ~30 GB in size. Make sure you have enough storage space beforehand to build it.
 
 ## Training
 
@@ -145,10 +145,10 @@ python zatom/train_fm.py experiment=train
 **Note:** You can override any parameter from the command line like this
 
 ```bash
-python zatom/train_fm.py experiment=train trainer.max_epochs=2000 data.datamodule.batch_size.train=8
+python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> Note: See the `[DEBUG] train_fm.py` config within `.vscode/launch.json` for a full example of how to customize or debug model training.
+> **Note:** See the `[DEBUG] train_fm.py` config within `.vscode/launch.json` for a full example of how to customize or debug model training.
 
 ## Evaluation
 
@@ -158,7 +158,7 @@ To generate Zatom's evaluation metrics for molecule and material generation
 python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt trainer=gpu
 ```
 
-> Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
+> **Note:** Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
 
 ## For developers
 

@@ -16,7 +16,7 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: null
+  - experiment: eval
 
 # run name and date, e.g., for logging
 name: "eval_arch-${hydra:runtime.choices.model/architecture}_${hydra:runtime.choices.data}"
