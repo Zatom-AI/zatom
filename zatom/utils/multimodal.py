@@ -197,9 +197,9 @@ class Flow(nn.Module):
             assert all(
                 isinstance(time, tuple) and len(time) == 2 for time in t
             ), "When using mean flows, t must be a tuple of (start_times, end_times) for each modality."
-            assert (
-                model_output_dt is not None
-            ), "When using mean flows, model_output_dt must be provided."
+            assert model_output_dt is not None and len(model_output_dt) == len(
+                self.paths
+            ), "When using mean flows, model_output_dt must be provided and match the number of modalities."
 
         loss_dict = {}
         total_loss = 0.0

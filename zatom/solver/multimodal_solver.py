@@ -266,6 +266,11 @@ class MultimodalSolver(Solver):
                     **model_extras,
                 )
 
+                # Separate modality outputs and any auxiliary outputs,
+                # (NOTE) which are currently unused during sampling
+                aux_outputs_returned = isinstance(outputs, tuple) and isinstance(outputs[0], tuple)
+                outputs = outputs[0] if aux_outputs_returned else outputs
+
                 t = [t.repeat(batch_size)] * len(states)
 
                 if not isinstance(outputs, (list, tuple)) or len(outputs) != len(states):

@@ -281,6 +281,7 @@ class MFT(nn.Module):
         )
 
         self.modals = list(modalities.keys())
+        self.auxiliary_tasks = self.flow.model.auxiliary_tasks
 
         self.a, self.b = grad_decay_a, grad_decay_b
         self.c = {
@@ -606,7 +607,7 @@ class MFT(nn.Module):
                 )
 
             with torch.amp.autocast(BEST_DEVICE.type, enabled=False):
-                model_output, model_output_dt = torch.func.jvp(
+                model_output, model_output_dt, model_aux_outputs = torch.func.jvp(
                     func=u_func,
                     primals=(
                         modal_input_dict["atom_types"][0],  # atom_types
@@ -654,10 +655,11 @@ class MFT(nn.Module):
                             modal_input_dict["angles_radians"][1][1]
                         ),  # angles_radians_dr_dt
                     ),
+                    has_aux=True,
                 )
         else:
             # Instantaneous velocity prediction
-            model_output = self.flow.model(
+            model_output, model_aux_outputs = self.flow.model(
                 x=(
                     modal_input_dict["atom_types"][0],  # atom_types
                     modal_input_dict["pos"][0],  # pos
@@ -704,7 +706,7 @@ class MFT(nn.Module):
                 )
 
                 # Augment input modality for new forward pass
-                model_output_aug = self.flow.model(
+                model_output_aug, _ = self.flow.model(
                     x=(
                         modal_input_dict["atom_types"][0],  # atom_types
                         torch.einsum(
@@ -823,7 +825,11 @@ class MFT(nn.Module):
         # Mask and aggregate losses
         loss_dict = {}
         for idx, modal in enumerate(self.modals):
-            modal_time_t = modal_input_dict[modal][1]
+            modal_time_t = (
+                modal_input_dict[modal][1][0]
+                if self.enable_mean_flows
+                else modal_input_dict[modal][1]
+            )
             modal_loss_value = training_loss_dict[modal]
 
             pred_modal = model_output[idx]
@@ -869,5 +875,42 @@ class MFT(nn.Module):
 
         # Aggregate losses
         loss_dict["loss"] = sum(loss_dict[f"{modal}_loss"] for modal in self.modals)
+
+        # Add auxiliary losses
+        for aux_idx, aux_task in enumerate(self.auxiliary_tasks):
+            model_aux_output = model_aux_outputs[aux_idx]
+            # Requested auxiliary task → compute loss
+            if aux_task in target_tensors:
+                mask_aux = (
+                    mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
+                    if model_aux_output.squeeze().ndim == 1
+                    else mask.unsqueeze(-1)  # (B, M, 1)
+                ).float()
+                target_aux = target_tensors[aux_task]
+                aux_loss_value = F.l1_loss(
+                    model_aux_output * mask_aux,
+                    target_aux * mask_aux,
+                    reduction="mean",
+                )
+                loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value
+            # Unused auxiliary task → add zero loss to computational graph
+            else:
+                loss_dict[f"aux_{aux_task}_loss"] = (model_aux_output * 0.0).mean()
+
+            # Maybe log per-atom auxiliary loss
+            if aux_task == "global_energy":
+                if aux_task in target_tensors:
+                    per_atom_aux_loss = F.l1_loss(
+                        model_aux_output.squeeze()
+                        / (mask.sum(dim=-1).clamp(min=1.0)),  # Avoid division by zero
+                        target_tensors[aux_task] / (mask.sum(dim=-1).clamp(min=1.0)),
+                        reduction="mean",
+                    )
+                else:
+                    per_atom_aux_loss = (model_aux_output * 0.0).mean()
+
+                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss
+
+            loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"]
 
         return loss_dict

@@ -163,6 +163,10 @@ class Zatom(LightningModule):
                 "lengths_scaled_loss": MeanMetric(),
                 "angles_radians_loss": MeanMetric(),
                 "loss": MeanMetric(),
+                "aux_global_property_loss": MeanMetric(),
+                "aux_global_energy_loss": MeanMetric(),
+                "aux_global_energy_per_atom_loss": MeanMetric(),
+                "aux_atomic_forces_loss": MeanMetric(),
                 "dataset_idx": MeanMetric(),
             }
         )
@@ -179,6 +183,10 @@ class Zatom(LightningModule):
                 "lengths_scaled_loss": MeanMetric(),
                 "angles_radians_loss": MeanMetric(),
                 "loss": MeanMetric(),
+                "aux_global_property_loss": MeanMetric(),
+                "aux_global_energy_loss": MeanMetric(),
+                "aux_global_energy_per_atom_loss": MeanMetric(),
+                "aux_atomic_forces_loss": MeanMetric(),
                 "valid_rate": MeanMetric(),
                 "unique_rate": MeanMetric(),
                 "sampling_time": MeanMetric(),

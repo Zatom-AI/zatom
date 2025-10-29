@@ -239,7 +239,10 @@ def main(cfg: DictConfig) -> float | None:
     os.makedirs(cfg.paths.output_dir, exist_ok=True)
 
     if cfg.get("ckpt_path"):  # Ensure training sweep checkpoint path exists
-        os.makedirs(cfg.ckpt_path, exist_ok=True)
+        ckpt_path = cfg.ckpt_path
+        if os.path.isfile(cfg.ckpt_path):
+            ckpt_path = os.path.dirname(cfg.ckpt_path)
+        os.makedirs(ckpt_path, exist_ok=True)
 
     # Apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
