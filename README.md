@@ -160,7 +160,7 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt tra
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
 
-To evalute the stability of generated materials
+To evaluate the stability of generated materials
 
 ```bash
 # Change as needed
