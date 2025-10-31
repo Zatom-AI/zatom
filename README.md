@@ -160,10 +160,15 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt tra
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
 
-To evaluate the stability of generated materials
+> 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the (new) directory `data/mp_02072023/`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
+
+> 💡 Note: Doing density functional theory (DFT) with [VASP](https://www.vasp.at/) requires a VASP license to define the required environment variable `PATH_TO_YOUR_PSEUDOPOTENTIALS`. We do not provide guidance on running DFT. That being said, your DFT results should typically be [corrected using the settings from the Materials Project](https://docs.materialsproject.org/methodology/materials-methodology/thermodynamic-stability/thermodynamic-stability).
+
+To fully evaluate the generated materials
 
 ```bash
 export PROJECT_ROOT=$(pwd)/forks/flowmm
+export PMG_VASP_PSP_DIR=PATH_TO_YOUR_PSEUDOPOTENTIALS
 
 # Change as needed
 eval_dir="$(pwd)/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00"
@@ -181,6 +186,12 @@ eval_for_dft_pt=$(python forks/flowmm/scripts_model/evaluate.py consolidate $eva
 
 # Pre-relax
 python forks/flowmm/scripts_analysis/prerelax.py "$eval_for_dft_pt" "$eval_for_dft_json" "$eval_log_dir" --num_jobs "$num_jobs" --slurm_partition "$slurm_partition"
+
+# DFT
+dft_dir="${parent}/dft"
+mkdir -p "$dft_dir"
+
+python forks/flowmm/scripts_analysis/dft_create_inputs.py "$eval_for_dft_json" "$dft_dir"
 ```
 
 ## For developers
