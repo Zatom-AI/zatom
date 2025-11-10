@@ -4,21 +4,10 @@ architecture:
   max_num_elements: 100
   add_mask_atom_type: true
 
-interpolant:
-  _target_: zatom.models.interpolants.flow_matching.FlowMatchingInterpolant
-  disc_feats: [atom_types]
-  cont_feats: [pos, frac_coords, lengths_scaled, angles_radians]
-  cont_feats_distributions: [centered_gaussian, uniform, uniform, uniform]
-  mask_token_index: ${model.architecture.max_num_elements}
-  min_t: 0
-  max_t: 0
-  corrupt: ${model.architecture.add_mask_atom_type}
-  disc_interpolant_type: masking # NOTE: must be one of (`uniform`, `masking`)
-
 augmentations:
   frac_coords: true
   pos: true
-  scale: 10.0
+  scale: 1.0
   ref_scale: 1.0 # NOTE: currently applied (multiplicitively) to noisy atom `pos` after normalizing by `scale`
   multiplicity: 8 # number of copies per GPU
 
