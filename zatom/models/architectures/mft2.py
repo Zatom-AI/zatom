@@ -127,6 +127,7 @@ class MFT2(nn.Module):
         self.time_alpha_factor = time_alpha_factor
 
         self.vocab_size = max_num_elements
+        self.continuous_x_1_prediction = True
 
         # Define time distribution
         if time_distribution == "uniform":
@@ -145,6 +146,7 @@ class MFT2(nn.Module):
             )
 
         # Build multimodal model
+        kwargs.pop("add_mask_atom_type", None)  # Remove if present
         self.model = multimodal_model(
             time_embedder=time_embedder,
             dataset_embedder=dataset_embedder,

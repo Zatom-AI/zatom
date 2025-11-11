@@ -107,18 +107,18 @@ atom_decoder_transformer:
 
 # Interpolants for each modality
 atom_types_interpolant:
-  _target_: zatom.flow.interpolate.DiscreteInterpolant
+  _target_: zatom.flow.interpolants.DiscreteInterpolant
   key: atom_types
   loss_weight: 0.1
   time_factor:
-    _target_: tabasco.flow.time_factor.InverseTimeFactor
+    _target_: zatom.flow.time_factor.InverseTimeFactor
     max_value: 100.0
     min_value: 0.05
     zero_before: 0.0
     eps: 1e-6
 
 pos_interpolant:
-  _target_: zatom.flow.interpolate.SDEMetricInterpolant
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: pos
   loss_weight: 1.0
   centered: true
@@ -136,7 +136,7 @@ pos_interpolant:
     eps: 1e-6
 
 frac_coords_interpolant:
-  _target_: zatom.flow.interpolate.SDEMetricInterpolant
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: frac_coords
   loss_weight: 1.0
   centered: false
@@ -154,7 +154,7 @@ frac_coords_interpolant:
     eps: 1e-6
 
 lengths_scaled_interpolant:
-  _target_: zatom.flow.interpolate.SDEMetricInterpolant
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: lengths_scaled
   loss_weight: 1.0
   centered: false
@@ -172,7 +172,7 @@ lengths_scaled_interpolant:
     eps: 1e-6
 
 angles_radians_interpolant:
-  _target_: zatom.flow.interpolate.SDEMetricInterpolant
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: angles_radians
   loss_weight: 1.0
   centered: false

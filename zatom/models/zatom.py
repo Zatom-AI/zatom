@@ -395,8 +395,8 @@ class Zatom(LightningModule):
         atom_to_token_idx = torch.arange(num_atoms, device=self.device).expand(
             batch.batch_size, -1
         )  # (batch_size, num_atoms)
-        atom_to_token = (
-            F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(torch.float32),
+        atom_to_token = F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(
+            torch.float32
         )  # (batch_size, num_atoms, num_tokens)
 
         # Prepare batch for forward pass
@@ -404,7 +404,7 @@ class Zatom(LightningModule):
         dense_batch = TensorDict(
             {
                 # modalities to predict
-                "atom_types": atom_types,
+                "atom_types": F.one_hot(atom_types, num_classes=self.model.vocab_size),
                 "pos": pos,
                 "frac_coords": frac_coords,
                 "lengths_scaled": lengths_scaled,
@@ -427,7 +427,7 @@ class Zatom(LightningModule):
         )
 
         # Run forward pass
-        loss_dict = self.model(dense_batch)
+        loss_dict = self.model.forward(dense_batch, compute_stats=False)
 
         return loss_dict
 

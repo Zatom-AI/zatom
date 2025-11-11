@@ -128,7 +128,7 @@ class DiscreteInterpolant(Interpolant):
         self.ce_loss = nn.CrossEntropyLoss(reduction="none")
 
     @typecheck
-    def sample_noise(self, shape: torch.Size, pad_mask: Tensor) -> TensorDict:
+    def sample_noise(self, shape: torch.Size, pad_mask: Tensor) -> Tensor:
         """Return uniformly random one-hot noise.
 
         Args:
@@ -271,7 +271,7 @@ class CenteredMetricInterpolant(Interpolant):
         self.mask_fn = mask_and_zero_com if self.centered else apply_mask
 
     @typecheck
-    def sample_noise(self, shape: torch.Size, pad_mask: Tensor) -> TensorDict:
+    def sample_noise(self, shape: torch.Size, pad_mask: Tensor) -> Tensor:
         """Return masked Gaussian noise with optional scaling.
 
         Args:
