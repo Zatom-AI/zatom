@@ -42,6 +42,8 @@ class Interpolant(ABC):
         loss_weight: Scalar weight applied to the computed loss.
         time_factor: Optional callable `f(t)` that rescales the per-sample loss as a
             function of the interpolation time `t`.
+        sample_schedule: Optional schedule for sampling times during training.
+            One of (`linear`, `power`, `log`).
     """
 
     @typecheck
@@ -51,11 +53,13 @@ class Interpolant(ABC):
         key_pad_mask: str = "padding_mask",
         loss_weight: float = 1.0,
         time_factor: Callable | None = None,
+        sample_schedule: Literal["linear", "power", "log"] = "linear",
     ):
         self.key = key
         self.key_pad_mask = key_pad_mask
         self.loss_weight = loss_weight
         self.time_factor = time_factor
+        self.sample_schedule = sample_schedule
 
     @typecheck
     @abstractmethod
@@ -111,15 +115,15 @@ class Interpolant(ABC):
 
     @typecheck
     @abstractmethod
-    def step(self, batch_t: TensorDict, pred: TensorDict, t: Tensor, dt: float) -> Tensor:
+    def step(self, batch_t: TensorDict, pred: TensorDict, t: TensorDict, dt: TensorDict) -> Tensor:
         """Advance the sample one explicit-Euler step along the reverse process.
 
         Args:
             batch_t: TensorDict with the current sample at time `t`.
             pred: Model prediction (same layout as `batch_t`) used to compute the
                 velocity field.
-            t: Tensor of shape `(B,)` with the current times.
-            dt: Scalar or tensor step size applied to each batch element.
+            t: TensorDict `(B,)` with current times.
+            dt: TensorDict of step sizes to advance.
 
         Returns:
             Updated data tensor corresponding to time `t + dt`.
@@ -224,20 +228,20 @@ class DiscreteInterpolant(Interpolant):
         return total_loss, stats_dict
 
     @typecheck
-    def step(self, batch_t: TensorDict, pred: TensorDict, t: Tensor, dt: float) -> Tensor:
+    def step(self, batch_t: TensorDict, pred: TensorDict, t: TensorDict, dt: TensorDict) -> Tensor:
         """Stochastic forward-Euler step for discrete states in continuous time.
 
         Args:
             batch_t: TensorDict containing one-hot states at time `t`.
             pred: Logits predicting the terminal distribution.
-            t: Tensor `(B,)` with current time.
-            dt: Step size to advance.
+            t: TensorDict `(B,)` with current times.
+            dt: TensorDict of step sizes to advance.
 
         Returns:
             One-hot tensor representing the new discrete state.
         """
-        t = t.unsqueeze(-1).unsqueeze(-1)
-        dt = dt.unsqueeze(-1).unsqueeze(-1)
+        t = t[self.key].unsqueeze(-1).unsqueeze(-1)
+        dt = dt[self.key].unsqueeze(-1).unsqueeze(-1)
         assert (
             dt.shape == t.shape == (batch_t[self.key].shape[0], 1, 1)
         ), f"t shape: {t.shape}, dt shape: {dt.shape}, batch_t shape: {batch_t[self.key].shape}"
@@ -399,21 +403,21 @@ class CenteredMetricInterpolant(Interpolant):
         return total_loss, stats_dict
 
     @typecheck
-    def step(self, batch_t: TensorDict, pred: TensorDict, t: Tensor, dt: float) -> Tensor:
+    def step(self, batch_t: TensorDict, pred: TensorDict, t: TensorDict, dt: TensorDict) -> Tensor:
         """Deterministic forward-Euler step for continuous modalities.
 
         Args:
             batch_t: TensorDict containing the current sample at time `t`.
             pred: Model prediction (same layout as `batch_t`) used to compute the
                 velocity field.
-            t: Tensor `(B,)` with current time.
-            dt: Step size to advance.
+            t: TensorDict `(B,)` with current times.
+            dt: TensorDict of step sizes to advance.
 
         Returns:
             Updated data tensor corresponding to time `t + dt`.
         """
-        t = t.unsqueeze(-1).unsqueeze(-1)
-        dt = dt.unsqueeze(-1).unsqueeze(-1)
+        t = t[self.key].unsqueeze(-1).unsqueeze(-1)
+        dt = dt[self.key].unsqueeze(-1).unsqueeze(-1)
         assert (
             dt.shape == t.shape == (batch_t[self.key].shape[0], 1, 1)
         ), f"t shape: {t.shape}, dt shape: {dt.shape}, batch_t shape: {batch_t[self.key].shape}"
@@ -472,21 +476,21 @@ class SDEMetricInterpolant(CenteredMetricInterpolant):
         return (t * v_t - x_t) / (1 - t + 1e-6)
 
     @typecheck
-    def step(self, batch_t: TensorDict, pred: TensorDict, t: Tensor, dt: float) -> Tensor:
+    def step(self, batch_t: TensorDict, pred: TensorDict, t: TensorDict, dt: TensorDict) -> Tensor:
         """Forward Euler integration step with score components and white noise injection.
 
         Args:
             batch_t: TensorDict containing the current sample at time `t`.
             pred: Model prediction (same layout as `batch_t`) used to compute the
                 velocity field.
-            t: Tensor `(B,)` with current time.
-            dt: Step size to advance.
+            t: TensorDict `(B,)` with current times.
+            dt: TensorDict of step sizes to advance.
 
         Returns:
             Updated data tensor corresponding to time `t + dt`.
         """
-        t = t.unsqueeze(-1).unsqueeze(-1)
-        dt = dt.unsqueeze(-1).unsqueeze(-1)
+        t = t[self.key].unsqueeze(-1).unsqueeze(-1)
+        dt = dt[self.key].unsqueeze(-1).unsqueeze(-1)
         assert (
             dt.shape == t.shape == (batch_t[self.key].shape[0], 1, 1)
         ), f"t shape: {t.shape}, dt shape: {dt.shape}, batch_t shape: {batch_t[self.key].shape}"

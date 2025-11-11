@@ -20,7 +20,7 @@ sampling:
   visualize: true
   save_dir: ${paths.viz_dir}
   removeHs: false # only retain heavy atoms (for molecules)
-  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  mask_token_index: ${model.architecture.max_num_elements}
 
 conditioning:
   dataset_idx: true # always true

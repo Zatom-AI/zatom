@@ -6,6 +6,7 @@ Adapted from:
     - https://github.com/facebookresearch/all-atom-diffusion-transformer
 """
 
+from copy import deepcopy
 from functools import partial
 from typing import Any, Callable, Dict, List, Literal, Tuple
 
@@ -18,6 +19,7 @@ from torch.nn.attention import SDPBackend
 from zatom.flow.interpolants import Interpolant
 from zatom.flow.path import FlowPath
 from zatom.models.components.losses import InterDistancesLoss
+from zatom.utils.sampling_utils import get_sample_schedule
 from zatom.utils.training_utils import (
     BEST_DEVICE,
     SDPA_BACKENDS,
@@ -120,6 +122,7 @@ class MFT(nn.Module):
 
         self.vocab_size = max_num_elements
         self.continuous_x_1_prediction = True
+        self.treat_discrete_modalities_as_continuous = False
 
         # Define time distribution
         if time_distribution == "uniform":
@@ -160,7 +163,7 @@ class MFT(nn.Module):
             max_num_elements=max_num_elements,
             use_length_condition=use_length_condition,
             add_mask_atom_type=False,
-            treat_discrete_modalities_as_continuous=False,
+            treat_discrete_modalities_as_continuous=self.treat_discrete_modalities_as_continuous,
             remove_t_conditioning=False,
             jvp_attn=jvp_attn,
             **kwargs,
@@ -182,14 +185,11 @@ class MFT(nn.Module):
         return next(self.parameters()).device
 
     @typecheck
-    def _sample_noise_like_batch(
-        self, batch: TensorDict | None = None, batch_size: int | None = None
-    ):
+    def _sample_noise_like_batch(self, batch: TensorDict):
         """Draw coordinate and atom-type noise compatible with `batch`.
 
         Args:
-            batch: Optional TensorDict containing batch data.
-            batch_size: Optional batch size if batch is None.
+            batch: TensorDict containing batch data.
 
         Returns:
             A TensorDict containing noise samples.
@@ -327,7 +327,7 @@ class MFT(nn.Module):
 
         Args:
             x_t: A TensorDict containing the noised input data at time t.
-            x_1: A TensorDict containing the clean data at time *t=1*.
+            x_1: A TensorDict containing the model's input features.
             t: A TensorDict containing the time points.
 
         Returns:
@@ -530,10 +530,22 @@ class MFT(nn.Module):
         return loss_dict, stats_dict
 
     @typecheck
-    def _step(self, x_t: TensorDict, t: TensorDict, step_size: float) -> TensorDict:
-        """Single Euler step at time `t` using model-predicted velocity."""
+    def _step(
+        self, x_t: TensorDict, x_1: TensorDict, t: TensorDict, step_size: TensorDict
+    ) -> TensorDict:
+        """Single Euler step at time `t` using model-predicted velocity.
+
+        Args:
+            x_t: A TensorDict containing the noised input data at time t.
+            x_1: A TensorDict containing the model's input features.
+            t: A TensorDict containing the time points.
+            step_size: A TensorDict containing the step sizes for each modality.
+
+        Returns:
+            A TensorDict containing the updated data after the Euler step.
+        """
         with torch.no_grad():
-            out_batch = self._call_model(x_t, t)
+            out_batch = self._call_model(x_t, x_1, t)
 
         x_t["atom_types"] = self.atom_types_interpolant.step(x_t, out_batch, t, step_size)
         x_t["pos"] = self.pos_interpolant.step(x_t, out_batch, t, step_size)
@@ -553,7 +565,22 @@ class MFT(nn.Module):
         """Compute training loss dictionary and optional statistics.
 
         Args:
-            batch: A TensorDict containing the input batch data.
+            batch: A TensorDict containing the input batch data, including:
+                - atom_types: Atom types tensor at *t=1*.
+                - pos: Atom positions tensor at *t=1*.
+                - frac_coords: Fractional coordinates tensor at *t=1*.
+                - lengths_scaled: Scaled lengths tensor at *t=1*.
+                - angles_radians: Angles in radians tensor at *t=1*.
+                - dataset_idx: Dataset index tensor.
+                - spacegroup: Spacegroup index tensor.
+                - ref_pos: Reference atom positions tensor.
+                - ref_space_uid: Reference space unique IDs tensor.
+                - atom_to_token: One-hot mapping from atom indices to token indices.
+                - atom_to_token_idx: Mapping from atom indices to token indices.
+                - token_index: Indices of the tokens in the batch.
+                - max_num_tokens: Maximum number of unmasked tokens for each batch element.
+                - padding_mask: Padding mask tensor.
+                - token_is_periodic: Periodicity mask tensor.
             compute_stats: Whether to compute and return statistics along with the loss.
 
         Returns:
@@ -568,49 +595,87 @@ class MFT(nn.Module):
     @typecheck
     def sample(
         self,
-        feats: Dict[str, torch.Tensor],
-        mask: Bool["b m"],  # type: ignore
+        batch: TensorDict,
         steps: int = 100,
         cfg_scale: float = 2.0,
-        enable_zero_centering: bool = True,
+        return_trajectories: bool = False,
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
-        modal_input_dict: (
-            Dict[
-                str,
-                Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None],
-            ]
-            | None
-        ) = None,
-        **kwargs,
-    ) -> Tuple[List[Dict[str, torch.Tensor]], None]:
+    ) -> Tuple[TensorDict, List[TensorDict]]:
         """ODE-driven sampling with MFT using classifier-free guidance.
 
         Args:
-            feats: Features for conditioning including:
-                dataset_idx: Dataset index for each sample.
-                spacegroup: Spacegroup index for each sample.
-                ref_pos: Reference atom positions tensor.
-                ref_space_uids: Reference space unique IDs tensor.
-                atom_to_token: One-hot mapping from atom indices to token indices.
-                atom_to_token_idx: Mapping from atom indices to token indices.
-                max_num_tokens: Maximum number of unmasked tokens for each batch element.
-                token_index: Indices of the tokens in the batch.
-            mask: True if valid token, False if padding.
+            batch: A TensorDict containing the input batch data, including:
+                - atom_types: Placeholder atom types tensor.
+                - pos: Placeholder atom positions tensor.
+                - frac_coords: Placeholder fractional coordinates tensor.
+                - lengths_scaled: Placeholder scaled lengths tensor.
+                - angles_radians: Placeholder angles in radians tensor.
+                - dataset_idx: Dataset index tensor.
+                - spacegroup: Spacegroup index tensor.
+                - ref_pos: Reference atom positions tensor.
+                - ref_space_uid: Reference space unique IDs tensor.
+                - atom_to_token: One-hot mapping from atom indices to token indices.
+                - atom_to_token_idx: Mapping from atom indices to token indices.
+                - token_index: Indices of the tokens in the batch.
+                - max_num_tokens: Maximum number of unmasked tokens for each batch element.
+                - padding_mask: Padding mask tensor.
+                - token_is_periodic: Periodicity mask tensor.
             steps: Number of integration steps for the multimodal ODE solver.
             cfg_scale: Classifier-free guidance scale.
-            enable_zero_centering (bool): Whether to allow centering of continuous modalities
-                at the origin after each denoising step. Defaults to ``True``.
+            return_trajectories: Whether to return full sampling trajectories.
             sdpa_backends: List of SDPBackend backends to try when using fused attention. Defaults to all.
-            modal_input_dict: If not None, a dictionary specifying input modalities to use and their input metadata.
-                The keys should be a subset of `["atom_types", "pos", "frac_coords", "lengths_scaled", "angles_radians"]`,
-                and the values should be tuples of (x_t, t).
-            kwargs: Additional keyword arguments (not used).
 
         Returns:
-            A list of predicted modalities as a dictionary and a null variable (for sake of API compatibility).
+            A tuple containing the final sampled TensorDict and a list of intermediate trajectories (if requested).
         """
-        device = mask.device
-        batch_size, num_tokens = mask.shape
+        trajectories = []
+
+        x_t = self._sample_noise_like_batch(batch)
+        x_1 = TensorDict(
+            {
+                "dataset_idx": batch["dataset_idx"],
+                "spacegroup": batch["spacegroup"],
+                "ref_pos": batch["ref_pos"],
+                "ref_space_uid": batch["ref_space_uid"],
+                "atom_to_token": batch["atom_to_token"],
+                "atom_to_token_idx": batch["atom_to_token_idx"],
+                "max_num_tokens": batch["max_num_tokens"],
+                "token_index": batch["token_index"],
+            },
+            batch_size=batch.batch_size,
+            device=batch.device,
+        )
+
+        T = TensorDict(
+            {
+                modal: get_sample_schedule(
+                    schedule=getattr(self, f"{modal}_interpolant").sample_schedule, num_steps=steps
+                )
+                .unsqueeze(-1)
+                .repeat(1, batch.batch_size)
+                for modal in self.modals
+            },
+            batch_size=batch.batch_size,
+            device=batch.device,
+        )
+
+        for i in range(1, len(T)):
+            t = TensorDict(
+                {modal: T[modal][i - 1] for modal in self.modals},
+                batch_size=batch.batch_size,
+                device=batch.device,
+            )
+            dt = TensorDict(
+                {modal: T[modal][i] - T[modal][i - 1] for modal in self.modals},
+                batch_size=batch.batch_size,
+                device=batch.device,
+            )
+
+            x_t = self._step(x_t, x_1, t, dt)
+            if return_trajectories:
+                trajectories.append(deepcopy(x_t.detach().cpu()))
+
+        return x_t, trajectories
 
         if modal_input_dict is None:
             # Define time points and corresponding noised inputs for each modality
@@ -650,13 +715,8 @@ class MFT(nn.Module):
                 modal_input_dict["lengths_scaled"][0],
                 modal_input_dict["angles_radians"][0],
             ],
-            time_grid=None,  # For now, use same time point for all modalities
-            device=mask.device,
             steps=steps,
-            feats=feats,
-            mask=mask,
             cfg_scale=cfg_scale,
-            enable_zero_centering=enable_zero_centering,
             sdpa_backends=sdpa_backends,
         )
 

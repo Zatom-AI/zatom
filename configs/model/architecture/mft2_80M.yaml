@@ -110,6 +110,7 @@ atom_types_interpolant:
   _target_: zatom.flow.interpolants.DiscreteInterpolant
   key: atom_types
   loss_weight: 0.1
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
   time_factor:
     _target_: zatom.flow.time_factor.InverseTimeFactor
     max_value: 100.0
@@ -121,6 +122,7 @@ pos_interpolant:
   _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: pos
   loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
   centered: true
   scale_noise_by_log_num_tokens: false
   noise_scale: 1.0
@@ -139,6 +141,7 @@ frac_coords_interpolant:
   _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: frac_coords
   loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
   centered: false
   scale_noise_by_log_num_tokens: false
   noise_scale: 1.0
@@ -157,6 +160,7 @@ lengths_scaled_interpolant:
   _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: lengths_scaled
   loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
   centered: false
   scale_noise_by_log_num_tokens: false
   noise_scale: 1.0
@@ -175,6 +179,7 @@ angles_radians_interpolant:
   _target_: zatom.flow.interpolants.SDEMetricInterpolant
   key: angles_radians
   loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
   centered: false
   scale_noise_by_log_num_tokens: false
   noise_scale: 1.0
