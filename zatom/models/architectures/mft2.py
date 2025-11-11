@@ -210,18 +210,28 @@ class MFT2(nn.Module):
                 torch.arange(max_num_atoms, device=self.device)[None, :]
                 >= sampled_num_atoms[:, None]
             )
-            pos_shape = (batch_size, max_num_atoms, self.data_stats["spatial_dim"])
             atom_types_shape = (batch_size, max_num_atoms, self.data_stats["atom_dim"])
+            pos_shape = (batch_size, max_num_atoms, self.data_stats["spatial_dim"])
+            frac_coords_shape = (batch_size, max_num_atoms, self.data_stats["spatial_dim"])
+            lengths_scaled_shape = (batch_size, 1, 3)
+            angles_radians_shape = (batch_size, 1, 3)
         else:
             pad_mask = batch["padding_mask"]
-            pos_shape = batch["pos"].shape
             atom_types_shape = batch["atom_types"].shape
+            pos_shape = batch["pos"].shape
+            frac_coords_shape = batch["frac_coords"].shape
+            lengths_scaled_shape = batch["lengths_scaled"].shape
+            angles_radians_shape = batch["angles_radians"].shape
 
         atom_types_noise = self.atom_types_interpolant.sample_noise(atom_types_shape, pad_mask)
         pos_noise = self.pos_interpolant.sample_noise(pos_shape, pad_mask)
-        frac_coords_noise = self.frac_coords_interpolant.sample_noise(pos_shape, pad_mask)
-        lengths_scaled_noise = self.lengths_scaled_interpolant.sample_noise(pos_shape, pad_mask)
-        angles_radians_noise = self.angles_radians_interpolant.sample_noise(pos_shape, pad_mask)
+        frac_coords_noise = self.frac_coords_interpolant.sample_noise(frac_coords_shape, pad_mask)
+        lengths_scaled_noise = self.lengths_scaled_interpolant.sample_noise(
+            lengths_scaled_shape, pad_mask
+        )
+        angles_radians_noise = self.angles_radians_interpolant.sample_noise(
+            angles_radians_shape, pad_mask
+        )
 
         noise_batch = TensorDict(
             {
