@@ -119,6 +119,8 @@ shifterimg -v pull registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
 
 Train model with default configuration
 
+> 💡 Note: The first time (only) you run the code, you'll need to uncomment Line 75 (`datamodule.setup()`) of `zatom/train_fm.py` to download each dataset's metadata for subsequent training runs.
+
 ```bash
 # train on CPU
 python zatom/train_fm.py trainer=cpu
