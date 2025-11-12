@@ -28,6 +28,7 @@ task_name: overfit_fm
 
 trainer:
   check_val_every_n_epoch: 500
+  gradient_clip_val: 0.5
   max_epochs: 20000
   overfit_batches: 1
   precision: 32-true

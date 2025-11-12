@@ -21,6 +21,7 @@ defaults:
   - override /trainer: ddp
 
 trainer:
+  gradient_clip_val: 0.5
   precision: 32-true
 
 model:
