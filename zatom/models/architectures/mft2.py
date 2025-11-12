@@ -521,8 +521,8 @@ class MFT(nn.Module):
             # Requested auxiliary task → compute loss
             if aux_task in path.x_1:
                 real_mask = 1 - path.x_1["padding_mask"].int()
-                aux_mask = ~path.x_1[aux_task].isnan()
                 aux_target = path.x_1[aux_task]
+                aux_mask = ~aux_target.isnan()
                 if aux_target.squeeze().dim() == 1:
                     err = (aux_pred - aux_target) * aux_mask
                     aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
@@ -544,11 +544,12 @@ class MFT(nn.Module):
                 if aux_task in path.x_1:
                     real_mask = 1 - path.x_1["padding_mask"].int()
                     aux_target = path.x_1[aux_task]
+                    aux_mask = ~aux_target.isnan()
                     n_tokens = real_mask.sum(dim=-1).clamp(min=1.0)
-                    err = (aux_pred.squeeze(-1) / n_tokens) - (aux_target.squeeze(-1) / n_tokens)
-                    per_atom_aux_loss_value = torch.sum(err.abs()) / (
-                        real_mask.any(-1).sum() + eps
-                    )
+                    err = (
+                        (aux_pred.squeeze(-1) / n_tokens) - (aux_target.squeeze(-1) / n_tokens)
+                    ) * aux_mask.squeeze(-1)
+                    per_atom_aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
                     per_atom_aux_loss_value = (aux_pred * 0.0).mean()
 

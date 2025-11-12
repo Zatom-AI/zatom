@@ -408,6 +408,11 @@ class Zatom(LightningModule):
             "frac_coords": dense_frac_coords,
             "lengths_scaled": dense_lengths_scaled,
             "angles_radians": dense_angles_radians,
+            # # auxiliary prediction tasks
+            # "global_property": torch.randn((batch.batch_size, 1), device=self.device),
+            # "global_energy": torch.randn((batch.batch_size, 1), device=self.device),
+            # "global_energy_per_atom": torch.randn((batch.batch_size, 1), device=self.device),
+            # "atomic_forces": torch.randn_like(dense_pos),
         }
 
         # Build features for conditioning

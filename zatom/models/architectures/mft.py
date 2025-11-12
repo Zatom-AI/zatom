@@ -908,39 +908,43 @@ class MFT(nn.Module):
 
         # Add auxiliary losses
         for aux_idx, aux_task in enumerate(self.auxiliary_tasks):
-            model_aux_output = model_aux_outputs[aux_idx]
+            aux_pred = model_aux_outputs[aux_idx].squeeze(-1)
             # Requested auxiliary task → compute loss
             if aux_task in target_tensors:
-                raise NotImplementedError("Auxiliary tasks not implemented yet.")
-                mask_aux = (
-                    mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
-                    if model_aux_output.squeeze().ndim == 1
-                    else mask.unsqueeze(-1)  # (B, M, 1)
-                ).float()
-                target_aux = target_tensors[aux_task]
-                aux_loss_value = F.l1_loss(
-                    model_aux_output * mask_aux,
-                    target_aux * mask_aux,
-                    reduction="mean",
-                )
+                real_mask = mask.int()
+                aux_target = target_tensors[aux_task]
+                aux_mask = ~aux_target.isnan()
+                if aux_target.squeeze().dim() == 1:
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
+                else:
+                    aux_mask = aux_mask * real_mask.unsqueeze(-1)
+                    n_tokens = aux_mask.all(-1).sum(dim=-1)
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss = torch.sum(err.abs(), dim=(-1, -2)) / (
+                        n_tokens * err.shape[-1] + eps
+                    )
+                    aux_loss_value = aux_loss.sum() / (real_mask.any(-1).sum() + eps)
                 loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value
             # Unused auxiliary task → add zero loss to computational graph
             else:
-                loss_dict[f"aux_{aux_task}_loss"] = (model_aux_output * 0.0).mean()
+                loss_dict[f"aux_{aux_task}_loss"] = (aux_pred * 0.0).mean()
 
-            # Maybe log per-atom auxiliary loss
+            # Log per-atom auxiliary loss
             if aux_task == "global_energy":
                 if aux_task in target_tensors:
-                    per_atom_aux_loss = F.l1_loss(
-                        model_aux_output.squeeze()
-                        / (mask.sum(dim=-1).clamp(min=1.0)),  # Avoid division by zero
-                        target_tensors[aux_task] / (mask.sum(dim=-1).clamp(min=1.0)),
-                        reduction="mean",
-                    )
+                    real_mask = mask.int()
+                    aux_target = target_tensors[aux_task]
+                    aux_mask = ~aux_target.isnan()
+                    n_tokens = real_mask.sum(dim=-1).clamp(min=1.0)
+                    err = (
+                        (aux_pred.squeeze(-1) / n_tokens) - (aux_target.squeeze(-1) / n_tokens)
+                    ) * aux_mask.squeeze(-1)
+                    per_atom_aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
-                    per_atom_aux_loss = (model_aux_output * 0.0).mean()
+                    per_atom_aux_loss_value = (aux_pred * 0.0).mean()
 
-                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss
+                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss_value
 
             loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"]
 
