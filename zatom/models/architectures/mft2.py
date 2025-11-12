@@ -21,11 +21,10 @@ from zatom.flow.path import FlowPath
 from zatom.models.components.losses import InterDistancesLoss
 from zatom.utils.sampling_utils import get_sample_schedule
 from zatom.utils.training_utils import (
-    BEST_DEVICE,
     SDPA_BACKENDS,
     HistogramTimeDistribution,
 )
-from zatom.utils.typing_utils import Bool, typecheck
+from zatom.utils.typing_utils import typecheck
 
 #################################################################################
 #                           Multimodal Flow Transformer                         #
