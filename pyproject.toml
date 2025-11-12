@@ -100,6 +100,7 @@ dependencies = [
     "geopandas==1.1.1",
     "seaborn==0.13.2",
     "libigl==2.6.1",
+    "tensordict==0.10.0",
     "flow_matching @ git+https://github.com/amorehead/flow_matching.git@mm",
     "fairchem-core @ git+https://github.com/amorehead/fairchem.git@torch-2.6.0-plus#subdirectory=packages/fairchem-core",
     "platonic_transformers @ git+https://github.com/amorehead/PlatonicTransformers.git@packaging",
