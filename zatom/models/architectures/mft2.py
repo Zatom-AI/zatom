@@ -403,7 +403,11 @@ class MFT(nn.Module):
 
     @typecheck
     def _compute_loss(
-        self, path: FlowPath, pred: TensorDict, compute_stats: bool = True
+        self,
+        path: FlowPath,
+        pred: TensorDict,
+        compute_stats: bool = True,
+        eps: float = 1e-6,
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, float]]:
         """Compute and sum each modality's loss as well as an optional inter-distance loss for
         (non-periodic) 3D atom positions.
@@ -418,6 +422,7 @@ class MFT(nn.Module):
             path: The FlowPath object containing the true data and noise.
             pred: The predicted TensorDict from the model.
             compute_stats: Whether to compute and return statistics.
+            eps: A small value to avoid division by zero.
 
         Returns:
             A tuple of (loss_dict, stats_dict) where loss_dict is a dictionary
@@ -511,36 +516,42 @@ class MFT(nn.Module):
 
         # Add auxiliary losses
         for aux_task in self.auxiliary_tasks:
-            aux_pred = pred[aux_task]
+            aux_pred = pred[aux_task].squeeze(-1)
             # Requested auxiliary task → compute loss
             if aux_task in path.x_1:
-                raise NotImplementedError("Auxiliary tasks not implemented yet.")
-                real_aux_mask = ~path.x_1[aux_task].isnan().unsqueeze(-1)  # (B, M, 1) or (B, 1, 1)
+                real_mask = 1 - path.x_1["padding_mask"].int()
+                aux_mask = ~path.x_1[aux_task].isnan()
                 aux_target = path.x_1[aux_task]
-                aux_loss_value = F.l1_loss(
-                    aux_pred * real_aux_mask,
-                    aux_target * real_aux_mask,
-                    reduction="none",
-                )
+                if aux_target.squeeze().dim() == 1:
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
+                else:
+                    aux_mask = aux_mask * real_mask.unsqueeze(-1)
+                    n_tokens = aux_mask.all(-1).sum(dim=-1)
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss = torch.sum(err.abs(), dim=(-1, -2)) / (
+                        n_tokens * err.shape[-1] + eps
+                    )
+                    aux_loss_value = aux_loss.sum() / (real_mask.any(-1).sum() + eps)
                 loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value
             # Unused auxiliary task → add zero loss to computational graph
             else:
                 loss_dict[f"aux_{aux_task}_loss"] = (aux_pred * 0.0).mean()
 
-            # Maybe log per-atom auxiliary loss
+            # Log per-atom auxiliary loss
             if aux_task == "global_energy":
                 if aux_task in path.x_1:
-                    real_mask = ~path.x_1[aux_task].isnan()  # (B,)
-                    per_atom_aux_loss = F.l1_loss(
-                        aux_pred.squeeze()
-                        / (real_mask.sum(dim=-1).clamp(min=1.0)),  # Avoid division by zero
-                        path.x_1[aux_task] / (real_mask.sum(dim=-1).clamp(min=1.0)),
-                        reduction="mean",
+                    real_mask = 1 - path.x_1["padding_mask"].int()
+                    aux_target = path.x_1[aux_task]
+                    n_tokens = real_mask.sum(dim=-1).clamp(min=1.0)
+                    err = (aux_pred.squeeze(-1) / n_tokens) - (aux_target.squeeze(-1) / n_tokens)
+                    per_atom_aux_loss_value = torch.sum(err.abs()) / (
+                        real_mask.any(-1).sum() + eps
                     )
                 else:
-                    per_atom_aux_loss = (aux_pred * 0.0).mean()
+                    per_atom_aux_loss_value = (aux_pred * 0.0).mean()
 
-                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss
+                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss_value
 
             loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"]
 
