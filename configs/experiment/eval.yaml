@@ -1,10 +1,13 @@
 # @package _global_
 
 # Options for evaluation:
+# - /model: [zatom, zatom2]
 # - /model/architecture:
 #         [mft_80M, mft_180M, mft_500M,
 #          met_80M, met_180M, met_500M,
-#          mfp_80M, mfp_180M, mfp_500M]
+#          mfp_80M, mfp_180M, mfp_500M,
+#          mft2_80M, mft2_180M, mft2_500M,
+#          tft_5M, tft_20M, tft_70M]
 # - /logger: [null, wandb]
 # - /trainer: [default, mps, ddp, fsdp]
 

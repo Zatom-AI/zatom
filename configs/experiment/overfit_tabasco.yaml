@@ -13,8 +13,8 @@
 
 defaults:
   - override /data: joint
-  - override /model: zatom
-  - override /model/architecture: mft_80M
+  - override /model: zatom2
+  - override /model/architecture: tft_70M
   - override /callbacks: default
   - override /logger: wandb
   - override /trainer: ddp
@@ -28,8 +28,10 @@ task_name: overfit_fm
 
 trainer:
   check_val_every_n_epoch: 500
+  gradient_clip_val: 0.5
   max_epochs: 20000
   overfit_batches: 1
+  precision: 32-true
 
 data:
   datamodule:
@@ -62,3 +64,10 @@ model:
   sampling:
     num_samples: 10
     batch_size: 10
+
+  scheduler: null # use no scheduler
+
+# precision for PyTorch's floating-point matrix multiplication
+float32_matmul_precision: high # NOTE: must be one of (`medium`, `high`, `highest`)
+cuda_matmul_allow_tf32: False # allow TF32 on Ampere GPUs, see https://pytorch.org/docs/stable/notes/cuda.html#tf32-on-ampere
+cudnn_allow_tf32: False # allow TF32 on Ampere GPUs, see https://pytorch.org/docs/stable/notes/cuda.html#tf32-on-ampere

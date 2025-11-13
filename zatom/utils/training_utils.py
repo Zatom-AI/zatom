@@ -138,6 +138,45 @@ class CosineScheduleWithWarmup:
         return self.min_lr_factor + (1.0 - self.min_lr_factor) * cosine_decay
 
 
+class HistogramTimeDistribution:
+    """A time distribution based on a histogram of probabilities.
+
+    Args:
+        probs: A 1D tensor of non-negative probabilities representing the histogram bins.
+    """
+
+    def __init__(self, probs: torch.Tensor):
+        assert probs.ndim == 1, "The argument `probs` must be 1D."
+        assert torch.all(probs >= 0), "The argument `probs` must be non-negative."
+
+        self.probs = probs / probs.sum()
+        self.bin_width = 1 / len(probs)
+
+        self.categorical = torch.distributions.Categorical(probs=self.probs)
+        self.uniform = torch.distributions.Uniform(0, 1)
+
+    @typecheck
+    def sample(self, sample_shape: torch.Size = torch.Size([])) -> torch.Tensor:
+        """Sample times from the histogram-based time distribution.
+
+        Args:
+            sample_shape: The shape of the output samples.
+
+        Returns:
+            A tensor of sampled times with shape `sample_shape`.
+        """
+        # Sample offset from uniform
+        offset = self.uniform.sample(sample_shape)
+
+        # Sample bin index
+        bin_idx = self.categorical.sample(sample_shape)
+
+        # Compute time
+        time = (bin_idx + offset) * self.bin_width
+
+        return time
+
+
 # Helper functions
 
 

@@ -13,7 +13,7 @@ last_model_checkpoint:
 
 model_checkpoint:
   dirpath: ${paths.output_dir}/checkpoints
-  filename: "model-epoch@{epoch}-step@{step}-val_qm9_valid_rate@{val_qm9/valid_rate:.4f}-val_mp20_valid_rate@{val_mp20/valid_rate:.4f}"
+  filename: "model-epoch@{epoch}-step@{step}-val_qm9_posebusters_rate@{val_qm9/posebusters_rate:.4f}-val_mp20_valid_rate@{val_mp20/valid_rate:.4f}"
   monitor: "val_mp20/valid_rate"
   mode: "max"
   save_last: True

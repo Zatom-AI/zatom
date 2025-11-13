@@ -234,20 +234,17 @@ class MFT(nn.Module):
                 {
                     "path": AffineProbPath(scheduler=cond_ot_scheduler()),
                     # loss omitted → Flow will use squared error automatically
-                    "weight": self.atom_types_loss_weight,
                     "x_1_prediction": continuous_x_1_prediction,
                 }
                 if treat_discrete_modalities_as_continuous
                 else {
                     "path": MixtureDiscreteProbPath(scheduler=PolynomialConvexScheduler(n=1.0)),
                     # loss omitted → Flow will use MixturePathGeneralizedKL automatically
-                    "weight": self.atom_types_loss_weight,
                 }
             ),
             "pos": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
                 # loss omitted → Flow will use squared error automatically
-                "weight": self.pos_loss_weight,
                 "x_1_prediction": continuous_x_1_prediction,
                 "should_rigid_align": weighted_rigid_align_pos,
                 "should_center_during_sampling": True,
@@ -255,20 +252,17 @@ class MFT(nn.Module):
             "frac_coords": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
                 # loss omitted → Flow will use squared error automatically
-                "weight": self.frac_coords_loss_weight,
                 "x_1_prediction": continuous_x_1_prediction,
                 "should_rigid_align": weighted_rigid_align_frac_coords,
             },
             "lengths_scaled": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
                 # loss omitted → Flow will use squared error automatically
-                "weight": self.lengths_scaled_loss_weight,
                 "x_1_prediction": continuous_x_1_prediction,
             },
             "angles_radians": {
                 "path": AffineProbPath(scheduler=cond_ot_scheduler()),
                 # loss omitted → Flow will use squared error automatically
-                "weight": self.angles_radians_loss_weight,
                 "x_1_prediction": continuous_x_1_prediction,
             },
         }
@@ -415,7 +409,7 @@ class MFT(nn.Module):
         return denoised_modals_list, None
 
     @typecheck
-    def forward_with_loss_wrapper(
+    def forward(
         self,
         atom_types: Int["b m"],  # type: ignore
         pos: Float["b m 3"],  # type: ignore - referenced via `locals()`
@@ -427,10 +421,10 @@ class MFT(nn.Module):
         token_is_periodic: Bool["b m"],  # type: ignore
         target_tensors: Dict[str, torch.Tensor],
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
-        epsilon: float = 1e-3,
+        eps: float = 1e-3,
         **kwargs: Any,
     ) -> Dict[str, torch.Tensor]:
-        """Forward pass of MFT with loss calculation.
+        """Forward pass of MFT.
 
         Args:
             atom_types: Atom types tensor.
@@ -475,16 +469,16 @@ class MFT(nn.Module):
             modal_t = 0.98 * sample_logit_normal(
                 n=batch_size, m=0.8, s=1.7, device=device
             ) + 0.02 * torch.rand(batch_size, device=device)
-            modal_t = modal_t * (1 - 2 * epsilon) + epsilon
+            modal_t = modal_t * (1 - 2 * eps) + eps
 
             modal_r = 0.98 * sample_logit_normal(
                 n=batch_size, m=0.8, s=1.7, device=device
             ) + 0.02 * torch.rand(batch_size, device=device)
-            modal_r = modal_r * (1 - 2 * epsilon) + epsilon
+            modal_r = modal_r * (1 - 2 * eps) + eps
         elif self.unified_modal_time:
             # Sample time point(s) from a uniform distribution for all modalities
-            modal_t = torch.rand(batch_size, device=device) * (1 - epsilon)
-            modal_r = torch.rand(batch_size, device=device) * (1 - epsilon)
+            modal_t = torch.rand(batch_size, device=device) * (1 - eps)
+            modal_r = torch.rand(batch_size, device=device) * (1 - eps)
 
         if self.enable_mean_flows and modal_t is not None and modal_r is not None:
             # When using mean flows, ensure start and end times `r` and `t` are properly set
@@ -505,16 +499,16 @@ class MFT(nn.Module):
                 t = 0.98 * sample_logit_normal(
                     n=batch_size, m=0.8, s=1.7, device=device
                 ) + 0.02 * torch.rand(batch_size, device=device)
-                t = t * (1 - 2 * epsilon) + epsilon
+                t = t * (1 - 2 * eps) + eps
 
                 r = 0.98 * sample_logit_normal(
                     n=batch_size, m=0.8, s=1.7, device=device
                 ) + 0.02 * torch.rand(batch_size, device=device)
-                r = r * (1 - 2 * epsilon) + epsilon
+                r = r * (1 - 2 * eps) + eps
             elif t is None or r is None:
                 # Sample time point(s) from a uniform distribution
-                t = torch.rand(batch_size, device=device) * (1 - epsilon)
-                r = torch.rand(batch_size, device=device) * (1 - epsilon)
+                t = torch.rand(batch_size, device=device) * (1 - eps)
+                r = torch.rand(batch_size, device=device) * (1 - eps)
 
             if self.enable_mean_flows:
                 # When using mean flows, ensure start and end times `r` and `t` are properly set
@@ -863,53 +857,94 @@ class MFT(nn.Module):
                 "angles_radians",
             ):  # Periodic (crystal) losses
                 modal_loss_value = modal_loss_value * loss_token_is_periodic
+                loss_mask = loss_mask * loss_token_is_periodic
             elif modal == "pos":  # Non-periodic (molecule) losses
                 modal_loss_value = modal_loss_value * (1 - loss_token_is_periodic)
+                loss_mask = loss_mask * (1 - loss_token_is_periodic)
+
+            # Aggregate losses
+            if modal in (
+                "pos",
+                "frac_coords",
+            ):
+                num_tokens = loss_mask.squeeze(-1).sum(-1)
+                modal_batch_loss = modal_loss_value.sum(dim=(-1, -2)) / (
+                    num_tokens * modal_loss_value.shape[-1] + 1e-6
+                )  # Average over tokens
+                loss_mask = loss_mask.squeeze(-1).any(-1)
+            elif modal in (
+                "lengths_scaled",
+                "angles_radians",
+            ):
+                num_tokens = loss_mask[..., 0].sum(-1)
+                modal_batch_loss = modal_loss_value.sum(dim=(-1, -2)) / (
+                    num_tokens * modal_loss_value.shape[-1] + 1e-6
+                )  # Average over tokens
+                loss_mask = loss_mask[..., 0].any(-1)
+            else:  # atom_types
+                num_tokens = loss_mask.sum(-1)
+                modal_batch_loss = modal_loss_value.sum(dim=-1) / (
+                    num_tokens + 1e-6
+                )  # Average over tokens
+                loss_mask = loss_mask.any(-1)
+
+            modal_batch_loss = self.loss_time_fn(
+                # Time-weight losses
+                x=modal_batch_loss,
+                t=modal_time_t,
+            )
+            modal_avg_loss = modal_batch_loss.sum() / (
+                loss_mask.sum() + 1e-6
+            )  # Average over batch
+
+            modal_loss_weight = getattr(self, f"{modal}_loss_weight")
+            modal_total_loss = modal_avg_loss * modal_loss_weight
 
             # Collect losses
-            time_weighted_modal_loss_value = self.loss_time_fn(
-                x=modal_loss_value,
-                t=expand_tensor_like(modal_time_t, expand_to=modal_loss_value),
-            )
-            loss_dict[f"{modal}_loss"] = time_weighted_modal_loss_value.mean()
+            loss_dict[f"{modal}_loss"] = modal_total_loss
 
         # Aggregate losses
         loss_dict["loss"] = sum(loss_dict[f"{modal}_loss"] for modal in self.modals)
 
         # Add auxiliary losses
         for aux_idx, aux_task in enumerate(self.auxiliary_tasks):
-            model_aux_output = model_aux_outputs[aux_idx]
+            aux_pred = model_aux_outputs[aux_idx].squeeze(-1)
             # Requested auxiliary task → compute loss
             if aux_task in target_tensors:
-                mask_aux = (
-                    mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
-                    if model_aux_output.squeeze().ndim == 1
-                    else mask.unsqueeze(-1)  # (B, M, 1)
-                ).float()
-                target_aux = target_tensors[aux_task]
-                aux_loss_value = F.l1_loss(
-                    model_aux_output * mask_aux,
-                    target_aux * mask_aux,
-                    reduction="mean",
-                )
+                real_mask = mask.int()
+                aux_target = target_tensors[aux_task]
+                aux_mask = ~aux_target.isnan()
+                if aux_target.squeeze().dim() == 1:
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
+                else:
+                    aux_mask = aux_mask * real_mask.unsqueeze(-1)
+                    n_tokens = aux_mask.all(-1).sum(dim=-1)
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss = torch.sum(err.abs(), dim=(-1, -2)) / (
+                        n_tokens * err.shape[-1] + eps
+                    )
+                    aux_loss_value = aux_loss.sum() / (real_mask.any(-1).sum() + eps)
                 loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value
             # Unused auxiliary task → add zero loss to computational graph
             else:
-                loss_dict[f"aux_{aux_task}_loss"] = (model_aux_output * 0.0).mean()
+                loss_dict[f"aux_{aux_task}_loss"] = (aux_pred * 0.0).mean()
 
-            # Maybe log per-atom auxiliary loss
+            # Log per-atom auxiliary loss
             if aux_task == "global_energy":
                 if aux_task in target_tensors:
-                    per_atom_aux_loss = F.l1_loss(
-                        model_aux_output.squeeze()
-                        / (mask.sum(dim=-1).clamp(min=1.0)),  # Avoid division by zero
-                        target_tensors[aux_task] / (mask.sum(dim=-1).clamp(min=1.0)),
-                        reduction="mean",
-                    )
+                    real_mask = mask.int()
+                    aux_target = target_tensors[aux_task]
+                    aux_mask = ~aux_target.isnan()
+                    n_tokens = real_mask.sum(dim=-1).clamp(min=1.0)
+                    err = (
+                        (aux_pred.squeeze(-1) / n_tokens) - (aux_target.squeeze(-1) / n_tokens)
+                    ) * aux_mask.squeeze(-1)
+                    per_atom_aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
-                    per_atom_aux_loss = (model_aux_output * 0.0).mean()
+                    per_atom_aux_loss_value = (aux_pred * 0.0).mean()
 
-                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss
+                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss_value
 
             loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"]
 

@@ -36,6 +36,6 @@ datamodule:
     test: ${resolve_batch_size:128,${model.architecture.batch_size_scale_factor}}
 
   num_workers:
-    train: 16
-    val: 16
-    test: 16
+    train: 32
+    val: 32
+    test: 32

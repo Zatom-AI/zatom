@@ -7,7 +7,7 @@ Adapted from:
 import collections.abc
 from functools import partial
 from itertools import repeat
-from typing import Any, Tuple, Type
+from typing import Any, Tuple
 
 import torch
 from platonic_transformers.models.platoformer.groups import PLATONIC_GROUPS
@@ -76,8 +76,8 @@ class Mlp(nn.Module):
         in_features: int,
         hidden_features: int | None = None,
         out_features: int | None = None,
-        act_layer: Type[nn.Module] = nn.GELU,
-        norm_layer: Type[nn.Module] | None = None,
+        act_layer: nn.Module = nn.GELU,
+        norm_layer: nn.Module | None = None,
         bias: bool | Tuple[bool, bool] = True,
         drop: float | Tuple[float, float] = 0.0,
         use_conv: bool = False,
@@ -146,8 +146,8 @@ class PlatonicMlp(nn.Module):
         solid: str,
         hidden_features: int | None = None,
         out_features: int | None = None,
-        act_layer: Type[nn.Module] = nn.GELU,
-        norm_layer: Type[nn.Module] | None = None,
+        act_layer: nn.Module = nn.GELU,
+        norm_layer: nn.Module | None = None,
         bias: bool | Tuple[bool, bool] = True,
         drop: float | Tuple[float, float] = 0.0,
         device: torch.device | None = None,
@@ -239,7 +239,7 @@ class DiTBlock(nn.Module):
 
     def __init__(
         self,
-        self_attention_layer: Type[nn.Module],
+        self_attention_layer: nn.Module,
         hidden_size: int,
         mlp_ratio: float = 4.0,
         use_swiglu: bool = True,
@@ -322,7 +322,7 @@ class DiPBlock(nn.Module):
 
     def __init__(
         self,
-        self_attention_layer: Type[nn.Module],
+        self_attention_layer: nn.Module,
         hidden_size: int,
         solid: str,
         mlp_ratio: float = 4.0,
@@ -437,7 +437,7 @@ class HomogenTrunk(nn.Module):
         Output tensor of shape (B, N, D).
     """
 
-    def __init__(self, block: Type[nn.Module], depth: int):
+    def __init__(self, block: nn.Module, depth: int):
         super().__init__()
         self.blocks = nn.ModuleList([block() for _ in range(depth)])
 

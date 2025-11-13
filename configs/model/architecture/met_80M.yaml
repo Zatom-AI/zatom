@@ -11,13 +11,13 @@ time_embedder:
 
 dataset_embedder:
   _target_: zatom.models.architectures.modules.layers.LabelEmbedder
-  num_classes: 2
+  num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
   _target_: zatom.models.architectures.modules.layers.LabelEmbedder
-  num_classes: 230
+  num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
@@ -29,7 +29,7 @@ token_pos_embedder:
 
 atom_pos_embedder:
   _target_: zatom.models.architectures.modules.pos_embed.FourierPositionEncoding
-  in_dim: 3
+  in_dim: ${globals.spatial_dim}
   include_input: True
   min_freq_log2: 0
   max_freq_log2: 12
@@ -115,7 +115,7 @@ atom_n_queries_enc: null # NOTE: if null, user-provided `mask` will be used inst
 atom_n_keys_enc: null # NOTE: if null, user-provided `mask` will be used instead
 atom_n_queries_dec: null # NOTE: if null, user-provided `mask` will be used instead
 atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
-max_num_elements: 100
+max_num_elements: ${globals.max_num_elements}
 batch_size_scale_factor: 2 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
 
 atom_types_loss_weight: 0.1

@@ -5,7 +5,7 @@ Adapted from:
 """
 
 import math
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -52,14 +52,14 @@ class MultimodalDiT(nn.Module):
 
     def __init__(
         self,
-        time_embedder: Type[nn.Module],
-        dataset_embedder: Type[nn.Module],
-        spacegroup_embedder: Type[nn.Module],
-        token_pos_embedder: Type[nn.Module],
-        atom_pos_embedder: Type[nn.Module],
-        trunk: Type[nn.Module],
-        atom_encoder_transformer: Type[nn.Module],
-        atom_decoder_transformer: Type[nn.Module],
+        time_embedder: nn.Module,
+        dataset_embedder: nn.Module,
+        spacegroup_embedder: nn.Module,
+        token_pos_embedder: nn.Module,
+        atom_pos_embedder: nn.Module,
+        trunk: nn.Module,
+        atom_encoder_transformer: nn.Module,
+        atom_decoder_transformer: nn.Module,
         hidden_size: int = 768,
         token_num_heads: int = 12,
         atom_num_heads: int = 4,
@@ -305,7 +305,7 @@ class MultimodalDiT(nn.Module):
                 dataset_idx: Dataset index for each sample.
                 spacegroup: Spacegroup index for each sample.
                 ref_pos: Reference atom positions tensor.
-                ref_space_uids: Reference space unique IDs tensor.
+                ref_space_uid: Reference space unique IDs tensor.
                 atom_to_token: One-hot mapping from atom indices to token indices.
                 atom_to_token_idx: Mapping from atom indices to token indices.
                 max_num_tokens: Maximum number of unmasked tokens for each batch element.
@@ -575,7 +575,7 @@ class MultimodalDiT(nn.Module):
                 dataset_idx: Dataset index for each sample.
                 spacegroup: Spacegroup index for each sample.
                 ref_pos: Reference atom positions tensor.
-                ref_space_uids: Reference space unique IDs tensor.
+                ref_space_uid: Reference space unique IDs tensor.
                 atom_to_token: One-hot mapping from atom indices to token indices.
                 atom_to_token_idx: Mapping from atom indices to token indices.
                 max_num_tokens: Maximum number of unmasked tokens for each batch element.

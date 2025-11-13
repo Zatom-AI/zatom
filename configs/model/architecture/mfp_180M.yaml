@@ -11,13 +11,13 @@ time_embedder:
 
 dataset_embedder:
   _target_: zatom.models.architectures.modules.layers.LabelEmbedder
-  num_classes: 2
+  num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
   _target_: zatom.models.architectures.modules.layers.LabelEmbedder
-  num_classes: 230
+  num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
@@ -32,7 +32,7 @@ atom_pos_embedder:
   embed_dim: ${model.architecture.hidden_size}
   solid_name: ${model.architecture.solid_name}
   freq_sigma: 0.5
-  spatial_dims: 3
+  spatial_dims: ${globals.spatial_dim}
   learned_freqs: True
 
 atom_encoder_transformer:
@@ -58,7 +58,7 @@ atom_encoder_transformer:
         _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.atom_hidden_size_enc}
         solid_name: ${model.architecture.solid_name}
-        spatial_dims: 3
+        spatial_dims: ${globals.spatial_dim}
         freq_sigma: 1.0
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
@@ -86,7 +86,7 @@ trunk:
         _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.hidden_size}
         solid_name: ${model.architecture.solid_name}
-        spatial_dims: 3
+        spatial_dims: ${globals.spatial_dim}
         freq_sigma: 1.0
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
@@ -114,7 +114,7 @@ atom_decoder_transformer:
         _partial_: True # NOTE: this is set to calculate `num_heads`/`head_dim` correctly during module initialization
         embed_dim: ${model.architecture.atom_hidden_size_dec}
         solid_name: ${model.architecture.solid_name}
-        spatial_dims: 3
+        spatial_dims: ${globals.spatial_dim}
         freq_sigma: 1.0
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
@@ -129,7 +129,7 @@ atom_n_queries_enc: null # NOTE: if null, user-provided `mask` will be used inst
 atom_n_keys_enc: null # NOTE: if null, user-provided `mask` will be used instead
 atom_n_queries_dec: null # NOTE: if null, user-provided `mask` will be used instead
 atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
-max_num_elements: 100
+max_num_elements: ${globals.max_num_elements}
 batch_size_scale_factor: 1 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
 
 atom_types_loss_weight: 0.1

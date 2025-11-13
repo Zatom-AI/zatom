@@ -11,6 +11,7 @@ from lightning import LightningModule
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.strategies import FSDPStrategy
 from omegaconf import DictConfig
+from tensordict import TensorDict
 from torch.nn import ModuleDict
 from torch_geometric.data import Batch
 from torch_geometric.utils import to_dense_batch
@@ -21,7 +22,6 @@ from zatom.data.components.preprocessing_utils import lattice_params_to_matrix_t
 from zatom.eval.crystal_generation import CrystalGenerationEvaluator
 from zatom.eval.mof_generation import MOFGenerationEvaluator
 from zatom.eval.molecule_generation import MoleculeGenerationEvaluator
-from zatom.flow.interpolants import MultimodalInterpolant
 from zatom.utils import pylogger
 from zatom.utils.training_utils import sample_uniform_rotation, scatter_mean_torch
 from zatom.utils.typing_utils import typecheck
@@ -87,7 +87,6 @@ class Zatom(LightningModule):
     def __init__(
         self,
         architecture: torch.nn.Module,
-        interpolant: MultimodalInterpolant,
         augmentations: DictConfig,
         sampling: DictConfig,
         conditioning: DictConfig,
@@ -115,9 +114,6 @@ class Zatom(LightningModule):
 
         # Model architecture
         self.model = architecture
-
-        # Interpolant for flow matching-based data corruption
-        self.interpolant = interpolant
 
         # Evaluator objects for computing metrics
         self.val_generation_evaluators = {
@@ -351,24 +347,35 @@ class Zatom(LightningModule):
                     mask = torch.isin(bins, spacegroups.to(bins.device))  # Keep matching bins
                     self.spacegroups_bincount[dataset_name][~mask] = 0
 
-        # Corrupt and densify batch using the interpolant
-        self.interpolant.device = self.device
-        max_num_nodes = max(
+        # Prepare batch metadata
+        self.max_num_nodes = max(
             len(self.num_nodes_bincount[dataset]) - 1
             for dataset in self.hparams.datasets
             if self.hparams.datasets[dataset].proportion > 0.0
         )
-
         if self.model.jvp_attn:
             # Find the smallest power of 2 >= max(max_num_nodes, 32)
-            min_num_nodes = max(max_num_nodes, 32)
+            min_num_nodes = max(self.max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()
-            max_num_nodes = int(closest_power_of_2)
+            self.max_num_nodes = int(closest_power_of_2)
 
-        self.interpolant.max_num_nodes = max_num_nodes
-        noisy_dense_batch = self.interpolant.corrupt_batch(batch)
+        # Densify batch
+        token_is_periodic, _ = to_dense_batch(
+            batch.node_is_periodic,
+            batch.batch,
+            max_num_nodes=self.max_num_nodes,
+        )
+        atom_types, mask = to_dense_batch(
+            batch.atom_types, batch.batch, max_num_nodes=self.max_num_nodes
+        )
+        pos, _ = to_dense_batch(batch.pos, batch.batch, max_num_nodes=self.max_num_nodes)
+        frac_coords, _ = to_dense_batch(
+            batch.frac_coords, batch.batch, max_num_nodes=self.max_num_nodes
+        )
+        lengths_scaled = batch.lengths_scaled.unsqueeze(-2)  # Handle as global feature
+        angles_radians = batch.angles_radians.unsqueeze(-2)  # Handle as global feature
 
-        # Prepare conditioning inputs to forward pass
+        # Prepare conditioning inputs
         use_cfg = self.model.class_dropout_prob > 0
         dataset_idx = batch.dataset_idx + int(
             use_cfg
@@ -379,88 +386,53 @@ class Zatom(LightningModule):
         if not self.hparams.conditioning.spacegroup:
             spacegroup = torch.zeros_like(batch.spacegroup)
 
-        # Prepare target tensors for loss calculation
-        dense_node_is_periodic, _ = to_dense_batch(
-            batch.node_is_periodic,
-            batch.batch,
-            max_num_nodes=self.interpolant.max_num_nodes,
-        )
-        dense_atom_types, mask = to_dense_batch(
-            batch.atom_types, batch.batch, max_num_nodes=self.interpolant.max_num_nodes
-        )
-        dense_pos, _ = to_dense_batch(
-            batch.pos, batch.batch, max_num_nodes=self.interpolant.max_num_nodes
-        )
-        dense_frac_coords, _ = to_dense_batch(
-            batch.frac_coords, batch.batch, max_num_nodes=self.interpolant.max_num_nodes
-        )
-        dense_lengths_scaled = batch.lengths_scaled.unsqueeze(
-            -2
-        )  # Handle these as global features
-        dense_angles_radians = batch.angles_radians.unsqueeze(-2)
-
-        dense_atom_types[~mask] = -100  # Mask out padding tokens during loss calculation
-
-        target_tensors = {
-            "atom_types": dense_atom_types,
-            "pos": dense_pos
-            / self.hparams.augmentations.scale,  # Supervise model predictions in units other than Angstroms
-            "frac_coords": dense_frac_coords,
-            "lengths_scaled": dense_lengths_scaled,
-            "angles_radians": dense_angles_radians,
-            # # auxiliary prediction tasks
-            # "global_property": torch.randn((batch.batch_size, 1), device=self.device),
-            # "global_energy": torch.randn((batch.batch_size, 1), device=self.device),
-            # "global_energy_per_atom": torch.randn((batch.batch_size, 1), device=self.device),
-            # "atomic_forces": torch.randn_like(dense_pos),
-        }
-
         # Build features for conditioning
-        num_atoms = num_tokens = noisy_dense_batch["pos"].shape[1]
-
+        # NOTE: Atoms and tokens are currently treated synonymously (i.e. one atom per token)
+        num_atoms = num_tokens = atom_types.shape[1]
         ref_pos = (
-            noisy_dense_batch.get("ref_pos", torch.zeros_like(noisy_dense_batch["pos"]))
-            * self.hparams.augmentations.ref_scale
+            torch.zeros_like(pos) * self.hparams.augmentations.ref_scale
         )  # Use scaled reference positions - (batch_size, num_atoms, 3)
-
-        atom_to_token_idx = noisy_dense_batch.get(
-            # NOTE: Atoms and tokens are currently treated synonymously (i.e. one atom per token)
-            "atom_to_token_idx",
-            torch.arange(num_atoms, device=self.device).expand(batch.batch_size, -1),
+        atom_to_token_idx = torch.arange(num_atoms, device=self.device).expand(
+            batch.batch_size, -1
         )  # (batch_size, num_atoms)
-
-        atom_to_token = noisy_dense_batch.get(
-            "atom_to_token",
-            F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(torch.float32),
+        atom_to_token = F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(
+            torch.float32
         )  # (batch_size, num_atoms, num_tokens)
 
+        # Prepare batch for forward pass
         max_num_tokens = mask.sum(dim=1)  # (batch_size,)
-
-        # Assemble features for conditioning
-        feats = {
-            "dataset_idx": dataset_idx,
-            "spacegroup": spacegroup,
-            "ref_pos": ref_pos,
-            "ref_space_uid": atom_to_token_idx,
-            "atom_to_token": atom_to_token,
-            "atom_to_token_idx": atom_to_token_idx,
-            "max_num_tokens": max_num_tokens,
-            "token_index": atom_to_token_idx,
-        }
-
-        # Run forward pass with loss calculation
-        loss_dict = self.model.forward(
-            atom_types=noisy_dense_batch["atom_types"],
-            pos=noisy_dense_batch["pos"],
-            frac_coords=noisy_dense_batch["frac_coords"],
-            lengths_scaled=noisy_dense_batch["lengths_scaled"],
-            angles_radians=noisy_dense_batch["angles_radians"],
-            feats=feats,
-            mask=noisy_dense_batch["token_mask"],
-            token_is_periodic=dense_node_is_periodic,
-            target_tensors=target_tensors,
-            stage=self.trainer.state.stage.value,  # 'train', 'sanity_check', 'validate', 'test', 'predict'
+        dense_batch = TensorDict(
+            {
+                # modalities to predict
+                "atom_types": F.one_hot(atom_types, num_classes=self.model.vocab_size),
+                "pos": pos,
+                "frac_coords": frac_coords,
+                "lengths_scaled": lengths_scaled,
+                "angles_radians": angles_radians,
+                # # auxiliary prediction tasks
+                # "global_property": torch.randn((batch.batch_size, 1), device=self.device),
+                # "global_energy": torch.randn((batch.batch_size, 1), device=self.device),
+                # "global_energy_per_atom": torch.randn((batch.batch_size, 1), device=self.device),
+                # "atomic_forces": torch.randn_like(pos),
+                # features for conditioning
+                "dataset_idx": dataset_idx,
+                "spacegroup": spacegroup,
+                "ref_pos": ref_pos,
+                "ref_space_uid": atom_to_token_idx,
+                "atom_to_token": atom_to_token,
+                "atom_to_token_idx": atom_to_token_idx,
+                "token_index": atom_to_token_idx,
+                "max_num_tokens": max_num_tokens,
+                # metadata
+                "padding_mask": ~mask,
+                "token_is_periodic": token_is_periodic,
+            },
+            batch_size=batch.batch_size,
+            device=self.device,
         )
+
+        # Run forward pass
+        loss_dict, _ = self.model.forward(dense_batch, compute_stats=False)
 
         return loss_dict
 
@@ -743,7 +715,7 @@ class Zatom(LightningModule):
                 desc="    Sampling",
             ):
                 # Perform sampling and decoding to crystal structures
-                out, batch, _ = self.sample_and_decode(
+                out, batch = self.sample_and_decode(
                     num_nodes_bincount=self.num_nodes_bincount[dataset],
                     spacegroups_bincount=self.spacegroups_bincount[dataset],
                     batch_size=self.hparams.sampling.batch_size,
@@ -756,7 +728,7 @@ class Zatom(LightningModule):
                 for idx_in_batch, num_atom in enumerate(batch["num_atoms"].tolist()):
                     _atom_types = out["atom_types"].narrow(0, start_idx, num_atom)
                     _atom_types[_atom_types == 0] = 1  # Atom type 0 -> 1 (H) to prevent crash
-                    _atom_types[_atom_types == self.interpolant.mask_token_index] = (
+                    _atom_types[_atom_types == self.hparams.sampling.mask_token_index] = (
                         1  # Mask atom type -> 1 (H) to prevent crash
                     )
                     _pos = (
@@ -866,7 +838,7 @@ class Zatom(LightningModule):
         cfg_scale: float = 2.0,
         dataset_idx: int = 0,
         steps: int = 100,
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """Sample and decode a batch of crystal structures.
 
         Args:
@@ -877,7 +849,7 @@ class Zatom(LightningModule):
             steps: The number of ODE steps to use for sampling. Only applicable if using flow matching-based sampling.
 
         Returns:
-            A tuple containing the sampled crystal structure modalities, the original batch, and the generated sample modalities for the final sampling step.
+            A tuple containing the sampled modalities and the original batch.
         """
         sample_is_periodic = torch.isin(dataset_idx, self.periodic_datasets)
 
@@ -911,113 +883,86 @@ class Zatom(LightningModule):
             ).to(self.device)
 
         # Create token mask for visualization
-        max_num_tokens = self.interpolant.max_num_nodes
         token_mask = torch.zeros(
             batch_size,
-            max_num_tokens,
+            self.max_num_nodes,
             dtype=torch.bool,
             device=self.device,
         )
         for idx, length in enumerate(sample_lengths):
             token_mask[idx, :length] = True
 
-        # Craft random samples using interpolant
+        # Craft initial modalities
         atom_types = torch.zeros(
-            (batch_size, max_num_tokens), dtype=torch.long, device=self.device
+            (batch_size, self.max_num_nodes), dtype=torch.long, device=self.device
         )
-        pos = torch.zeros((batch_size, max_num_tokens, 3), dtype=torch.float32, device=self.device)
+        pos = torch.zeros(
+            (batch_size, self.max_num_nodes, 3), dtype=torch.float32, device=self.device
+        )
         frac_coords = torch.zeros(
-            (batch_size, max_num_tokens, 3), dtype=torch.float32, device=self.device
+            (batch_size, self.max_num_nodes, 3), dtype=torch.float32, device=self.device
         )
         lengths_scaled = torch.zeros((batch_size, 1, 3), dtype=torch.float32, device=self.device)
         angles_radians = torch.zeros((batch_size, 1, 3), dtype=torch.float32, device=self.device)
-        token_long_mask = token_mask.long()
-        token_full_mask = torch.ones((batch_size, 1), dtype=torch.bool, device=self.device)
-
-        self.interpolant.device = self.device
-        t = self.interpolant._sample_t(batch_size)[:, None]
-
-        noisy_dense_batch = Batch(
-            atom_types=self.interpolant._corrupt_disc_x(
-                atom_types, t, token_long_mask, token_long_mask
-            ),
-            pos=self.interpolant._corrupt_cont_x(
-                pos, t, token_long_mask, token_long_mask, feat="pos"
-            ),
-            frac_coords=self.interpolant._corrupt_cont_x(
-                frac_coords, t, token_long_mask, token_long_mask, feat="frac_coords"
-            ),
-            lengths_scaled=self.interpolant._corrupt_cont_x(
-                lengths_scaled,
-                t,
-                token_full_mask,
-                token_full_mask,
-                feat="lengths_scaled",
-            ),
-            angles_radians=self.interpolant._corrupt_cont_x(
-                angles_radians,
-                t,
-                token_full_mask,
-                token_full_mask,
-                feat="angles_radians",
-            ),
-        )
 
         # Build features for conditioning
-        num_atoms = num_tokens = noisy_dense_batch["pos"].shape[1]
+        # NOTE: Atoms and tokens are currently treated synonymously (i.e. one atom per token)
+        num_atoms = num_tokens = pos.shape[1]
 
         ref_pos = (
-            noisy_dense_batch.get("ref_pos", noisy_dense_batch["pos"])
-            * self.hparams.augmentations.ref_scale
+            torch.zeros_like(pos) * self.hparams.augmentations.ref_scale
         )  # Use scaled reference positions - (batch_size, num_atoms, 3)
-
-        atom_to_token_idx = noisy_dense_batch.get(
-            # NOTE: Atoms and tokens are currently treated synonymously (i.e. one atom per token)
-            "atom_to_token_idx",
-            torch.arange(num_atoms, device=self.device).expand(batch_size, -1),
+        atom_to_token_idx = torch.arange(num_atoms, device=self.device).expand(
+            batch_size, -1
         )  # (batch_size, num_atoms)
-
-        atom_to_token = noisy_dense_batch.get(
-            "atom_to_token",
-            F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(torch.float32),
+        atom_to_token = F.one_hot(atom_to_token_idx, num_classes=num_tokens).to(
+            torch.float32
         )  # (batch_size, num_atoms, num_tokens)
 
+        token_is_periodic = torch.zeros_like(token_mask)
+        token_is_periodic[sample_is_periodic] = True
+
+        # Prepare batch for sampling
         max_num_tokens = token_mask.sum(dim=1)  # (batch_size,)
+        dense_batch = TensorDict(
+            {
+                # modalities to predict
+                "atom_types": F.one_hot(atom_types, num_classes=self.model.vocab_size),
+                "pos": pos,
+                "frac_coords": frac_coords,
+                "lengths_scaled": lengths_scaled,
+                "angles_radians": angles_radians,
+                # features for conditioning
+                "dataset_idx": dataset_idx,
+                "spacegroup": spacegroup,
+                "ref_pos": ref_pos,
+                "ref_space_uid": atom_to_token_idx,
+                "atom_to_token": atom_to_token,
+                "atom_to_token_idx": atom_to_token_idx,
+                "token_index": atom_to_token_idx,
+                "max_num_tokens": max_num_tokens,
+                # metadata
+                "padding_mask": ~token_mask,
+                "token_is_periodic": token_is_periodic * token_mask,
+            },
+            batch_size=batch_size,
+            device=self.device,
+        )
 
-        # Assemble features for conditioning
-        feats = {
-            "dataset_idx": dataset_idx,
-            "spacegroup": spacegroup,
-            "ref_pos": ref_pos,
-            "ref_space_uid": atom_to_token_idx,
-            "atom_to_token": atom_to_token,
-            "atom_to_token_idx": atom_to_token_idx,
-            "max_num_tokens": max_num_tokens,
-            "token_index": atom_to_token_idx,
-        }
-
-        # Use forward pass of model to predict sample modalities
-        denoised_modals_list, _ = self.model.sample(
-            atom_types=noisy_dense_batch["atom_types"],
-            pos=noisy_dense_batch["pos"],
-            frac_coords=noisy_dense_batch["frac_coords"],
-            lengths_scaled=noisy_dense_batch["lengths_scaled"],
-            angles_radians=noisy_dense_batch["angles_radians"],
-            feats=feats,
-            mask=token_mask,
+        # Sample modalities
+        sampled_x_1, _ = self.model.sample(
+            dense_batch,
             steps=steps,
             cfg_scale=cfg_scale,
-            # NOTE: For non-periodic samples only, we may center positions at origin after each denoising step
-            enable_zero_centering=not sample_is_periodic.any().item(),
         )
 
         # Collect final sample modalities and remove padding (to convert to PyG format)
         out = {
-            "atom_types": denoised_modals_list[-1]["atom_types"][token_mask.reshape(-1)],
-            "pos": denoised_modals_list[-1]["pos"][token_mask],
-            "frac_coords": denoised_modals_list[-1]["frac_coords"][token_mask],
-            "lengths_scaled": denoised_modals_list[-1]["lengths_scaled"].squeeze(-2),
-            "angles_radians": denoised_modals_list[-1]["angles_radians"].squeeze(-2),
+            "atom_types": sampled_x_1["atom_types"].argmax(-1)[token_mask],
+            "pos": sampled_x_1["pos"][token_mask],
+            "frac_coords": sampled_x_1["frac_coords"][token_mask],
+            "lengths_scaled": sampled_x_1["lengths_scaled"].squeeze(-2),
+            "angles_radians": sampled_x_1["angles_radians"].squeeze(-2),
         }
 
         batch = {
@@ -1027,7 +972,7 @@ class Zatom(LightningModule):
             # ),
             # "token_idx": (torch.cumsum(token_mask, dim=-1, dtype=torch.int64) - 1)[token_mask],
         }
-        return out, batch, denoised_modals_list[-1]
+        return out, batch
 
     #####################################################################################################
 

@@ -6,7 +6,7 @@ Adapted from:
 """
 
 import math
-from typing import Dict, List, Literal, Tuple, Type
+from typing import Dict, List, Literal, Tuple
 
 import torch
 from platonic_transformers.models.platoformer.groups import PLATONIC_GROUPS
@@ -64,14 +64,14 @@ class MultimodalDiP(nn.Module):
 
     def __init__(
         self,
-        time_embedder: Type[nn.Module],
-        dataset_embedder: Type[nn.Module],
-        spacegroup_embedder: Type[nn.Module],
-        token_pos_embedder: Type[nn.Module],
-        atom_pos_embedder: Type[nn.Module],
-        trunk: Type[nn.Module],
-        atom_encoder_transformer: Type[nn.Module],
-        atom_decoder_transformer: Type[nn.Module],
+        time_embedder: nn.Module,
+        dataset_embedder: nn.Module,
+        spacegroup_embedder: nn.Module,
+        token_pos_embedder: nn.Module,
+        atom_pos_embedder: nn.Module,
+        trunk: nn.Module,
+        atom_encoder_transformer: nn.Module,
+        atom_decoder_transformer: nn.Module,
         hidden_size: int = 768,
         token_num_heads: int = 12,
         atom_num_heads: int = 4,
