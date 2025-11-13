@@ -136,6 +136,7 @@ continuous_x_1_prediction: true
 logit_normal_time: true
 unified_modal_time: true
 remove_t_conditioning: false
+condition_on_input: false
 enable_eqm_mode: false
 enable_mean_flows: false
 add_mask_atom_type: true

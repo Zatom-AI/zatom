@@ -84,6 +84,7 @@ bash -c "
     date=$RUN_DATE \
     model=$MODEL \
     model/architecture=$ARCHITECTURE \
+    model.architecture.condition_on_input=true \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
