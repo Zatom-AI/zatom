@@ -67,6 +67,7 @@ class MFT(nn.Module):
         max_num_elements: Maximum number of elements in the dataset.
         batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 180M) model variant.
         use_length_condition: Whether to use the length condition.
+        condition_on_input: Whether to condition the model on the input as well as context.
         jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
         interdist_loss: Type of interatomic distance loss to use. If None, no interatomic distance loss is used.
         time_distribution: Distribution to sample time points from. Must be one of (`uniform`, `beta`, `histogram`).
@@ -101,6 +102,7 @@ class MFT(nn.Module):
         max_num_elements: int = 100,
         batch_size_scale_factor: int = 1,
         use_length_condition: bool = True,
+        condition_on_input: bool = False,
         jvp_attn: bool = False,
         interdist_loss: InterDistancesLoss | None = None,
         time_distribution: Literal["uniform", "beta", "histogram"] = "beta",
@@ -165,6 +167,7 @@ class MFT(nn.Module):
             add_mask_atom_type=False,
             treat_discrete_modalities_as_continuous=self.treat_discrete_modalities_as_continuous,
             remove_t_conditioning=False,
+            condition_on_input=condition_on_input,
             jvp_attn=jvp_attn,
             **kwargs,
         )

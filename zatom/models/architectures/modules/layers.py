@@ -649,15 +649,26 @@ class FinalLayer(nn.Module):
         hidden_size: The input dimension.
         out_channels: The output dimension.
         c_dim: The dimension of the conditioning vector.
+        condition_on_input: Whether to condition on the input as well as the provided context.
     """
 
-    def __init__(self, hidden_size: int, out_channels: int, c_dim: int | None = None):
+    def __init__(
+        self,
+        hidden_size: int,
+        out_channels: int,
+        c_dim: int | None = None,
+        condition_on_input: bool = False,
+    ):
         super().__init__()
         self.norm_final = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.linear = nn.Linear(hidden_size, out_channels, bias=True)
         self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(), nn.Linear(c_dim, 2 * hidden_size, bias=True)
+            nn.SiLU(),
+            nn.Linear(
+                hidden_size + c_dim if condition_on_input else c_dim, 2 * hidden_size, bias=True
+            ),
         )
+        self.condition_on_input = condition_on_input
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -690,8 +701,17 @@ class FinalLayer(nn.Module):
         Returns:
             Output tensor of shape (B, N, out_channels).
         """
-        shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
-        x = modulate(self.norm_final(x), shift, scale)
+        adaLN_input = (
+            torch.cat((x, c.unsqueeze(-2).repeat(1, x.shape[1], 1)), dim=-1)
+            if self.condition_on_input
+            else c
+        )
+        shift, scale = self.adaLN_modulation(adaLN_input).chunk(2, dim=-1)
+        x = (
+            self.norm_final(x) * (1 + scale) + shift
+            if self.condition_on_input
+            else modulate(self.norm_final(x), shift, scale)
+        )
         x = self.linear(x)
         return x
 
@@ -704,9 +724,17 @@ class PlatonicFinalLayer(nn.Module):
         out_channels: The output dimension.
         solid: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
         c_dim: The dimension of the conditioning vector.
+        condition_on_input: Whether to condition on the input as well as the provided context.
     """
 
-    def __init__(self, hidden_size: int, out_channels: int, solid: str, c_dim: int | None = None):
+    def __init__(
+        self,
+        hidden_size: int,
+        out_channels: int,
+        solid: str,
+        c_dim: int | None = None,
+        condition_on_input: bool = False,
+    ):
         super().__init__()
 
         if solid.lower() not in PLATONIC_GROUPS:
@@ -722,8 +750,15 @@ class PlatonicFinalLayer(nn.Module):
         )
         self.linear = PlatonicLinear(hidden_size, out_channels, solid=solid, bias=True)
         self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(), PlatonicLinear(c_dim, 2 * hidden_size, solid=solid, bias=True)
+            nn.SiLU(),
+            PlatonicLinear(
+                hidden_size + c_dim if condition_on_input else c_dim,
+                2 * hidden_size,
+                solid=solid,
+                bias=True,
+            ),
         )
+        self.condition_on_input = condition_on_input
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -778,7 +813,16 @@ class PlatonicFinalLayer(nn.Module):
         Returns:
             Output tensor of shape (B, N, out_channels).
         """
-        shift, scale = self.adaLN_modulation(c).chunk(2, dim=1)
-        x = modulate(self.group_normalize(x, self.norm_final), shift, scale)
+        adaLN_input = (
+            torch.cat((x, c.unsqueeze(-2).repeat(1, x.shape[1], 1)), dim=-1)
+            if self.condition_on_input
+            else c
+        )
+        shift, scale = self.adaLN_modulation(adaLN_input).chunk(2, dim=-1)
+        x = (
+            self.group_normalize(x, self.norm_final) * (1 + scale) + shift
+            if self.condition_on_input
+            else modulate(self.group_normalize(x, self.norm_final), shift, scale)
+        )
         x = self.linear(x)
         return x

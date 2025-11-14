@@ -207,6 +207,7 @@ atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
 max_num_elements: ${globals.max_num_elements}
 batch_size_scale_factor: 2 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
 use_length_condition: true
+condition_on_input: false
 jvp_attn: false
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # note: must be one of (`uniform`, `beta`, `histogram`)

@@ -58,6 +58,7 @@ class MultimodalDiP(nn.Module):
         add_mask_atom_type: Whether to add a special mask atom type.
         treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         remove_t_conditioning: Whether to remove time conditioning.
+        condition_on_input: Whether to condition the final layer on the input as well.
         jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
         solid_name: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
     """
@@ -86,6 +87,7 @@ class MultimodalDiP(nn.Module):
         add_mask_atom_type: bool = True,
         treat_discrete_modalities_as_continuous: bool = False,
         remove_t_conditioning: bool = False,
+        condition_on_input: bool = False,
         jvp_attn: bool = False,
         solid_name: PLATONIC_GROUP_NAMES = "octahedron",
     ):
@@ -196,6 +198,7 @@ class MultimodalDiP(nn.Module):
             hidden_size,
             solid=solid_name,
             c_dim=hidden_size * self.num_G,
+            condition_on_input=condition_on_input,
         )
 
         self.atom_types_head = PlatonicLinear(

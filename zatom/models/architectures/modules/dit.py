@@ -46,6 +46,7 @@ class MultimodalDiT(nn.Module):
         add_mask_atom_type: Whether to add a special mask atom type.
         treat_discrete_modalities_as_continuous: Whether to treat discrete modalities as continuous (one-hot) vectors for flow matching.
         remove_t_conditioning: Whether to remove time conditioning.
+        condition_on_input: Whether to condition the final layer on the input as well.
         jvp_attn: Whether to use JVP Flash Attention instead of PyTorch's Scaled Dot Product Attention.
         kwargs: Additional keyword arguments (unused).
     """
@@ -74,6 +75,7 @@ class MultimodalDiT(nn.Module):
         add_mask_atom_type: bool = True,
         treat_discrete_modalities_as_continuous: bool = False,
         remove_t_conditioning: bool = False,
+        condition_on_input: bool = False,
         jvp_attn: bool = False,
         **kwargs: Any,
     ):
@@ -170,7 +172,12 @@ class MultimodalDiT(nn.Module):
             nn.Linear(hidden_size, self.atom_hidden_size_dec),
         )
 
-        self.final_layer = FinalLayer(self.atom_hidden_size_dec, hidden_size, c_dim=hidden_size)
+        self.final_layer = FinalLayer(
+            self.atom_hidden_size_dec,
+            hidden_size,
+            c_dim=hidden_size,
+            condition_on_input=condition_on_input,
+        )
 
         self.atom_types_head = nn.Linear(hidden_size, vocab_size, bias=True)
         self.pos_head = nn.Linear(hidden_size, 3, bias=False)

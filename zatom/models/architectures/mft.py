@@ -91,6 +91,7 @@ class MFT(nn.Module):
         logit_normal_time: Whether to sample time points from a logit-normal distribution.
         unified_modal_time: Whether to use a single (i.e., the same) time input for all modalities.
         remove_t_conditioning: Whether to remove timestep conditioning for each modality.
+        condition_on_input: Whether to condition the model on the input as well as context.
         enable_eqm_mode: Whether to enable Equilibrium Matching (EqM) mode.
         enable_mean_flows: Whether to enable mean flows for each (continuous) modality.
         add_mask_atom_type: Whether to add a mask token for atom types.
@@ -141,6 +142,7 @@ class MFT(nn.Module):
         logit_normal_time: bool = True,
         unified_modal_time: bool = True,
         remove_t_conditioning: bool = False,
+        condition_on_input: bool = False,
         enable_eqm_mode: bool = False,
         enable_mean_flows: bool = False,
         add_mask_atom_type: bool = True,
@@ -220,6 +222,7 @@ class MFT(nn.Module):
             atom_n_keys_dec=atom_n_keys_dec,
             max_num_elements=max_num_elements,
             use_length_condition=use_length_condition,
+            condition_on_input=condition_on_input,
             add_mask_atom_type=add_mask_atom_type,
             treat_discrete_modalities_as_continuous=treat_discrete_modalities_as_continuous,
             remove_t_conditioning=remove_t_conditioning,
