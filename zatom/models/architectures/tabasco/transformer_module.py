@@ -274,6 +274,7 @@ class TransformerModule(nn.Module):
             feats: Features for conditioning including:
                 dataset_idx: Dataset index for each sample.
                 spacegroup: Spacegroup index for each sample.
+                token_is_periodic: Whether each token corresponds to a periodic sample (B, M).
             padding_mask: True if padding token, False otherwise (B, M).
             kwargs: Any additional keyword arguments.
 
@@ -289,6 +290,16 @@ class TransformerModule(nn.Module):
 
         dataset_idx = feats["dataset_idx"]
         spacegroup = feats["spacegroup"]
+
+        token_is_periodic = feats["token_is_periodic"].unsqueeze(-1)
+        sample_is_periodic = token_is_periodic.any(-2, keepdim=True)
+
+        # Ensure atom positions are masked out for periodic samples and the
+        # remaining continuous modalities are masked out for non-periodic samples
+        pos = pos * ~token_is_periodic
+        frac_coords = frac_coords * token_is_periodic
+        lengths_scaled = lengths_scaled * sample_is_periodic
+        angles_radians = angles_radians * sample_is_periodic
 
         real_mask = 1 - padding_mask.int()
 
@@ -425,10 +436,10 @@ class TransformerModule(nn.Module):
         global_mask = real_mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
         pred_modals = (
             out_atom_types * real_mask.unsqueeze(-1),  # (B, M, V=self.vocab_size)
-            out_pos * real_mask.unsqueeze(-1),  # (B, M, 3)
-            frac_coords * real_mask.unsqueeze(-1),  # (B, M, 3)
-            lengths_scaled * global_mask,  # (B, 1, 3)
-            angles_radians * global_mask,  # (B, 1, 3)
+            out_pos * real_mask.unsqueeze(-1) * ~token_is_periodic,  # (B, M, 3)
+            frac_coords * real_mask.unsqueeze(-1) * token_is_periodic,  # (B, M, 3)
+            lengths_scaled * global_mask * sample_is_periodic,  # (B, 1, 3)
+            angles_radians * global_mask * sample_is_periodic,  # (B, 1, 3)
         )
         pred_aux_outputs = (
             self.global_property_head(h_out.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
@@ -501,6 +512,7 @@ class TransformerModule(nn.Module):
             feats: Features for conditioning including:
                 dataset_idx: Dataset index for each sample.
                 spacegroup: Spacegroup index for each sample.
+                token_is_periodic: Whether each token corresponds to a periodic sample (B, M).
             padding_mask: True if padding token, False otherwise (B, M).
             cfg_scale: Classifier-free guidance scale.
             kwargs: Any additional keyword arguments.
