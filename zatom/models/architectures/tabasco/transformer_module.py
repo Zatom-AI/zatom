@@ -81,8 +81,8 @@ class TransformerModule(nn.Module):
         self.atom_type_embed = nn.Embedding(atom_dim, hidden_dim)
         self.pos_embed = nn.Linear(spatial_dim, hidden_dim, bias=False)
         self.frac_coords_embed = nn.Linear(spatial_dim, hidden_dim, bias=False)
-        self.lengths_scaled_embed = nn.Linear(spatial_dim, hidden_dim)
-        self.angles_radians_embed = nn.Linear(spatial_dim, hidden_dim)
+        self.lengths_scaled_embed = nn.Linear(spatial_dim, hidden_dim, bias=False)
+        self.angles_radians_embed = nn.Linear(spatial_dim, hidden_dim, bias=False)
 
         if self.add_sinusoid_posenc:
             self.positional_encoding = SinusoidEncoding(posenc_dim=hidden_dim, max_len=90)
@@ -135,11 +135,11 @@ class TransformerModule(nn.Module):
         )
         self.out_lengths_scaled = nn.Sequential(
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, spatial_dim),
+            nn.Linear(hidden_dim, spatial_dim, bias=False),
         )
         self.out_angles_radians = nn.Sequential(
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, spatial_dim),
+            nn.Linear(hidden_dim, spatial_dim, bias=False),
         )
 
         # Add cross attention layers

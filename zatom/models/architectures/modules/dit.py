@@ -119,16 +119,8 @@ class MultimodalDiT(nn.Module):
             if treat_discrete_modalities_as_continuous
             else nn.Embedding(vocab_size, hidden_size)
         )
-        self.lengths_scaled_embedder = nn.Sequential(
-            nn.Linear(3, hidden_size, bias=False),
-            nn.LayerNorm(hidden_size),
-            nn.SiLU(),
-        )
-        self.angles_radians_embedder = nn.Sequential(
-            nn.Linear(3, hidden_size, bias=False),
-            nn.LayerNorm(hidden_size),
-            nn.SiLU(),
-        )
+        self.lengths_scaled_embedder = nn.Linear(3, hidden_size, bias=False)
+        self.angles_radians_embedder = nn.Linear(3, hidden_size, bias=False)
 
         atom_feat_dim = atom_pos_embed_channels + token_pos_embed_channels + hidden_size * 3 + 1
         self.atom_feat_proj = nn.Sequential(
@@ -182,8 +174,8 @@ class MultimodalDiT(nn.Module):
         self.atom_types_head = nn.Linear(hidden_size, vocab_size, bias=True)
         self.pos_head = nn.Linear(hidden_size, 3, bias=False)
         self.frac_coords_head = nn.Linear(hidden_size, 3, bias=False)
-        self.lengths_scaled_head = nn.Linear(hidden_size, 3, bias=True)
-        self.angles_radians_head = nn.Linear(hidden_size, 3, bias=True)
+        self.lengths_scaled_head = nn.Linear(hidden_size, 3, bias=False)
+        self.angles_radians_head = nn.Linear(hidden_size, 3, bias=False)
 
         self.global_property_head = nn.Linear(hidden_size, 1, bias=True)
         self.global_energy_head = nn.Linear(hidden_size, 1, bias=True)

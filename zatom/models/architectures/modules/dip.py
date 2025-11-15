@@ -138,16 +138,8 @@ class MultimodalDiP(nn.Module):
             if treat_discrete_modalities_as_continuous
             else nn.Embedding(self.vocab_size, hidden_size)
         )
-        self.lengths_scaled_embedder = nn.Sequential(
-            nn.Linear(3, hidden_size, bias=False),
-            nn.LayerNorm(hidden_size),
-            nn.SiLU(),
-        )
-        self.angles_radians_embedder = nn.Sequential(
-            nn.Linear(3, hidden_size, bias=False),
-            nn.LayerNorm(hidden_size),
-            nn.SiLU(),
-        )
+        self.lengths_scaled_embedder = nn.Linear(3, hidden_size, bias=False)
+        self.angles_radians_embedder = nn.Linear(3, hidden_size, bias=False)
 
         atom_feat_dim = token_pos_embed_channels + hidden_size * 3 + 1
         self.atom_feat_proj = nn.Sequential(
@@ -209,10 +201,10 @@ class MultimodalDiP(nn.Module):
             hidden_size, 3 * self.num_G, solid=solid_name, bias=False
         )
         self.lengths_scaled_head = PlatonicLinear(
-            hidden_size, 3 * self.num_G, solid=solid_name, bias=True
+            hidden_size, 3 * self.num_G, solid=solid_name, bias=False
         )
         self.angles_radians_head = PlatonicLinear(
-            hidden_size, 3 * self.num_G, solid=solid_name, bias=True
+            hidden_size, 3 * self.num_G, solid=solid_name, bias=False
         )
 
         self.global_property_head = PlatonicLinear(
