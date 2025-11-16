@@ -5,8 +5,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from zatom.models.architectures.tabasco.attention import AttentionBlock
-from zatom.models.architectures.tabasco.transition import Transition
+from zatom.models.architectures.transformer.attention import AttentionBlock
+from zatom.models.architectures.transformer.transition import Transition
 from zatom.utils.typing_utils import typecheck
 
 

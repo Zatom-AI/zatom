@@ -1,4 +1,4 @@
-"""Tabasco flow transformer (TFT).
+"""Trunk-based flow transformer (TFT).
 
 Adapted from:
     - https://github.com/apple/ml-simplefold
@@ -17,7 +17,7 @@ from torch.nn.attention import SDPBackend
 
 from zatom.flow.interpolants import Interpolant
 from zatom.flow.path import FlowPath
-from zatom.models.architectures.tabasco.losses import InterDistancesLoss
+from zatom.models.architectures.transformer.losses import InterDistancesLoss
 from zatom.utils import pylogger
 from zatom.utils.sampling_utils import get_sample_schedule
 from zatom.utils.training_utils import (
@@ -29,12 +29,12 @@ from zatom.utils.typing_utils import typecheck
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 #################################################################################
-#                           Tabasco Flow Transformer                            #
+#                           Trunk-Based Flow Transformer                        #
 #################################################################################
 
 
 class TFT(nn.Module):
-    """Tabasco-based flow model with a trunk-decoder architecture.
+    """Flow transformer with a trunk-based architecture (TFT).
 
     Typical usage:
     - `forward`:    Called during training to compute loss and optional stats.

@@ -2,33 +2,33 @@ _target_: zatom.models.architectures.mft.MFT
 
 # Modules
 multimodal_model:
-  _target_: zatom.models.architectures.modules.dit.MultimodalDiT
+  _target_: zatom.models.architectures.dit.dit.MultimodalDiT
   _partial_: True
 
 time_embedder:
-  _target_: zatom.models.architectures.modules.layers.TimestepEmbedder
+  _target_: zatom.models.architectures.dit.layers.TimestepEmbedder
   hidden_size: ${model.architecture.hidden_size}
 
 dataset_embedder:
-  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
   num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
-  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
   num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 token_pos_embedder:
-  _target_: zatom.models.architectures.modules.pos_embed.AbsolutePositionEncoding
+  _target_: zatom.models.architectures.dit.pos_embed.AbsolutePositionEncoding
   in_dim: 1
   embed_dim: ${model.architecture.hidden_size}
   include_input: True
 
 atom_pos_embedder:
-  _target_: zatom.models.architectures.modules.pos_embed.FourierPositionEncoding
+  _target_: zatom.models.architectures.dit.pos_embed.FourierPositionEncoding
   in_dim: ${globals.spatial_dim}
   include_input: True
   min_freq_log2: 0
@@ -37,69 +37,69 @@ atom_pos_embedder:
   log_sampling: True
 
 atom_encoder_transformer:
-  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 2
   block:
-    _target_: zatom.models.architectures.modules.blocks.DiTBlock
+    _target_: zatom.models.architectures.dit.blocks.DiTBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.atom_hidden_size_enc}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer
+      _target_: zatom.models.architectures.dit.layers.EfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_enc}
       num_heads: ${model.architecture.atom_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
       pos_embedder:
-        _target_: zatom.models.architectures.modules.pos_embed.AxialRotaryPositionEncoding
+        _target_: zatom.models.architectures.dit.pos_embed.AxialRotaryPositionEncoding
         in_dim: 4
         embed_dim: ${model.architecture.atom_hidden_size_enc}
         num_heads: ${model.architecture.atom_num_heads}
         base: 100.0
 
 trunk:
-  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 24
   block:
-    _target_: zatom.models.architectures.modules.blocks.DiTBlock
+    _target_: zatom.models.architectures.dit.blocks.DiTBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.hidden_size}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer
+      _target_: zatom.models.architectures.dit.layers.EfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.hidden_size}
       num_heads: ${model.architecture.token_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
       pos_embedder:
-        _target_: zatom.models.architectures.modules.pos_embed.AxialRotaryPositionEncoding
+        _target_: zatom.models.architectures.dit.pos_embed.AxialRotaryPositionEncoding
         in_dim: 1
         embed_dim: ${model.architecture.hidden_size}
         num_heads: ${model.architecture.token_num_heads}
         base: 100.0
 
 atom_decoder_transformer:
-  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 2
   block:
-    _target_: zatom.models.architectures.modules.blocks.DiTBlock
+    _target_: zatom.models.architectures.dit.blocks.DiTBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.atom_hidden_size_dec}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.EfficientSelfAttentionLayer
+      _target_: zatom.models.architectures.dit.layers.EfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_dec}
       num_heads: ${model.architecture.atom_num_heads}
       qk_norm: True
       jvp_attn: ${model.architecture.jvp_attn}
       pos_embedder:
-        _target_: zatom.models.architectures.modules.pos_embed.AxialRotaryPositionEncoding
+        _target_: zatom.models.architectures.dit.pos_embed.AxialRotaryPositionEncoding
         in_dim: 4
         embed_dim: ${model.architecture.atom_hidden_size_dec}
         num_heads: ${model.architecture.atom_num_heads}

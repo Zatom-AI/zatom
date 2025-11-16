@@ -9,7 +9,7 @@
 #        --gpus-per-node=2 \
 #        --ntasks-per-node=2 \
 #        --time=04:00:00 \
-#        --job-name=mft-80M-mp20
+#        --job-name=tft-5M-mp20
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -30,9 +30,9 @@ mkdir -p "$HF_HOME"
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
 DEFAULT_RUN_ID="a2izcs75"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
 DEFAULT_RUN_DATE="2025-11-15_16-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
-DEFAULT_MODEL="zatom2"                    # NOTE: Set the model to be used, must be one of (`zatom`, `zatom2`)
-DEFAULT_EXPERIMENT="train_tabasco"        # NOTE: Set the experiment name to be used, must be one of (`train`, `train_tabasco`, `eval`, `overfit`, `overfit_tabasco`)
-DEFAULT_ARCHITECTURE="tft_5M"             # NOTE: Set the model architecture to be used, must be one of (`{mft,mft2,met,mfp}_80M`, `{mft,met,mfp}_180M`, `{mft,met,mfp}_500M`)
+DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
+DEFAULT_EXPERIMENT="train"                # NOTE: Set the experiment name to be used, must be one of (`train`, `eval`, `overfit`)
+DEFAULT_ARCHITECTURE="tft_5M"             # NOTE: Set the model architecture to be used, must be one of (`{tft,}_5M`, `{tft,}_20M`, `{tft,}_70M`, `{mft,}_80M`, `{mft,}_180M`, `{mft,}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided

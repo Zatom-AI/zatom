@@ -6,12 +6,12 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from zatom.models.architectures.tabasco.common import SwiGLU
-from zatom.models.architectures.tabasco.positional_encoder import (
+from zatom.models.architectures.transformer.common import SwiGLU
+from zatom.models.architectures.transformer.positional_encoder import (
     SinusoidEncoding,
     TimeFourierEncoding,
 )
-from zatom.models.architectures.tabasco.transformer import Transformer
+from zatom.models.architectures.transformer.transformer import Transformer
 from zatom.utils.pylogger import RankedLogger
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 

@@ -469,40 +469,6 @@ def weighted_rigid_align(
 
 
 @typecheck
-def roto_translate(
-    p: torch.Tensor,
-    rot_mat: torch.Tensor,
-    trans_vec: torch.Tensor,
-    inverse: bool = False,
-    validate: bool = False,
-) -> torch.Tensor:
-    """Apply roto-translation to a set of 3D points. p' = R @ p + t (First rotate, then translate.)
-
-    Args:
-        p: A tensor of shape (N, 3) representing the set of points.
-        rot_mat: A tensor of shape (3, 3) representing the rotation matrix.
-        trans_vec: A tensor of shape (3,) representing the translation vector.
-        validate: Whether to validate the input.
-
-    Returns:
-        A tensor of shape (N, 3) representing the set of points after roto-translation.
-    """
-    if validate:
-        device = p.device
-        _, num_coords = p.shape
-        assert rot_mat.shape == (num_coords, num_coords)
-        assert trans_vec.shape == (num_coords,)
-        assert torch.allclose(
-            rot_mat @ rot_mat.T, torch.eye(num_coords, device=device), atol=1e-3, rtol=1e-3
-        )
-
-    if inverse:
-        return (p - trans_vec) @ rot_mat
-
-    return p @ rot_mat.T + trans_vec
-
-
-@typecheck
 def sample_uniform_rotation(
     shape: torch.Size, dtype: torch.dtype, device: torch.device
 ) -> torch.Tensor:
@@ -547,67 +513,6 @@ def scatter_mean_torch(src: torch.Tensor, index: torch.Tensor, dim: int = 0) -> 
         expanded_index = index.unsqueeze(-1).expand_as(src)
     out.scatter_reduce_(dim, expanded_index, src, reduce="mean")
     return out
-
-
-@typecheck
-def masked_mean(
-    x: torch.Tensor,
-    mask: torch.Tensor,
-    dim: int,
-    keepdim: bool = False,
-    nan_if_all_masked: bool = False,
-) -> torch.Tensor:
-    """Compute the mean along `dim` using a custom boolean mask.
-
-    Args:
-        x: Input tensor of any shape.
-        mask: Boolean tensor of the same shape as `x`, where True means "include value".
-        dim: Dimension along which to take the mean.
-        keepdim: If True, retains `dim` with size 1 in the output.
-        nan_if_all_masked:
-            If True, positions where all mask entries along `dim` are False will be NaN.
-            If False, returns 0 in those cases.
-
-    Returns:
-        torch.Tensor with mean values computed using only masked elements.
-    """
-    # Ensure mask is boolean
-    mask = mask.bool()
-
-    # Sum only masked values
-    sum_masked = torch.sum(x * mask, dim=dim, keepdim=keepdim)
-
-    # Count of True mask entries along the reduction dimension
-    count_masked = torch.sum(mask, dim=dim, keepdim=keepdim)
-
-    # Avoid division by zero
-    mean_masked = sum_masked / count_masked.clamp(min=1)
-
-    if nan_if_all_masked:
-        mean_masked[count_masked == 0] = float("nan")
-
-    return mean_masked
-
-
-@typecheck
-def sample_logit_normal(
-    n: int = 1, m: float = 0.0, s: float = 1.0, device: torch.device | None = None
-) -> torch.Tensor:
-    """
-    Logit-normal sampling from https://arxiv.org/pdf/2403.03206.pdf.
-
-    Args:
-        n: Number of samples to generate.
-        m: Mean of the underlying normal distribution.
-        s: Standard deviation of the underlying normal distribution.
-        device: The device to create the tensor on.
-
-    Returns:
-        A tensor of shape (n,) containing samples from the logit-normal distribution.
-    """
-    u = torch.randn(n, device=device) * s + m
-    t = 1 / (1 + torch.exp(-u))
-    return t
 
 
 # Optimize common operations
