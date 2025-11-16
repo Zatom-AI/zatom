@@ -891,7 +891,7 @@ class Zatom(LightningModule):
 
         # Create dataset_idx tensor
         # NOTE 0 -> null class within model, while 0 -> MP20 elsewhere, so increment by 1 (for classifier-free guidance or CFG)
-        use_cfg = self.model.class_dropout_prob > 0 and cfg_scale != 0.0
+        use_cfg = self.model.class_dropout_prob > 0
         dataset_idx = torch.full(
             (batch_size,),
             dataset_idx + int(use_cfg),
@@ -1012,7 +1012,7 @@ class Zatom(LightningModule):
             mask=token_mask,
             steps=steps,
             cfg_scale=cfg_scale,
-            use_cfg=use_cfg,
+            use_cfg=use_cfg and cfg_scale != 0.0,
             # NOTE: For non-periodic samples only, we may center positions at origin after each denoising step
             enable_zero_centering=not sample_is_periodic.any().item(),
         )
