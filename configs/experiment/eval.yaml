@@ -1,6 +1,6 @@
 # @package _global_
 
-# Options for training:
+# Options for evaluation:
 # - /model: [zatom]
 # - /model/architecture:
 #         [tft_5M, tft_20M, tft_70M,
