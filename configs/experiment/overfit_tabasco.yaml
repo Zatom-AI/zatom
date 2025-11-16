@@ -58,12 +58,6 @@ data:
 model:
   log_grads_every_n_steps: 100
 
-  architecture:
-    dataset_embedder:
-      dropout_prob: 0.0
-    spacegroup_embedder:
-      dropout_prob: 0.0
-
   optimizer:
     lr: 1e-4
 

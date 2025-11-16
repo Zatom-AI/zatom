@@ -26,12 +26,6 @@ trainer:
   precision: 32-true
 
 model:
-  architecture:
-    dataset_embedder:
-      dropout_prob: 0.0
-    spacegroup_embedder:
-      dropout_prob: 0.0
-
   optimizer:
     lr: 2e-3
 
