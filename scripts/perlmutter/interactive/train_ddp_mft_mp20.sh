@@ -28,11 +28,11 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="k7sy02i8"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-11-13_12-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="a2izcs75"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-11-15_16-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom2"                    # NOTE: Set the model to be used, must be one of (`zatom`, `zatom2`)
-DEFAULT_EXPERIMENT="train"                # NOTE: Set the experiment name to be used, must be one of (`train`, `train_tabasco`, `eval`, `overfit`, `overfit_tabasco`)
-DEFAULT_ARCHITECTURE="mft2_80M"           # NOTE: Set the model architecture to be used, must be one of (`{mft,mft2,met,mfp}_80M`, `{mft,met,mfp}_180M`, `{mft,met,mfp}_500M`)
+DEFAULT_EXPERIMENT="train_tabasco"        # NOTE: Set the experiment name to be used, must be one of (`train`, `train_tabasco`, `eval`, `overfit`, `overfit_tabasco`)
+DEFAULT_ARCHITECTURE="tft_5M"             # NOTE: Set the model architecture to be used, must be one of (`{mft,mft2,met,mfp}_80M`, `{mft,met,mfp}_180M`, `{mft,met,mfp}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided
