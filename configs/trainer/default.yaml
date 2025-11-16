@@ -11,11 +11,11 @@ accelerator: cpu
 devices: 1
 
 # mixed precision for extra speed-up
-precision: bf16-mixed
+precision: 32-true
 
 # check validation set every N training epochs
 val_check_interval: 1.0
-check_val_every_n_epoch: 50
+check_val_every_n_epoch: 20
 
 # # check validation set every N training batches
 # val_check_interval: 1000
@@ -27,7 +27,7 @@ deterministic: False
 
 # if `gradient_clip_val` is not `0.0` or `null`, gradients will be norm-clipped by an upper bound of `gradient_clip_val` during training
 gradient_clip_algorithm: norm
-gradient_clip_val: 10.0
+gradient_clip_val: 0.5
 
 # accumulate gradients of `accumulate_grad_batches` batches (e.g., by this amount for each rank) before doing a backward pass
 # NOTE: here, we would have to accumulate gradients independently for each rank, per https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients

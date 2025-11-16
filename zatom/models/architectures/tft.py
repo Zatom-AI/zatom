@@ -1,4 +1,4 @@
-"""Tabasco flow transformer (TFT).
+"""Trunk-based flow transformer (TFT).
 
 Adapted from:
     - https://github.com/apple/ml-simplefold
@@ -12,12 +12,13 @@ from typing import Any, Callable, Dict, List, Literal, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from tensordict import TensorDict
 from torch.nn.attention import SDPBackend
 
 from zatom.flow.interpolants import Interpolant
 from zatom.flow.path import FlowPath
-from zatom.models.architectures.tabasco.losses import InterDistancesLoss
+from zatom.models.architectures.transformer.losses import InterDistancesLoss
 from zatom.utils import pylogger
 from zatom.utils.sampling_utils import get_sample_schedule
 from zatom.utils.training_utils import (
@@ -29,12 +30,12 @@ from zatom.utils.typing_utils import typecheck
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 #################################################################################
-#                           Tabasco Flow Transformer                            #
+#                           Trunk-Based Flow Transformer                        #
 #################################################################################
 
 
 class TFT(nn.Module):
-    """Tabasco-based flow model with a trunk-decoder architecture.
+    """Flow transformer with a trunk-based architecture (TFT).
 
     Typical usage:
     - `forward`:    Called during training to compute loss and optional stats.
@@ -57,6 +58,7 @@ class TFT(nn.Module):
         interdist_loss: Type of interatomic distance loss to use. If None, no interatomic distance loss is used.
         time_distribution: Distribution to sample time points from. Must be one of (`uniform`, `beta`, `histogram`).
         time_alpha_factor: Alpha factor for beta time distribution.
+        test_so3_equivariance: Whether to test the model for SO(3) equivariance after each forward pass.
     """
 
     def __init__(
@@ -77,6 +79,7 @@ class TFT(nn.Module):
         interdist_loss: InterDistancesLoss | None = None,
         time_distribution: Literal["uniform", "beta", "histogram"] = "beta",
         time_alpha_factor: float = 2.0,
+        test_so3_equivariance: bool = False,
         **kwargs: Any,
     ):
         super().__init__()
@@ -91,6 +94,7 @@ class TFT(nn.Module):
         self.class_dropout_prob = dataset_embedder.dropout_prob
         self.interdist_loss = interdist_loss
         self.time_alpha_factor = time_alpha_factor
+        self.test_so3_equivariance = test_so3_equivariance
 
         self.vocab_size = max_num_elements
 
@@ -343,6 +347,63 @@ class TFT(nn.Module):
         assert len(aux_task_preds) == len(
             self.auxiliary_tasks
         ), f"Expected {len(self.auxiliary_tasks)} auxiliary task predictions, but got {len(aux_task_preds)}."
+
+        if self.test_so3_equivariance:
+            # Test SO(3) equivariance by applying a random rotation to the input positions
+            # and checking if the output positions rotate accordingly.
+            from zatom.utils.training_utils import sample_uniform_rotation
+
+            rand_rot_mat = sample_uniform_rotation(
+                shape=pos.shape[:-2], dtype=pos.dtype, device=pos.device
+            )
+
+            # Rotate the original predictions
+            rotated_original_pred_pos = torch.einsum(
+                "bij,bjk->bik", pos, rand_rot_mat.transpose(-2, -1)
+            )
+
+            # Rotate input positions and get new predictions
+            rotated_pos = torch.einsum("bij,bjk->bik", x_t["pos"], rand_rot_mat.transpose(-2, -1))
+            (
+                _,
+                rotated_pred_pos,
+                _,
+                _,
+                _,
+            ), _ = model_fn(
+                x=(
+                    x_t["atom_types"],
+                    rotated_pos,
+                    x_t["frac_coords"],
+                    x_t["lengths_scaled"],
+                    x_t["angles_radians"],
+                ),
+                t=(
+                    t["atom_types"],
+                    t["pos"],
+                    t["frac_coords"],
+                    t["lengths_scaled"],
+                    t["angles_radians"],
+                ),
+                feats={
+                    "dataset_idx": x_1["dataset_idx"],
+                    "spacegroup": x_1["spacegroup"],
+                    "ref_pos": x_1["ref_pos"],
+                    "ref_space_uid": x_1["ref_space_uid"],
+                    "atom_to_token": x_1["atom_to_token"],
+                    "atom_to_token_idx": x_1["atom_to_token_idx"],
+                    "max_num_tokens": x_1["max_num_tokens"],
+                    "token_index": x_1["token_index"],
+                    "token_is_periodic": x_1["token_is_periodic"],
+                },
+                padding_mask=x_t["padding_mask"],
+                sdpa_backends=sdpa_backends,
+            )
+
+            # Compute the mean squared error between the rotated predictions and
+            # the predictions from the rotated input
+            so3_equivariance_error = F.mse_loss(rotated_original_pred_pos, rotated_pred_pos)
+            log.info(f"SO(3) Equivariance Test - MSE Error: {so3_equivariance_error.item():.6f}")
 
         return TensorDict(
             {

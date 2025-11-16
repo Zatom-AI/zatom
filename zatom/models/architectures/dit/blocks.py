@@ -14,7 +14,7 @@ from platonic_transformers.models.platoformer.groups import PLATONIC_GROUPS
 from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn
 
-from zatom.models.architectures.modules.layers import (
+from zatom.models.architectures.dit.layers import (
     PlatonicSwiGLUFeedForward,
     SwiGLUFeedForward,
     modulate,

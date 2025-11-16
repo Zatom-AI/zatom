@@ -48,6 +48,6 @@ resume_from_last_step_dir: True # if `True`, resume from the last (i.e., max '{e
 seed: ${generate_index:8}
 
 # precision for PyTorch's floating-point matrix multiplication
-float32_matmul_precision: medium # NOTE: must be one of (`medium`, `high`, `highest`)
-cuda_matmul_allow_tf32: True # allow TF32 on Ampere GPUs, see https://pytorch.org/docs/stable/notes/cuda.html#tf32-on-ampere
-cudnn_allow_tf32: True # allow TF32 on Ampere GPUs, see https://pytorch.org/docs/stable/notes/cuda.html#tf32-on-ampere
+float32_matmul_precision: high # NOTE: must be one of (`medium`, `high`, `highest`)
+cuda_matmul_allow_tf32: False # allow TF32 on Ampere GPUs, see https://pytorch.org/docs/stable/notes/cuda.html#tf32-on-ampere
+cudnn_allow_tf32: False # allow TF32 on Ampere GPUs, see https://pytorch.org/docs/stable/notes/cuda.html#tf32-on-ampere

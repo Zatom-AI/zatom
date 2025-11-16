@@ -2,7 +2,7 @@ _target_: zatom.models.architectures.tft.TFT
 
 # Modules
 multimodal_model:
-  _target_: zatom.models.architectures.tabasco.transformer_module.TransformerModule
+  _target_: zatom.models.architectures.transformer.transformer_module.TransformerModule
   _partial_: True
   spatial_dim: ${globals.spatial_dim}
   atom_dim: ${globals.max_num_elements}
@@ -10,13 +10,13 @@ multimodal_model:
   cross_attention: true
 
 dataset_embedder:
-  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
   num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
-  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
   num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
@@ -119,3 +119,4 @@ batch_size_scale_factor: 1 # 2, 2, 1 -> 5M, 20M, 70M model sizes
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # note: must be one of (`uniform`, `beta`, `histogram`)
 time_alpha_factor: 1.8
+test_so3_equivariance: false

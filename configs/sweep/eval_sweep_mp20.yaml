@@ -1,4 +1,4 @@
-name: eval_sweep_mp20_2025-10-14_14-00-00
+name: eval_sweep_mp20_2025-11-16_10-00-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -20,7 +20,7 @@ parameters:
     value: 0.0
 
   date:
-    value: "2025-10-14_14-00-00"
+    value: "2025-11-16_10-00-00"
 
   experiment:
     value: eval
@@ -32,10 +32,10 @@ parameters:
     value: 10000
 
   model.sampling.steps:
-    values: [25, 50, 100, 250, 500, 1000]
+    values: [5, 10, 25, 50, 100, 200]
 
   model.sampling.cfg_scale:
-    values: [1.0, 2.0, 3.0, 4.0, 6.0, 8.0]
+    values: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
 
   name:
     value: "eval_${hydra:runtime.choices.model/architecture}_steps-${hydra:runtime.choices.model.sampling.steps}_cfg-${hydra:runtime.choices.model.sampling.cfg_scale}_mp20"

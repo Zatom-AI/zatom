@@ -4,21 +4,10 @@ architecture:
   max_num_elements: ${globals.max_num_elements}
   add_mask_atom_type: true
 
-interpolant:
-  _target_: zatom.flow.interpolants.MultimodalInterpolant
-  disc_feats: [atom_types]
-  cont_feats: [pos, frac_coords, lengths_scaled, angles_radians]
-  cont_feats_distributions: [centered_gaussian, uniform, uniform, uniform]
-  mask_token_index: ${model.architecture.max_num_elements}
-  min_t: 0
-  max_t: 0
-  corrupt: ${model.architecture.add_mask_atom_type}
-  disc_interpolant_type: masking # NOTE: must be one of (`uniform`, `masking`)
-
 augmentations:
   frac_coords: true
   pos: true
-  scale: 10.0
+  scale: 1.0
   ref_scale: 1.0 # NOTE: currently applied (multiplicitively) to noisy atom `pos` after normalizing by `scale`
   multiplicity: 8 # number of copies per GPU
 
@@ -31,6 +20,7 @@ sampling:
   visualize: true
   save_dir: ${paths.viz_dir}
   removeHs: false # only retain heavy atoms (for molecules)
+  mask_token_index: ${model.architecture.max_num_elements}
 
 conditioning:
   dataset_idx: true # always true
@@ -41,14 +31,14 @@ datasets: ${data.datamodule.datasets}
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
-  lr: 5e-4
+  lr: 2e-3
   weight_decay: 0.0
   betas: [0.9, 0.995]
 
 scheduler:
-  _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
-  _partial_: true
-  lr_lambda: ${resolve_lr_scheduler:constant_schedule_with_warmup,10}
+  # _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
+  # _partial_: true
+  # lr_lambda: ${resolve_lr_scheduler:constant_schedule_with_warmup,10}
 
 scheduler_frequency: 1
 # scheduler_frequency: ${trainer.check_val_every_n_epoch}

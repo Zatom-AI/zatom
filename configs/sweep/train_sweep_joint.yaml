@@ -1,4 +1,4 @@
-name: train-sweep_joint-qm9-mp20_loss-weights_2025-10-25_17-00-00
+name: train-sweep_joint_atom-types-loss-pos-loss-frac-coords-loss_2025-11-16_10-00-00
 project: zatom
 entity: zatom
 program: zatom/train_fm.py
@@ -13,26 +13,23 @@ parameters:
   ckpt_path:
     value: "${paths.log_dir}/${task_name}/runs/${name}_${date}/checkpoints/"
 
-  data.datamodule.batch_size.base_accumulate_grad_batches:
-    value: 4
-
   date:
-    value: "2025-10-25_17-00-00"
+    value: "2025-11-16_10-00-00"
 
   experiment:
     value: train
 
-  model.architecture.pos_loss_weight:
-    values: [1.0, 10.0]
+  model.architecture.atom_types_interpolant.loss_weight:
+    values: [0.1, 1.0]
 
-  model.architecture.frac_coords_loss_weight:
-    values: [1.0, 10.0]
+  model.architecture.pos_interpolant.loss_weight:
+    values: [0.1, 1.0]
 
-  model.architecture.angles_radians_loss_weight:
-    values: [1.0, 10.0]
+  model.architecture.frac_coords_interpolant.loss_weight:
+    values: [0.1, 1.0]
 
   name:
-    value: "train-sweep_joint-qm9-mp20_pos-loss-${model.architecture.pos_loss_weight}_frac-coords-loss-${model.architecture.frac_coords_loss_weight}_angles-radians-loss-${model.architecture.angles_radians_loss_weight}"
+    value: "train-sweep_joint_atom-types-loss-${model.architecture.atom_types_interpolant.loss_weight}_pos-loss-${model.architecture.pos_interpolant.loss_weight}_frac-coords-loss-${model.architecture.frac_coords_interpolant.loss_weight}"
 
   seed:
     value: 42

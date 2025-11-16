@@ -2,27 +2,27 @@ _target_: zatom.models.architectures.mft.MFT
 
 # Modules
 multimodal_model:
-  _target_: zatom.models.architectures.modules.dip.MultimodalDiP
+  _target_: zatom.models.architectures.dit.dip.MultimodalDiP
   _partial_: True
 
 time_embedder:
-  _target_: zatom.models.architectures.modules.layers.TimestepEmbedder
+  _target_: zatom.models.architectures.dit.layers.TimestepEmbedder
   hidden_size: ${model.architecture.hidden_size}
 
 dataset_embedder:
-  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
   num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
-  _target_: zatom.models.architectures.modules.layers.LabelEmbedder
+  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
   num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 token_pos_embedder:
-  _target_: zatom.models.architectures.modules.pos_embed.AbsolutePositionEncoding
+  _target_: zatom.models.architectures.dit.pos_embed.AbsolutePositionEncoding
   in_dim: 1
   embed_dim: ${model.architecture.hidden_size}
   include_input: True
@@ -36,17 +36,17 @@ atom_pos_embedder:
   learned_freqs: True
 
 atom_encoder_transformer:
-  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 2
   block:
-    _target_: zatom.models.architectures.modules.blocks.DiPBlock
+    _target_: zatom.models.architectures.dit.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.atom_hidden_size_enc}
     solid: ${model.architecture.solid_name}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
+      _target_: zatom.models.architectures.dit.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_enc}
       solid: ${model.architecture.solid_name}
@@ -64,17 +64,17 @@ atom_encoder_transformer:
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
 trunk:
-  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 24
   block:
-    _target_: zatom.models.architectures.modules.blocks.DiPBlock
+    _target_: zatom.models.architectures.dit.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.hidden_size}
     solid: ${model.architecture.solid_name}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
+      _target_: zatom.models.architectures.dit.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.hidden_size}
       solid: ${model.architecture.solid_name}
@@ -92,17 +92,17 @@ trunk:
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
 atom_decoder_transformer:
-  _target_: zatom.models.architectures.modules.blocks.HomogenTrunk
+  _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 2
   block:
-    _target_: zatom.models.architectures.modules.blocks.DiPBlock
+    _target_: zatom.models.architectures.dit.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module
     hidden_size: ${model.architecture.atom_hidden_size_dec}
     solid: ${model.architecture.solid_name}
     mlp_ratio: 4.0
     use_swiglu: True # SwiGLU FFN
     self_attention_layer:
-      _target_: zatom.models.architectures.modules.layers.PlatonicEfficientSelfAttentionLayer
+      _target_: zatom.models.architectures.dit.layers.PlatonicEfficientSelfAttentionLayer
       _partial_: True
       hidden_size: ${model.architecture.atom_hidden_size_dec}
       solid: ${model.architecture.solid_name}
@@ -119,6 +119,95 @@ atom_decoder_transformer:
         learned_freqs: True
         freq_init: random # NOTE: must be one of (`random`, `spiral`)
 
+# Interpolants for each modality
+atom_types_interpolant:
+  _target_: zatom.flow.interpolants.DiscreteInterpolant
+  key: atom_types
+  loss_weight: 0.1
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+pos_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: pos
+  loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: true
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+frac_coords_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: frac_coords
+  loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: false
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+lengths_scaled_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: lengths_scaled
+  loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: false
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+angles_radians_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: angles_radians
+  loss_weight: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: false
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
 # General architecture parameters
 hidden_size: 4416
 token_num_heads: 552
@@ -131,33 +220,13 @@ atom_n_queries_dec: null # NOTE: if null, user-provided `mask` will be used inst
 atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
 max_num_elements: ${globals.max_num_elements}
 batch_size_scale_factor: 0.5 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
-
-atom_types_loss_weight: 0.1
-pos_loss_weight: 1.0
-frac_coords_loss_weight: 1.0
-lengths_scaled_loss_weight: 1.0
-angles_radians_loss_weight: 1.0
-grad_decay_a: 0.8 # NOTE: only used if `enable_eqm_mode=true`
-grad_decay_b: 0.8 # NOTE: only used if `enable_eqm_mode=true`
-grad_mul: 1.0 # NOTE: only used if `enable_eqm_mode=true`
-early_stopping_grad_norm: null
-
 use_length_condition: true
-jvp_attn: false
-weighted_rigid_align_pos: false
-weighted_rigid_align_frac_coords: false
-continuous_x_1_prediction: true
-logit_normal_time: true
-unified_modal_time: true
-remove_t_conditioning: false
 condition_on_input: false
-enable_eqm_mode: false
-add_mask_atom_type: true
-treat_discrete_modalities_as_continuous: false
 test_so3_equivariance: false
-
-loss_time_fn: beta # NOTE: must be one of (`none`, `beta`)
-grad_decay_method: none # NOTE: must be `none` when `enable_eqm_mode=false`
+jvp_attn: false
+interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
+time_distribution: beta # note: must be one of (`uniform`, `beta`, `histogram`)
+time_alpha_factor: 1.8
 
 # Platonic Transformer parameters
 solid_name: octahedron # NOTE: must be one of (`trivial`, `tetrahedron`, `octahedron`, `icosahedron`, `octahedron_reflections`)

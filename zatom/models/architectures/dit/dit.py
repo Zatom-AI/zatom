@@ -11,7 +11,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.modules.layers import FinalLayer
+from zatom.models.architectures.dit.layers import FinalLayer
 from zatom.utils.training_utils import SDPA_BACKENDS
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 

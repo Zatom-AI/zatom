@@ -15,7 +15,7 @@ from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn
 from torch.nn.attention import SDPBackend
 
-from zatom.models.architectures.modules.layers import PlatonicFinalLayer
+from zatom.models.architectures.dit.layers import PlatonicFinalLayer
 from zatom.utils.training_utils import SDPA_BACKENDS
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
