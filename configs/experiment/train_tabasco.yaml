@@ -29,9 +29,6 @@ model:
   optimizer:
     lr: 2e-3
 
-  sampling:
-    cfg_scale: 0.0
-
   scheduler: null # use no scheduler
 
 # precision for PyTorch's floating-point matrix multiplication

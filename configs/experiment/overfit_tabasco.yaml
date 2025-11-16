@@ -62,7 +62,6 @@ model:
     lr: 1e-4
 
   sampling:
-    cfg_scale: 0.0
     num_samples: 10
     batch_size: 10
 

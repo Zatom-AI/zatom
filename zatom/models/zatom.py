@@ -864,7 +864,7 @@ class Zatom(LightningModule):
         num_nodes_bincount: torch.Tensor,
         spacegroups_bincount: torch.Tensor | None,
         batch_size: int,
-        cfg_scale: float = 2.0,
+        cfg_scale: float = 0.0,
         dataset_idx: int = 0,
         steps: int = 100,
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:

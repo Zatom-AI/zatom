@@ -12,7 +12,7 @@ augmentations:
   multiplicity: 8 # number of copies per GPU
 
 sampling:
-  cfg_scale: 2.0 # classifier-free guidance scale, 0.0 = no guidance
+  cfg_scale: 0.0 # classifier-free guidance scale, 0.0 = no guidance
   num_samples: 1000
   batch_size: 100
   steps: 100 # number of ODE steps
