@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -11,6 +12,8 @@ from lightning.fabric.plugins.environments.cluster_environment import ClusterEnv
 from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies.strategy import Strategy
 from omegaconf import DictConfig, open_dict
+
+from zatom.models.architectures import dit, transformer
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -175,6 +178,10 @@ def main(cfg: DictConfig) -> None:
         torch.backends.cuda.matmul.allow_tf32 = True
     if cfg.cudnn_allow_tf32:
         torch.backends.cudnn.allow_tf32 = True
+
+    # Support checkpoints using old module names
+    sys.modules["zatom.models.architectures.modules"] = dit
+    sys.modules["zatom.models.architectures.tabasco"] = transformer
 
     # Run evaluation
     set_omegaconf_flag_recursive(
