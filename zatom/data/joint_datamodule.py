@@ -78,7 +78,7 @@ def global_property_custom_transform(data: Data) -> Data:
         Data: Transformed data object.
     """
     # PyG object attributes consistent with CrystalDataset
-    data.y = torch.tensor([[0.0]], dtype=torch.float32)  # Dummy target property
+    data.y = torch.tensor([[torch.nan]], dtype=torch.float32)  # Dummy target property
     return data
 
 
@@ -166,7 +166,7 @@ class JointDataModule(LightningDataModule):
         #     os.path.join(self.hparams.datasets.qm9.root, "num_nodes_bincount.pt"),
         # )
         # torch.save(smiles, os.path.join(self.hparams.datasets.qm9.root, "smiles.pt"))
-        # Like Platonic Transformers, normalize property prediction targets per data sample to mean=0 and std=1 using training set statistics
+        # Normalize property prediction targets per data sample using training set statistics
         qm9_train_dataset = qm9_dataset[:100000]
         qm9_prop_mean = qm9_train_dataset.data.y.mean(dim=0, keepdim=True)
         qm9_prop_std = qm9_train_dataset.data.y.std(dim=0, keepdim=True)
@@ -321,43 +321,25 @@ class JointDataModule(LightningDataModule):
         #     os.path.join(self.hparams.datasets.omol25.root, "num_nodes_bincount.pt"),
         # )
         # torch.save(smiles, os.path.join(self.hparams.datasets.omol25.root, "smiles.pt"))
-        # Normalize energy prediction targets per data sample
+        # Normalize energy and force prediction targets per data sample using training set statistics
         if self.hparams.datasets.omol25.global_energy:
             omol25_train_energy_coefficients, omol25_train_dataset_stats = (
                 get_omol25_per_atom_energy_and_stats(
                     dataset=self.omol25_train_dataset,
                     coef_path=self.hparams.datasets.omol25.root,
                     include_hof=False,
-                    recalculate=True,
+                    recalculate=False,
                 )
             )
-            omol25_val_energy_coefficients, omol25_val_dataset_stats = (
-                get_omol25_per_atom_energy_and_stats(
-                    dataset=self.omol25_val_dataset,
-                    coef_path=self.hparams.datasets.omol25.root,
-                    include_hof=False,
-                    recalculate=True,
-                )
-            )
-            omol25_test_energy_coefficients, omol25_test_dataset_stats = (
-                get_omol25_per_atom_energy_and_stats(
-                    dataset=self.omol25_test_dataset,
-                    coef_path=self.hparams.datasets.omol25.root,
-                    include_hof=False,
-                    recalculate=True,
-                )
-            )
-
             self.omol25_train_dataset.energy_coefficients = omol25_train_energy_coefficients
-            self.omol25_val_dataset.energy_coefficients = omol25_val_energy_coefficients
-            self.omol25_test_dataset.energy_coefficients = omol25_test_energy_coefficients
-
+            self.omol25_val_dataset.energy_coefficients = omol25_train_energy_coefficients
+            self.omol25_test_dataset.energy_coefficients = omol25_train_energy_coefficients
             self.omol25_train_dataset.shift = omol25_train_dataset_stats["shift"]
             self.omol25_train_dataset.scale = omol25_train_dataset_stats["scale"]
-            self.omol25_val_dataset.shift = omol25_val_dataset_stats["shift"]
-            self.omol25_val_dataset.scale = omol25_val_dataset_stats["scale"]
-            self.omol25_test_dataset.shift = omol25_test_dataset_stats["shift"]
-            self.omol25_test_dataset.scale = omol25_test_dataset_stats["scale"]
+            self.omol25_val_dataset.shift = omol25_train_dataset_stats["shift"]
+            self.omol25_val_dataset.scale = omol25_train_dataset_stats["scale"]
+            self.omol25_test_dataset.shift = omol25_train_dataset_stats["shift"]
+            self.omol25_test_dataset.scale = omol25_train_dataset_stats["scale"]
         # Retain subset of dataset; can be used to train on only one dataset, too
         omol25_train_subset_size = int(
             len(self.omol25_train_dataset) * self.hparams.datasets.omol25.proportion

@@ -29,13 +29,14 @@ from zatom.utils.typing_utils import typecheck
 log = pylogger.RankedLogger(__name__)
 
 
-IDX_TO_DATASET = {
+INDEX_TO_DATASET = {
     0: "mp20",
     1: "qm9",
     2: "qmof150",
     3: "omol25",
     4: "geom",
 }
+DATASET_TO_INDEX = {v: k for k, v in INDEX_TO_DATASET.items()}
 DATASET_TO_IDX = {
     "mp20": 0,  # Periodic
     "qm9": 1,  # Non-periodic
@@ -333,7 +334,7 @@ class Zatom(LightningModule):
             for dataset_index in batch.dataset_idx.unique_consecutive():
                 num_nodes = batch_num_nodes[batch.dataset_idx == dataset_index]
                 spacegroups = batch.spacegroup[batch.dataset_idx == dataset_index]
-                dataset_name = IDX_TO_DATASET[dataset_index.item()]
+                dataset_name = INDEX_TO_DATASET[dataset_index.item()]
 
                 # Filter `num_nodes_bincount`
                 if self.num_nodes_bincount[dataset_name] is not None:
@@ -431,12 +432,27 @@ class Zatom(LightningModule):
             device=self.device,
         )
 
-        if self.hparams.datasets["qm9"].global_property is not None:
+        is_qm9_dataset = (batch.dataset_idx == DATASET_TO_INDEX["qm9"]).any()
+        is_omol25_dataset = (batch.dataset_idx == DATASET_TO_INDEX["omol25"]).any()
+
+        if is_qm9_dataset and self.hparams.datasets["qm9"].global_property is not None:
             dense_batch["global_property"] = batch.y
 
-        if self.hparams.datasets["omol25"].global_energy is not None:
-            dense_batch["global_energy"] = dense_batch["global_energy_per_atom"] = batch.y[:, 0:1]
-            dense_batch["atomic_forces"] = batch.y[:, 1:4]
+        if is_omol25_dataset and self.hparams.datasets["omol25"].global_energy is not None:
+            global_energy, _ = to_dense_batch(
+                batch.y[:, 0:1],
+                batch.batch,
+                max_num_nodes=self.max_num_nodes,
+            )
+            atomic_forces, _ = to_dense_batch(
+                batch.y[:, 1:4],
+                batch.batch,
+                max_num_nodes=self.max_num_nodes,
+            )
+            dense_batch["global_energy"] = dense_batch["global_energy_per_atom"] = global_energy[
+                :, 0, :
+            ]
+            dense_batch["atomic_forces"] = atomic_forces
 
         # Run forward pass
         loss_dict, _ = self.model.forward(dense_batch, compute_stats=False)
@@ -676,9 +692,9 @@ class Zatom(LightningModule):
         if stage not in ["val", "test"]:
             raise ValueError("The `stage` must be `val` or `test`.")
 
-        metrics = getattr(self, f"{stage}_metrics")[IDX_TO_DATASET[dataloader_idx]]
+        metrics = getattr(self, f"{stage}_metrics")[INDEX_TO_DATASET[dataloader_idx]]
         generation_evaluator = getattr(self, f"{stage}_generation_evaluators")[
-            IDX_TO_DATASET[dataloader_idx]
+            INDEX_TO_DATASET[dataloader_idx]
         ]
         generation_evaluator.device = metrics["loss"].device
 
@@ -693,7 +709,7 @@ class Zatom(LightningModule):
         for k, v in loss_dict.items():
             metrics[k](v)
             self.log(
-                f"{stage}_{IDX_TO_DATASET[dataloader_idx]}/{k}",
+                f"{stage}_{INDEX_TO_DATASET[dataloader_idx]}/{k}",
                 metrics[k],
                 on_step=False,
                 on_epoch=True,

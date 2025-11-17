@@ -85,7 +85,7 @@ class TransformerModule(nn.Module):
         self.angles_radians_embed = nn.Linear(spatial_dim, hidden_dim, bias=False)
 
         if self.add_sinusoid_posenc:
-            self.positional_encoding = SinusoidEncoding(posenc_dim=hidden_dim, max_len=90)
+            self.positional_encoding = SinusoidEncoding(posenc_dim=hidden_dim, max_len=350)
 
         if self.concat_combine_input:
             self.combine_input = nn.Linear(self.cond_dim * hidden_dim, hidden_dim)

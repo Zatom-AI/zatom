@@ -118,8 +118,8 @@ def compute_per_atom_energy_and_stat(
 
     # Loop through dataset to build K matrix and E_dft vector
     log.info("Building K matrix and E_DFT vector from dataset")
-    for idx in tqdm(dataset.indices):
-        atoms = dataset.ase_dataset.get_atoms(idx)
+    for idx in tqdm(dataset.indices()):
+        atoms = dataset.dataset.get_atoms(idx)
         energy_dft = atoms.get_potential_energy()
 
         # Count elements in this molecule
@@ -156,7 +156,7 @@ def compute_per_atom_energy_and_stat(
     )
 
     # Replace sklearn with numpy.linalg.lstsq
-    log.info("Solving linear regression K*P = E_DFT using numpy.linalg.lstsq...")
+    log.info("Solving linear regression K*P = E_DFT using numpy.linalg.lstsq")
     coeffs_reduced, residuals, rank, s = np.linalg.lstsq(reduced_K, E_dft, rcond=None)
 
     # Extract isolated atomic energies E_i,DFT
