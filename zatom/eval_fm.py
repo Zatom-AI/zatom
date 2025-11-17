@@ -179,7 +179,7 @@ def main(cfg: DictConfig) -> None:
     if cfg.cudnn_allow_tf32:
         torch.backends.cudnn.allow_tf32 = True
 
-    # Support checkpoints using old module names
+    # Support checkpoints using old module names - TODO: remove this in future versions
     sys.modules["zatom.models.architectures.modules"] = dit
     sys.modules["zatom.models.architectures.tabasco"] = transformer
 
