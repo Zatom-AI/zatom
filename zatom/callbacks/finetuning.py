@@ -53,8 +53,8 @@ class AuxiliaryTaskFinetuning(BaseFinetuning):
             for head in aux_task_heads:
                 named_modules.remove(head)
 
-        modules_to_freeze = list(named_module[1] for named_module in named_modules)
-        self.freeze(modules_to_freeze)
+        # modules_to_freeze = list(named_module[1] for named_module in named_modules)
+        # self.freeze(modules_to_freeze)
 
     def finetune_function(self, pl_module: LightningModule, epoch: int, optimizer: Optimizer):
         """Finetuning function called at the beginning of each training epoch.
@@ -137,8 +137,8 @@ class FlowMatchingAuxiliaryTaskFinetuning(AuxiliaryTaskFinetuning):
             for head in aux_task_heads:
                 named_modules.remove(head)
 
-        modules_to_freeze = list(named_module[1] for named_module in named_modules)
-        self.freeze(modules_to_freeze)
+        # modules_to_freeze = list(named_module[1] for named_module in named_modules)
+        # self.freeze(modules_to_freeze)
 
         # Set the minimum and maximum path times for each modality's interpolant
         for modal in pl_module.model.modals:
