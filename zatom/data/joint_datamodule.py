@@ -196,6 +196,8 @@ class JointDataModule(LightningDataModule):
             raise ValueError(
                 f"QM9 target property '{self.hparams.datasets.qm9.global_property}' not recognized. Must be one of ('mu', 'alpha') or None."
             )
+        else:
+            qm9_dataset.data.y = qm9_dataset.data.y[:, 0].unsqueeze(-1)  # Default to dipole moment
         # Create train, val, test splits
         self.qm9_train_dataset = qm9_train_dataset
         self.qm9_val_dataset = qm9_dataset[100000:118000]
