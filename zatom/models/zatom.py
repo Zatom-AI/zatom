@@ -460,6 +460,10 @@ class Zatom(LightningModule):
         # Run forward pass
         loss_dict, _ = self.model.forward(dense_batch, compute_stats=False)
 
+        # Recompute loss when finetuning
+        if self.hparams.task_name == "finetune_fm":
+            loss_dict["loss"] = sum(v for k, v in loss_dict.items() if "aux_" in k)
+
         return loss_dict
 
     #####################################################################################################
