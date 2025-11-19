@@ -165,9 +165,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
         # Override pretrained checkpoint path if a regular checkpoint path is given
         if cfg.get("ckpt_path") and os.path.exists(cfg.get("ckpt_path")):
-            ckpt_path = cfg.get("ckpt_path")
-
-            if cfg.resume_from_last_step_dir and os.path.isdir(ckpt_path):
+            if cfg.resume_from_last_step_dir and os.path.isdir(cfg.get("ckpt_path")):
                 # Enforce `epoch={epoch}-step={step}.ckpt` (w/ logger) or `{epoch}-{step}.ckpt` (w/o logger) format
                 last_ckpt_cb_files = [
                     f
@@ -191,6 +189,12 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
                     assert os.path.exists(
                         ckpt_path
                     ), f"Failed to resume from the last step. Checkpoint path does not exist: {ckpt_path}."
+                elif ckpt_path:
+                    # No checkpoint files found in the given directory but pretrained checkpoint path exists
+                    log.warning(
+                        f"No checkpoint files found in the given directory: {cfg.get('ckpt_path')}. "
+                        f"Resuming from the last step is not possible. Using provided pretrained checkpoint path: {ckpt_path}."
+                    )
                 else:
                     log.warning(
                         f"No checkpoint files found in the given directory: {cfg.get('ckpt_path')}. "
