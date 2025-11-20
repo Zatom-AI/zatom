@@ -36,6 +36,7 @@ class TransformerModule(nn.Module):
         concat_combine_input: Whether to concatenate and combine inputs.
         custom_weight_init: Custom weight initialization method (None, "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal").
             NOTE: "uniform" does not work well.
+        num_auxiliary_task_layers: Number of cross-attention layers for auxiliary tasks.
     """
 
     @typecheck
@@ -56,6 +57,7 @@ class TransformerModule(nn.Module):
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
         ] = None,
+        num_auxiliary_task_layers: int = 3,
     ):
         super().__init__()
 
@@ -179,12 +181,17 @@ class TransformerModule(nn.Module):
                 batch_first=True,
                 norm_first=True,
             )
-            self.global_property_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
+            self.global_property_cross_attention = nn.ModuleList(
+                [
+                    nn.TransformerDecoderLayer(
+                        d_model=hidden_dim,
+                        nhead=num_heads,
+                        dim_feedforward=hidden_dim * 4,
+                        batch_first=True,
+                        norm_first=True,
+                    )
+                ]
+                for _ in range(num_auxiliary_task_layers)
             )
 
         # Add auxiliary task heads
@@ -426,12 +433,15 @@ class TransformerModule(nn.Module):
                 tgt_key_padding_mask=padding_mask,
                 memory_key_padding_mask=padding_mask,
             )
-            h_global_property = self.global_property_cross_attention(
-                h_out,
-                h_in,
-                tgt_key_padding_mask=padding_mask,
-                memory_key_padding_mask=padding_mask,
-            )
+
+            h_global_property = h_out.clone()
+            for layer in self.global_property_cross_attention:
+                h_global_property = layer(
+                    h_global_property,
+                    h_in,
+                    tgt_key_padding_mask=padding_mask,
+                    memory_key_padding_mask=padding_mask,
+                )
 
             out_atom_types = self.out_atom_types(h_atom)
             out_pos = self.out_pos(h_pos)
