@@ -57,6 +57,11 @@ def resolve_omegaconf_variable(variable_path: str) -> Any:
     return attribute
 
 
+def resolve_lr(lr: float, scale_factor: float) -> float:
+    """Resolve learning rate based on base learning rate and scale factor."""
+    return lr * scale_factor
+
+
 def resolve_batch_size(base_size: int, scale_factor: float) -> int:
     """Resolve batch size based on base size and scale factor."""
     return max(1, round(base_size * scale_factor))
@@ -73,6 +78,10 @@ def register_custom_omegaconf_resolvers():
     OmegaConf.register_new_resolver(
         "resolve_variable",
         lambda variable_path: resolve_omegaconf_variable(variable_path),
+    )
+    OmegaConf.register_new_resolver(
+        "resolve_lr",
+        lambda lr, scale_factor: resolve_lr(lr, scale_factor),
     )
     OmegaConf.register_new_resolver(
         "resolve_lr_scheduler",

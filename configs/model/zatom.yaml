@@ -31,7 +31,7 @@ datasets: ${data.datamodule.datasets}
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
-  lr: 2e-3
+  lr: ${resolve_lr:1e-3,${model.architecture.batch_size_scale_factor}}
   weight_decay: 0.0
   betas: [0.9, 0.995]
 
