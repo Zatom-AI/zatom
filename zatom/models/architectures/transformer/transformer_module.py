@@ -26,11 +26,12 @@ class TransformerModule(nn.Module):
         atom_dim: Number of atom types.
         num_heads: Number of attention heads.
         num_layers: Number of transformer layers.
+        aux_layer: Layer at which to extract representations for auxiliary tasks.
         hidden_dim: Dimension of the hidden layers.
         dataset_embedder: The dataset embedder module.
         spacegroup_embedder: The spacegroup embedder module.
         activation: Activation function to use ("SiLU", "ReLU", "SwiGLU").
-        implementation: Implementation type ("pytorch" or "reimplemented").
+        implementation: Implementation type ("reimplemented",).
         cross_attention: Whether to use cross-attention layers.
         add_sinusoid_posenc: Whether to add sinusoidal positional encoding.
         concat_combine_input: Whether to concatenate and combine inputs.
@@ -45,11 +46,12 @@ class TransformerModule(nn.Module):
         atom_dim: int,
         num_heads: int,
         num_layers: int,
+        aux_layer: int,
         hidden_dim: int,
         dataset_embedder: nn.Module,
         spacegroup_embedder: nn.Module,
         activation: Literal["SiLU", "ReLU", "SwiGLU"] = "SiLU",
-        implementation: Literal["pytorch", "reimplemented"] = "pytorch",
+        implementation: Literal["reimplemented"] = "reimplemented",
         cross_attention: bool = False,
         add_sinusoid_posenc: bool = True,
         concat_combine_input: bool = False,
@@ -101,21 +103,12 @@ class TransformerModule(nn.Module):
         else:
             raise ValueError(f"Invalid activation: {activation}")
 
-        if self.implementation == "pytorch":
-            encoder_layer = nn.TransformerEncoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                activation=activation,
-                batch_first=True,
-                norm_first=True,
-            )
-            self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        elif self.implementation == "reimplemented":
+        if self.implementation == "reimplemented":
             self.transformer = Transformer(
                 dim=hidden_dim,
                 num_heads=num_heads,
                 depth=num_layers,
+                repr_layer=aux_layer,
             )
         else:
             raise ValueError(f"Invalid implementation: {self.implementation}")
@@ -381,10 +374,10 @@ class TransformerModule(nn.Module):
             )
         h_in = h_in * real_mask.unsqueeze(-1)
 
-        if self.implementation == "pytorch":
-            h_out = self.transformer(h_in, src_key_padding_mask=padding_mask)
-        elif self.implementation == "reimplemented":
-            h_out = self.transformer(h_in, padding_mask=padding_mask)
+        if self.implementation == "reimplemented":
+            h_out, h_aux = self.transformer(h_in, padding_mask=padding_mask)
+        else:
+            raise ValueError(f"Invalid implementation: {self.implementation}")
 
         h_out = h_out * real_mask.unsqueeze(-1)
 
@@ -442,9 +435,9 @@ class TransformerModule(nn.Module):
             angles_radians * global_mask * sample_is_periodic,  # (B, 1, 3)
         )
         pred_aux_outputs = (
-            self.global_property_head(h_out.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
-            self.global_energy_head(h_out.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
-            self.atomic_forces_head(h_out) * real_mask.unsqueeze(-1),  # (B, M, 3)
+            self.global_property_head(h_aux.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
+            self.global_energy_head(h_aux.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
+            self.atomic_forces_head(h_aux) * real_mask.unsqueeze(-1),  # (B, M, 3)
         )
 
         return pred_modals, pred_aux_outputs

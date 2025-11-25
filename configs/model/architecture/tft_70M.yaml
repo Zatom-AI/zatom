@@ -6,7 +6,7 @@ multimodal_model:
   _partial_: True
   spatial_dim: ${globals.spatial_dim}
   atom_dim: ${globals.max_num_elements}
-  implementation: reimplemented # NOTE: must be one of (`pytorch`, `reimplemented`)
+  implementation: reimplemented # NOTE: must be one of (`reimplemented`,)
   cross_attention: true
 
 dataset_embedder:
@@ -113,6 +113,7 @@ angles_radians_interpolant:
 # General architecture parameters
 hidden_size: 512 # 128, 256, 512 -> 5M, 20M, 70M model sizes
 num_layers: 16
+aux_layer: 7 # NOTE: by default set to half of num_layers (zero-indexed)
 token_num_heads: 8
 max_num_elements: ${globals.max_num_elements}
 batch_size_scale_factor: 1 # 2, 2, 1 -> 5M, 20M, 70M model sizes

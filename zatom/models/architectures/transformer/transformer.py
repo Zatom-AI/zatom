@@ -1,6 +1,6 @@
 """Adapted from https://github.com/carlosinator/tabasco."""
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -90,6 +90,7 @@ class Transformer(nn.Module):
     Args:
         dim: Model dimension
         depth: Number of transformer blocks
+        repr_layer: Layer at which to additionally extract intermediate representations.
         num_heads: Number of attention heads
         mlp_dim: Hidden dimension for feed-forward networks (defaults to 4x dim)
         dropout: Dropout probability
@@ -102,6 +103,7 @@ class Transformer(nn.Module):
         self,
         dim: int,
         depth: int,
+        repr_layer: int,
         num_heads: int,
         mlp_dim: Optional[int] = None,
         dropout: float = 0.0,
@@ -109,6 +111,8 @@ class Transformer(nn.Module):
         norm_eps: float = 1e-5,
     ):
         super().__init__()
+
+        self.repr_layer = repr_layer
 
         if mlp_dim is None:
             mlp_dim = 4 * dim
@@ -130,6 +134,7 @@ class Transformer(nn.Module):
 
         # Final layer normalization
         self.norm = nn.LayerNorm(dim, eps=norm_eps)
+        self.repr_norm = nn.LayerNorm(dim, eps=norm_eps)
 
     @typecheck
     def forward(
@@ -137,7 +142,7 @@ class Transformer(nn.Module):
         x: torch.Tensor,
         padding_mask: Optional[torch.Tensor] = None,
         attn_mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass through the transformer.
 
         Args:
@@ -148,13 +153,22 @@ class Transformer(nn.Module):
                 Shape: [seq_len, seq_len] or [batch_size, seq_len, seq_len]
 
         Returns:
-            Output tensor of shape [batch_size, seq_len, dim]
+            Output tensor of shape [batch_size, seq_len, dim] and
+            intermediate representation from the specified layer.
         """
         # Pass through each transformer block
-        for layer in self.layers:
+        repr = None
+        for i, layer in enumerate(self.layers):
             x = layer(x, padding_mask=padding_mask, attn_mask=attn_mask)
+            if i == self.repr_layer:
+                repr = x.clone()
+
+        assert (
+            repr is not None
+        ), f"The specified `repr_layer` ({self.repr_layer}) was not reached during the forward pass."
 
         # Apply final normalization
         x = self.norm(x)
+        repr = self.repr_norm(repr)
 
-        return x
+        return x, repr
