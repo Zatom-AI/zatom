@@ -476,7 +476,7 @@ class MultimodalDiT(nn.Module):
         ), f"Latent must have {num_tokens} tokens, but got {latent.shape[1]}."
 
         # Run token trunk
-        latent = self.trunk(
+        latent, aux_latent = self.trunk(
             latents=latent,
             c=c_emb,
             attention_mask=attention_mask,
@@ -504,7 +504,10 @@ class MultimodalDiT(nn.Module):
             sdpa_backends=sdpa_backends,
         )
         output = self.final_layer(output, c=c_emb)
-        output = output * mask.unsqueeze(-1)  # Mask out padding atoms
+
+        # Mask out padding atoms
+        output = output * mask.unsqueeze(-1)
+        aux_output = aux_latent * mask.unsqueeze(-1)
 
         # Collect predictions
         global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
@@ -520,9 +523,10 @@ class MultimodalDiT(nn.Module):
             * sample_is_periodic,  # (B, 1, 3)
         )
         pred_aux_outputs = (
-            self.global_property_head(output.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
-            self.global_energy_head(output.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
-            self.atomic_forces_head(output) * mask.unsqueeze(-1),  # (B, M, 3)
+            self.global_property_head(aux_output.mean(-2, keepdim=True))
+            * global_mask,  # (B, 1, 1)
+            self.global_energy_head(aux_output.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
+            self.atomic_forces_head(aux_output) * mask.unsqueeze(-1),  # (B, M, 3)
         )
 
         return pred_modals, pred_aux_outputs

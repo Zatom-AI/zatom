@@ -432,17 +432,19 @@ class HomogenTrunk(nn.Module):
     Args:
         block: A callable that returns a DiTBlock or DiPBlock.
         depth: The number of blocks in the trunk.
+        repr_layer: The layer index for representation extraction. If None, no extraction is done. Default: None
 
     Returns:
         Output tensor of shape (B, N, D).
     """
 
-    def __init__(self, block: nn.Module, depth: int):
+    def __init__(self, block: nn.Module, depth: int, repr_layer: int | None = None):
         super().__init__()
         self.blocks = nn.ModuleList([block() for _ in range(depth)])
+        self.repr_layer = repr_layer
 
     @typecheck
-    def forward(self, latents: Tensor, c: Tensor, **kwargs: Any) -> Tensor:
+    def forward(self, latents: Tensor, c: Tensor, **kwargs: Any) -> Tensor | Tuple[Tensor, Tensor]:
         """Forward pass of the homogeneous trunk.
 
         Args:
@@ -451,9 +453,22 @@ class HomogenTrunk(nn.Module):
             **kwargs: Additional arguments for the blocks.
 
         Returns:
-            Output tensor of shape (B, N, D).
+            Output tensor of shape (B, N, D), or a tuple
+            of (output tensor, representation tensor)
+            if repr_layer is specified.
         """
+        repr = None
+
         for i, block in enumerate(self.blocks):
             kwargs["layer_idx"] = i
             latents = block(latents=latents, c=c, **kwargs)
+            if self.repr_layer is not None and i == self.repr_layer:
+                repr = latents.clone()
+
+        if self.repr_layer is not None:
+            assert (
+                repr is not None
+            ), f"Representation layer {self.repr_layer} not found in trunk of depth {len(self.blocks)}."
+            return latents, repr
+
         return latents

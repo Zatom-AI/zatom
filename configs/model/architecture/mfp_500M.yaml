@@ -66,6 +66,7 @@ atom_encoder_transformer:
 trunk:
   _target_: zatom.models.architectures.dit.blocks.HomogenTrunk
   depth: 24
+  repr_layer: 11 # NOTE: by default set to half of depth (zero-indexed)
   block:
     _target_: zatom.models.architectures.dit.blocks.DiPBlock
     _partial_: True # NOTE: this is set since, in the for-loop, we create a new module

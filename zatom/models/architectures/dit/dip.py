@@ -536,7 +536,7 @@ class MultimodalDiP(nn.Module):
 
         # Run token trunk
         token_c_emb_trunk = self.token_trunk_cond_proj(c_emb)
-        latent = self.trunk(
+        latent, aux_latent = self.trunk(
             latents=latent,
             c=token_c_emb_trunk.squeeze(-2),
             attention_mask=attention_mask,
@@ -568,7 +568,10 @@ class MultimodalDiP(nn.Module):
             sdpa_backends=sdpa_backends,
         )
         output = self.final_layer(output, c=c_emb.squeeze(-2))
-        output = output * mask.unsqueeze(-1)  # Mask out padding atoms
+
+        # Mask out padding atoms
+        output = output * mask.unsqueeze(-1)
+        aux_output = aux_latent * mask.unsqueeze(-1)
 
         # Collect predictions
         pred_atom_types = to_scalars_vectors(
@@ -586,14 +589,14 @@ class MultimodalDiP(nn.Module):
         )[0]
 
         pred_global_property = to_scalars_vectors(
-            self.global_property_head(output.mean(-2, keepdim=True)), 1, 0, self.group
+            self.global_property_head(aux_output.mean(-2, keepdim=True)), 1, 0, self.group
         )[0]
         pred_global_energy = to_scalars_vectors(
-            self.global_energy_head(output.mean(-2, keepdim=True)), 1, 0, self.group
+            self.global_energy_head(aux_output.mean(-2, keepdim=True)), 1, 0, self.group
         )[0]
-        pred_atomic_forces = to_scalars_vectors(self.atomic_forces_head(output), 0, 1, self.group)[
-            1
-        ].squeeze(-2)
+        pred_atomic_forces = to_scalars_vectors(
+            self.atomic_forces_head(aux_output), 0, 1, self.group
+        )[1].squeeze(-2)
 
         global_mask = mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
         pred_modals = (
