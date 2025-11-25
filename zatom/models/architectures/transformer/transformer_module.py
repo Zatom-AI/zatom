@@ -26,6 +26,7 @@ class TransformerModule(nn.Module):
         atom_dim: Number of atom types.
         num_heads: Number of attention heads.
         num_layers: Number of transformer layers.
+        num_aux_layers: Number of auxiliary transformer layers.
         aux_layer: Layer at which to extract representations for auxiliary tasks.
         hidden_dim: Dimension of the hidden layers.
         dataset_embedder: The dataset embedder module.
@@ -46,6 +47,7 @@ class TransformerModule(nn.Module):
         atom_dim: int,
         num_heads: int,
         num_layers: int,
+        num_aux_layers: int,
         aux_layer: int,
         hidden_dim: int,
         dataset_embedder: nn.Module,
@@ -71,6 +73,7 @@ class TransformerModule(nn.Module):
         self.comb_input_dim = self.input_dim + self.time_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.num_aux_layers = num_aux_layers
         self.implementation = implementation
         self.cross_attention = cross_attention
         self.add_sinusoid_posenc = add_sinusoid_posenc
@@ -172,29 +175,24 @@ class TransformerModule(nn.Module):
                 batch_first=True,
                 norm_first=True,
             )
-            self.global_property_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
-            )
-            self.global_energy_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
-            )
-            self.atomic_forces_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
-            )
 
         # Add auxiliary task heads
+        self.global_property_transformer = Transformer(
+            dim=hidden_dim,
+            num_heads=num_heads,
+            depth=num_aux_layers,
+        )
+        self.global_energy_transformer = Transformer(
+            dim=hidden_dim,
+            num_heads=num_heads,
+            depth=num_aux_layers,
+        )
+        self.atomic_forces_transformer = Transformer(
+            dim=hidden_dim,
+            num_heads=num_heads,
+            depth=num_aux_layers,
+        )
+
         self.global_property_head = nn.Linear(hidden_dim, 1, bias=True)
         self.global_energy_head = nn.Linear(hidden_dim, 1, bias=True)
         self.atomic_forces_head = nn.Linear(hidden_dim, 3, bias=False)
@@ -434,37 +432,12 @@ class TransformerModule(nn.Module):
                 tgt_key_padding_mask=padding_mask,
                 memory_key_padding_mask=padding_mask,
             )
-            h_global_property = self.global_property_cross_attention(
-                h_aux,
-                h_in,
-                tgt_key_padding_mask=padding_mask,
-                memory_key_padding_mask=padding_mask,
-            )
-            h_global_energy = self.global_energy_cross_attention(
-                h_aux,
-                h_in,
-                tgt_key_padding_mask=padding_mask,
-                memory_key_padding_mask=padding_mask,
-            )
-            h_atomic_forces = self.atomic_forces_cross_attention(
-                h_aux,
-                h_in,
-                tgt_key_padding_mask=padding_mask,
-                memory_key_padding_mask=padding_mask,
-            )
 
             out_atom_types = self.out_atom_types(h_atom)
             out_pos = self.out_pos(h_pos)
             frac_coords = self.out_frac_coords(h_frac_coords)
             lengths_scaled = self.out_lengths_scaled(h_lengths_scaled.mean(-2, keepdim=True))
             angles_radians = self.out_angles_radians(h_angles_radians.mean(-2, keepdim=True))
-            global_property = (
-                self.global_property_head(h_global_property.mean(-2, keepdim=True))
-            ) * global_mask
-            global_energy = (
-                self.global_energy_head(h_global_energy.mean(-2, keepdim=True)) * global_mask
-            )
-            atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
 
         else:
             out_atom_types = self.out_atom_types(h_out)
@@ -472,11 +445,26 @@ class TransformerModule(nn.Module):
             frac_coords = self.out_frac_coords(h_out)
             lengths_scaled = self.out_lengths_scaled(h_out.mean(-2, keepdim=True))
             angles_radians = self.out_angles_radians(h_out.mean(-2, keepdim=True))
-            global_property = (
-                self.global_property_head(h_aux.mean(-2, keepdim=True))
-            ) * global_mask
-            global_energy = self.global_energy_head(h_aux.mean(-2, keepdim=True)) * global_mask
-            atomic_forces = self.atomic_forces_head(h_aux) * real_mask.unsqueeze(-1)
+
+        h_global_property = self.global_property_transformer(
+            h_aux,
+            padding_mask=padding_mask,
+        )
+        h_global_energy = self.global_energy_transformer(
+            h_aux,
+            padding_mask=padding_mask,
+        )
+        h_atomic_forces = self.atomic_forces_transformer(
+            h_aux,
+            padding_mask=padding_mask,
+        )
+        global_property = (
+            self.global_property_head(h_global_property.mean(-2, keepdim=True))
+        ) * global_mask
+        global_energy = (
+            self.global_energy_head(h_global_energy.mean(-2, keepdim=True)) * global_mask
+        )
+        atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
 
         pred_modals = (
             out_atom_types * real_mask.unsqueeze(-1),  # (B, M, V=self.vocab_size)
