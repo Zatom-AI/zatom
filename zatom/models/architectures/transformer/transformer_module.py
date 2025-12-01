@@ -26,6 +26,7 @@ class TransformerModule(nn.Module):
         atom_dim: Number of atom types.
         num_heads: Number of attention heads.
         num_layers: Number of transformer layers.
+        num_aux_layers: Number of auxiliary transformer layers.
         aux_layer: Layer at which to extract representations for auxiliary tasks.
         hidden_dim: Dimension of the hidden layers.
         dataset_embedder: The dataset embedder module.
@@ -46,6 +47,7 @@ class TransformerModule(nn.Module):
         atom_dim: int,
         num_heads: int,
         num_layers: int,
+        num_aux_layers: int,
         aux_layer: int,
         hidden_dim: int,
         dataset_embedder: nn.Module,
@@ -71,6 +73,7 @@ class TransformerModule(nn.Module):
         self.comb_input_dim = self.input_dim + self.time_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
+        self.num_aux_layers = num_aux_layers
         self.implementation = implementation
         self.cross_attention = cross_attention
         self.add_sinusoid_posenc = add_sinusoid_posenc
@@ -174,6 +177,22 @@ class TransformerModule(nn.Module):
             )
 
         # Add auxiliary task heads
+        self.global_property_transformer = Transformer(
+            dim=hidden_dim,
+            num_heads=num_heads,
+            depth=num_aux_layers,
+        )
+        self.global_energy_transformer = Transformer(
+            dim=hidden_dim,
+            num_heads=num_heads,
+            depth=num_aux_layers,
+        )
+        self.atomic_forces_transformer = Transformer(
+            dim=hidden_dim,
+            num_heads=num_heads,
+            depth=num_aux_layers,
+        )
+
         self.global_property_head = nn.Linear(hidden_dim, 1, bias=True)
         self.global_energy_head = nn.Linear(hidden_dim, 1, bias=True)
         self.atomic_forces_head = nn.Linear(hidden_dim, 3, bias=False)
@@ -295,6 +314,7 @@ class TransformerModule(nn.Module):
         angles_radians = angles_radians * sample_is_periodic
 
         real_mask = 1 - padding_mask.int()
+        global_mask = real_mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
 
         embed_atom_types = self.atom_type_embed(atom_types.argmax(dim=-1))
         embed_pos = self.pos_embed(pos)
@@ -426,7 +446,26 @@ class TransformerModule(nn.Module):
             lengths_scaled = self.out_lengths_scaled(h_out.mean(-2, keepdim=True))
             angles_radians = self.out_angles_radians(h_out.mean(-2, keepdim=True))
 
-        global_mask = real_mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
+        h_global_property = self.global_property_transformer(
+            h_aux,
+            padding_mask=padding_mask,
+        )
+        h_global_energy = self.global_energy_transformer(
+            h_aux,
+            padding_mask=padding_mask,
+        )
+        h_atomic_forces = self.atomic_forces_transformer(
+            h_aux,
+            padding_mask=padding_mask,
+        )
+        global_property = (
+            self.global_property_head(h_global_property.mean(-2, keepdim=True))
+        ) * global_mask
+        global_energy = (
+            self.global_energy_head(h_global_energy.mean(-2, keepdim=True)) * global_mask
+        )
+        atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
+
         pred_modals = (
             out_atom_types * real_mask.unsqueeze(-1),  # (B, M, V=self.vocab_size)
             out_pos * real_mask.unsqueeze(-1) * ~token_is_periodic,  # (B, M, 3)
@@ -435,9 +474,9 @@ class TransformerModule(nn.Module):
             angles_radians * global_mask * sample_is_periodic,  # (B, 1, 3)
         )
         pred_aux_outputs = (
-            self.global_property_head(h_aux.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
-            self.global_energy_head(h_aux.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
-            self.atomic_forces_head(h_aux) * real_mask.unsqueeze(-1),  # (B, M, 3)
+            global_property,  # (B, 1, 1)
+            global_energy,  # (B, 1, 1)
+            atomic_forces,  # (B, M, 3)
         )
 
         return pred_modals, pred_aux_outputs

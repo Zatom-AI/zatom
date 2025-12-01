@@ -41,17 +41,17 @@ class AuxiliaryTaskFinetuning(BaseFinetuning):
             1:
         ]  # Skip the top-level module
         for aux_task in pl_module.model.auxiliary_tasks:
-            aux_task_heads = list(
+            aux_task_modules = list(
                 filter(
-                    lambda param: param[0].lower().endswith(f"{aux_task}_head"),
+                    lambda param: aux_task in param[0].lower(),
                     named_modules,
                 )
             )
             assert (
-                len(aux_task_heads) == 1
-            ), f"Expected exactly one head for auxiliary task '{aux_task}'."
-            for head in aux_task_heads:
-                named_modules.remove(head)
+                len(aux_task_modules) >= 1
+            ), f"Expected at least one module for auxiliary task '{aux_task}'."
+            for module in aux_task_modules:
+                named_modules.remove(module)
 
         modules_to_freeze = list(named_module[1] for named_module in named_modules)
         self.freeze(modules_to_freeze)
@@ -125,17 +125,17 @@ class FlowMatchingAuxiliaryTaskFinetuning(AuxiliaryTaskFinetuning):
             1:
         ]  # Skip the top-level module
         for aux_task in pl_module.model.auxiliary_tasks:
-            aux_task_heads = list(
+            aux_task_modules = list(
                 filter(
-                    lambda param: param[0].lower().endswith(f"{aux_task}_head"),
+                    lambda param: aux_task in param[0].lower(),
                     named_modules,
                 )
             )
             assert (
-                len(aux_task_heads) == 1
-            ), f"Expected exactly one head for auxiliary task '{aux_task}'."
-            for head in aux_task_heads:
-                named_modules.remove(head)
+                len(aux_task_modules) >= 1
+            ), f"Expected at least one module for auxiliary task '{aux_task}'."
+            for module in aux_task_modules:
+                named_modules.remove(module)
 
         modules_to_freeze = list(named_module[1] for named_module in named_modules)
         self.freeze(modules_to_freeze)

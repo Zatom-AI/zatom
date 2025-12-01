@@ -1,21 +1,15 @@
 #!/bin/bash -l
 
-######################### Batch Headers #########################
-#SBATCH -C gpu&hbm40g                                         # request GPU nodes
-#SBATCH --qos=shared                                          # use specified partition for job
-#SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
-#SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
-#SBATCH --account=m5008                                       # use specified account for billing (e.g., `m5008_g` for AI4Science proposal, `dasrepo` for all else)
-#SBATCH --nodes=1                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
-#SBATCH --gpus-per-node=2                                     # request A100 GPU resource(s)
-#SBATCH --ntasks-per-node=2                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
-#SBATCH --time=00-23:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=finetune-tft-5M-joint                      # job name
-#SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
-#SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
-
-# Wait for 5-10 seconds randomly to avoid race condition
-sleep $((RANDOM % 6 + 5))
+# salloc -C "gpu&hbm40g" \
+#        --qos=shared_interactive \
+#        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
+#        --module=gpu,nccl-plugin \
+#        --account=m5008 \
+#        --nodes=1 \
+#        --gpus-per-node=2 \
+#        --ntasks-per-node=2 \
+#        --time=04:00:00 \
+#        --job-name=finetune-tft-70M-joint
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -34,11 +28,11 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="v8zoszir"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-11-20_18-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="tyideuig"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-11-25_14-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
-DEFAULT_ARCHITECTURE="tft_5M"             # NOTE: Set the model architecture to be used, must be one of (`{tft,}_5M`, `{tft,}_20M`, `{tft,}_70M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
+DEFAULT_ARCHITECTURE="tft_70M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_5M`, `{tft,}_20M`, `{tft,}_70M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided
@@ -50,12 +44,12 @@ ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architectu
 TASK_NAME="finetune_fm"                                                # Name of the task to perform
 RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_joint"     # Name of the model type and dataset configuration
 
-PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_tabasco_model-zatom2_arch-tft_5M_joint_2025-11-15_17-00-00/checkpoints/model-epoch@919-step@228160-val_qm9_posebusters_rate@0.9764-val_mp20_valid_rate@0.8610.ckpt"  # Path at which to find (initial) pretrained model checkpoint
+PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_model-zatom_arch-tft_70M_joint_2025-11-22_10-00-00/checkpoints/model-epoch@779-step@386880-val_qm9_posebusters_rate@0.9877-val_mp20_valid_rate@0.8865.ckpt"  # Path at which to find (initial) pretrained model checkpoint
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
 mkdir -p "$CKPT_PATH"
 
 # Inform user of job details
-echo -e "Job details:\n==================\n"
+echo -e "Job details:\n========================================================================\n"
 
 echo "Run name: $RUN_NAME"
 echo "Run ID: $RUN_ID"
@@ -73,7 +67,7 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script train_fm.py:\n==================\n"
+echo -e "\nExecuting script train_fm.py:\n========================================================================\n"
 
 # Run script
 bash -c "
