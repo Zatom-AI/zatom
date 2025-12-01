@@ -154,7 +154,8 @@ class JointDataModule(LightningDataModule):
             root=self.hparams.datasets.qm9.root,
             transform=partial(qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs),
         ).shuffle()
-        if self.hparams.datasets.qm9.global_property is None:
+        qm9_target_name = self.hparams.datasets.qm9.global_property
+        if qm9_target_name is None:
             qm9_dataset.data.y = qm9_dataset.data.y[:, 0:1]  # Default to dipole moment (μ)
         # Create train, val, test splits
         self.qm9_train_dataset = qm9_dataset[:100000]
@@ -196,7 +197,6 @@ class JointDataModule(LightningDataModule):
             "B",
             "C",
         ]
-        qm9_target_name = self.hparams.datasets.qm9.global_property
         qm9_target_map = {name: i for i, name in enumerate(qm9_all_targets)}
         if qm9_target_name is not None:
             assert (
