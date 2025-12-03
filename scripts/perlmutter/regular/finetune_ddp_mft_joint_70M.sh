@@ -82,6 +82,7 @@ bash -c "
     srun --kill-on-bad-exit=1 shifter python zatom/train_fm.py \
     pretrained_ckpt_path=$PRETRAINED_CKPT_PATH \
     ckpt_path=$CKPT_PATH \
+    callbacks.auxiliary_task_finetuning.t_min=0.9 \
     data=$DATASET \
     date=$RUN_DATE \
     experiment=$EXPERIMENT \
