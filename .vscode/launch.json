@@ -204,7 +204,7 @@
                 // "data.datamodule.num_workers.test=0",
                 // "data.datamodule.datasets.mp20.proportion=4e-5",
                 // "data.datamodule.datasets.qm9.proportion=1e-5",
-                // "data.datamodule.datasets.qm9.global_property=mu",
+                "data.datamodule.datasets.qm9.global_property=all",
                 // "data.datamodule.datasets.qmof150.proportion=0.0",
                 // "data.datamodule.datasets.omol25.proportion=4e-5",
                 // "data.datamodule.datasets.omol25.global_energy=true",

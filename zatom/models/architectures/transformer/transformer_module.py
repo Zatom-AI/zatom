@@ -29,6 +29,7 @@ class TransformerModule(nn.Module):
         num_aux_layers: Number of auxiliary transformer layers.
         aux_layer: Layer at which to extract representations for auxiliary tasks.
         hidden_dim: Dimension of the hidden layers.
+        num_properties: Number of global properties to predict.
         dataset_embedder: The dataset embedder module.
         spacegroup_embedder: The spacegroup embedder module.
         activation: Activation function to use ("SiLU", "ReLU", "SwiGLU").
@@ -50,6 +51,7 @@ class TransformerModule(nn.Module):
         num_aux_layers: int,
         aux_layer: int,
         hidden_dim: int,
+        num_properties: int,
         dataset_embedder: nn.Module,
         spacegroup_embedder: nn.Module,
         activation: Literal["SiLU", "ReLU", "SwiGLU"] = "SiLU",
@@ -215,7 +217,7 @@ class TransformerModule(nn.Module):
                 depth=num_aux_layers,
             )
 
-        self.global_property_head = nn.Linear(hidden_dim, 1, bias=True)
+        self.global_property_head = nn.Linear(hidden_dim, num_properties, bias=True)
         self.global_energy_head = nn.Linear(hidden_dim, 1, bias=True)
         self.atomic_forces_head = nn.Linear(hidden_dim, 3, bias=False)
 
@@ -285,7 +287,7 @@ class TransformerModule(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],
@@ -562,7 +564,7 @@ class TransformerModule(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],

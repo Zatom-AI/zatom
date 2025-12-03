@@ -68,18 +68,20 @@ def qm9_custom_transform(data: Data, removeHs: bool = True) -> Data:
 
 
 @typecheck
-def global_property_custom_transform(data: Data) -> Data:
+def global_property_custom_transform(data: Data, num_properties: int) -> Data:
     """Custom global property transformation for a dataset.
 
     Args:
         data: Input data object.
-        removeHs: Whether to remove hydrogen atoms.
+        num_properties: Number of global properties.
 
     Returns:
         Data: Transformed data object.
     """
     # PyG object attributes consistent with CrystalDataset
-    data.y = torch.tensor([[torch.nan]], dtype=torch.float32)  # Dummy target property
+    data.y = torch.tensor(
+        [[torch.nan] * num_properties], dtype=torch.float32
+    )  # Dummy target property
     return data
 
 
@@ -200,7 +202,7 @@ class JointDataModule(LightningDataModule):
         qm9_target_map = {name: i for i, name in enumerate(qm9_all_targets)}
         if qm9_target_name is not None:
             assert (
-                qm9_target_name in qm9_target_map
+                qm9_target_name == "all" or qm9_target_name in qm9_target_map
             ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {qm9_all_targets}."
             qm9_dataset = QM9(
                 root=self.hparams.datasets.qm9.root,
@@ -208,12 +210,17 @@ class JointDataModule(LightningDataModule):
                     qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs
                 ),
             )
-            qm9_target_idx = qm9_target_map[qm9_target_name]
-            qm9_dataset.data.y = qm9_dataset.data.y[:, qm9_target_idx : qm9_target_idx + 1]
-            log.info(
-                f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
-                f" with mean {qm9_dataset.data.y.mean().item():.4f} and std {qm9_dataset.data.y.std().item():.4f}."
-            )
+            if qm9_target_name == "all":
+                log.info(
+                    f"QM9 target property set to 'all' ({qm9_dataset.data.y.shape[1]} properties)."
+                )
+            else:
+                qm9_target_idx = qm9_target_map[qm9_target_name]
+                qm9_dataset.data.y = qm9_dataset.data.y[:, qm9_target_idx : qm9_target_idx + 1]
+                log.info(
+                    f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
+                    f" with mean {qm9_dataset.data.y.mean().item():.4f} and std {qm9_dataset.data.y.std().item():.4f}."
+                )
             # Create property prediction train/val/test splits (n.b., same as Platonic Transformer)
             qm9_random_state = np.random.RandomState(seed=42)
             qm9_perm = torch.from_numpy(qm9_random_state.permutation(np.arange(130831)))
@@ -248,9 +255,12 @@ class JointDataModule(LightningDataModule):
         ]
 
         # MP20 dataset
+        global_property_custom_transform_fn = partial(
+            global_property_custom_transform, num_properties=qm9_dataset.data.y.shape[1]
+        )  # Dummy property
         mp20_dataset = MP20(
             root=self.hparams.datasets.mp20.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
         )  # .shuffle()
         # # Save num_nodes histogram for sampling from generative models
         # num_nodes = torch.tensor([data["num_nodes"] for data in mp20_dataset])
@@ -283,7 +293,7 @@ class JointDataModule(LightningDataModule):
         # QMOF150 dataset
         qmof150_dataset = QMOF150(
             root=self.hparams.datasets.qmof150.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
         ).shuffle()
         # # Save num_nodes histogram for sampling from generative models
         # num_nodes = torch.tensor([data["num_nodes"] for data in qmof150_dataset])
@@ -391,19 +401,19 @@ class JointDataModule(LightningDataModule):
         # Create train, val, test splits
         self.geom_train_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
             load=self.hparams.datasets.geom.proportion > 0.0,
             split="train",
         )  # .shuffle()
         self.geom_val_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
             load=self.hparams.datasets.geom.proportion > 0.0,
             split="val",
         )
         self.geom_test_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
             load=self.hparams.datasets.geom.proportion > 0.0,
             split="test",
         )

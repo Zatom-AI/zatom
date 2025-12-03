@@ -44,6 +44,7 @@ class MultimodalDiP(nn.Module):
         trunk: The trunk transformer module for tokens.
         atom_encoder_transformer: The transformer module for atom encoding.
         atom_decoder_transformer: The transformer module for atom decoding.
+        num_properties: The number of global properties to predict.
         hidden_size: The hidden size for the model.
         token_num_heads: The number of (token) attention heads for the trunk transformer.
         atom_num_heads: The number of (atom) attention heads for the atom transformers.
@@ -73,6 +74,7 @@ class MultimodalDiP(nn.Module):
         trunk: nn.Module,
         atom_encoder_transformer: nn.Module,
         atom_decoder_transformer: nn.Module,
+        num_properties: int,
         hidden_size: int = 768,
         token_num_heads: int = 12,
         atom_num_heads: int = 4,
@@ -105,6 +107,7 @@ class MultimodalDiP(nn.Module):
         self.atom_encoder_transformer = atom_encoder_transformer
         self.atom_decoder_transformer = atom_decoder_transformer
 
+        self.num_properties = num_properties
         self.hidden_size = hidden_size
         self.token_num_heads = token_num_heads
         self.atom_num_heads = atom_num_heads
@@ -208,7 +211,7 @@ class MultimodalDiP(nn.Module):
         )
 
         self.global_property_head = PlatonicLinear(
-            hidden_size, 1 * self.num_G, solid=solid_name, bias=True
+            hidden_size, num_properties * self.num_G, solid=solid_name, bias=True
         )
         self.global_energy_head = PlatonicLinear(
             hidden_size, 1 * self.num_G, solid=solid_name, bias=True
@@ -339,7 +342,7 @@ class MultimodalDiP(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],
@@ -589,7 +592,10 @@ class MultimodalDiP(nn.Module):
         )[0]
 
         pred_global_property = to_scalars_vectors(
-            self.global_property_head(aux_output.mean(-2, keepdim=True)), 1, 0, self.group
+            self.global_property_head(aux_output.mean(-2, keepdim=True)),
+            self.num_properties,
+            0,
+            self.group,
         )[0]
         pred_global_energy = to_scalars_vectors(
             self.global_energy_head(aux_output.mean(-2, keepdim=True)), 1, 0, self.group
@@ -610,7 +616,7 @@ class MultimodalDiP(nn.Module):
             pred_angles_radians * global_mask * sample_is_periodic,  # (B, 1, 3)
         )
         pred_aux_outputs = (
-            pred_global_property * global_mask,  # (B, 1, 1)
+            pred_global_property * global_mask,  # (B, 1, P)
             pred_global_energy * global_mask,  # (B, 1, 1)
             pred_atomic_forces * mask.unsqueeze(-1),  # (B, M, 3)
         )

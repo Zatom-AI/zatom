@@ -67,6 +67,7 @@ class MFT(nn.Module):
         atom_n_queries_dec: Number of queries in the atom decoder.
         atom_n_keys_dec: Number of keys in the atom decoder.
         max_num_elements: Maximum number of elements in the dataset.
+        num_properties: Number of global properties to predict.
         batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 180M) model variant.
         use_length_condition: Whether to use the length condition.
         condition_on_input: Whether to condition the model on the input as well as context.
@@ -103,6 +104,7 @@ class MFT(nn.Module):
         atom_n_queries_dec: int = 32,
         atom_n_keys_dec: int = 128,
         max_num_elements: int = 100,
+        num_properties: int = 1,
         batch_size_scale_factor: int = 1,
         use_length_condition: bool = True,
         condition_on_input: bool = False,
@@ -158,6 +160,7 @@ class MFT(nn.Module):
             trunk=trunk,
             atom_encoder_transformer=atom_encoder_transformer,
             atom_decoder_transformer=atom_decoder_transformer,
+            num_properties=num_properties,
             hidden_size=hidden_size,
             token_num_heads=token_num_heads,
             atom_num_heads=atom_num_heads,
@@ -586,15 +589,15 @@ class MFT(nn.Module):
 
         # Add auxiliary losses
         for aux_task in self.auxiliary_tasks:
-            aux_pred = pred[aux_task].squeeze(-1)
+            aux_pred = pred[aux_task]
             # Requested auxiliary task → compute loss
             if aux_task in path.x_1:
                 real_mask = 1 - path.x_1["padding_mask"].int()
                 aux_target = path.x_1[aux_task]
                 aux_mask = ~aux_target.isnan()
                 aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                if aux_target.squeeze().dim() == 1:
-                    err = (aux_pred - aux_target) * aux_mask
+                if aux_task in ("global_property", "global_energy"):
+                    err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
                     aux_mask = aux_mask * real_mask.unsqueeze(-1)
@@ -616,8 +619,10 @@ class MFT(nn.Module):
                     aux_target = path.x_1[aux_task]
                     aux_mask = ~aux_target.isnan()
                     aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                    n_tokens = real_mask.sum(dim=-1, keepdim=True).clamp(min=1.0)
-                    err = ((aux_pred / n_tokens) - (aux_target / n_tokens)) * aux_mask
+                    n_tokens = real_mask.sum(dim=-1, keepdim=True).clamp(min=1.0).unsqueeze(-2)
+                    err = (
+                        (aux_pred / n_tokens) - (aux_target.unsqueeze(-2) / n_tokens)
+                    ) * aux_mask.unsqueeze(-2)
                     per_atom_aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
                     per_atom_aux_loss_value = (aux_pred * 0.0).mean()

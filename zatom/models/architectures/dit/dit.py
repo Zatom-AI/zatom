@@ -32,6 +32,7 @@ class MultimodalDiT(nn.Module):
         trunk: The trunk transformer module for tokens.
         atom_encoder_transformer: The transformer module for atom encoding.
         atom_decoder_transformer: The transformer module for atom decoding.
+        num_properties: The number of global properties to predict.
         hidden_size: The hidden size for the model.
         token_num_heads: The number of (token) attention heads for the trunk transformer.
         atom_num_heads: The number of (atom) attention heads for the atom transformers.
@@ -61,6 +62,7 @@ class MultimodalDiT(nn.Module):
         trunk: nn.Module,
         atom_encoder_transformer: nn.Module,
         atom_decoder_transformer: nn.Module,
+        num_properties: int,
         hidden_size: int = 768,
         token_num_heads: int = 12,
         atom_num_heads: int = 4,
@@ -177,7 +179,7 @@ class MultimodalDiT(nn.Module):
         self.lengths_scaled_head = nn.Linear(hidden_size, 3, bias=False)
         self.angles_radians_head = nn.Linear(hidden_size, 3, bias=False)
 
-        self.global_property_head = nn.Linear(hidden_size, 1, bias=True)
+        self.global_property_head = nn.Linear(hidden_size, num_properties, bias=True)
         self.global_energy_head = nn.Linear(hidden_size, 1, bias=True)
         self.atomic_forces_head = nn.Linear(hidden_size, 3, bias=False)
 
@@ -281,7 +283,7 @@ class MultimodalDiT(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],
@@ -524,7 +526,7 @@ class MultimodalDiT(nn.Module):
         )
         pred_aux_outputs = (
             self.global_property_head(aux_output.mean(-2, keepdim=True))
-            * global_mask,  # (B, 1, 1)
+            * global_mask,  # (B, 1, P)
             self.global_energy_head(aux_output.mean(-2, keepdim=True)) * global_mask,  # (B, 1, 1)
             self.atomic_forces_head(aux_output) * mask.unsqueeze(-1),  # (B, M, 3)
         )

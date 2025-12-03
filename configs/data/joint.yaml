@@ -12,7 +12,7 @@ datamodule:
       root: ${paths.data_dir}/qm9
       removeHs: false # only retain heavy atoms
       proportion: 1.0
-      global_property: null # NOTE: if provided, must be one of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
+      global_property: null # NOTE: if provided, must be either `all` or one of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
 
     qmof150:
       _target_: zatom.data.components.qmof150_dataset.QMOF150

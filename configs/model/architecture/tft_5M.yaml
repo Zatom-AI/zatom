@@ -6,6 +6,7 @@ multimodal_model:
   _partial_: True
   spatial_dim: ${globals.spatial_dim}
   atom_dim: ${globals.max_num_elements}
+  num_properties: ${resolve_num_properties:${data.datamodule.datasets.qm9.global_property}}
   implementation: reimplemented # NOTE: must be one of (`reimplemented`,)
   cross_attention: true
 
