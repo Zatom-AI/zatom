@@ -83,7 +83,6 @@ bash -c "
     pretrained_ckpt_path=$PRETRAINED_CKPT_PATH \
     ckpt_path=$CKPT_PATH \
     data=$DATASET \
-    data.datamodule.datasets.qm9.global_property=all \
     date=$RUN_DATE \
     experiment=$EXPERIMENT \
     model=$MODEL \
