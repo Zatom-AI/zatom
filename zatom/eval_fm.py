@@ -145,8 +145,18 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log.info("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
+    # Load checkpoint and update model state dict using only matching keys
+    log.info(f"Loading checkpoint from {cfg.ckpt_path}")
+    checkpoint = torch.load(cfg.ckpt_path, map_location="cpu", weights_only=False)  # nosec
+
+    old_state_dict = checkpoint["state_dict"]
+    new_state_dict = model.state_dict()
+
+    updated_state_dict = {k: v for k, v in old_state_dict.items() if k in new_state_dict}
+    model.load_state_dict(updated_state_dict, strict=False)
+
     log.info("Starting testing!")
-    trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
+    trainer.test(model=model, datamodule=datamodule)
 
     # For predictions use trainer.predict(...)
     # predictions = trainer.predict(model=model, dataloaders=dataloaders, ckpt_path=cfg.ckpt_path)
