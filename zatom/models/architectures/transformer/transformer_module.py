@@ -29,6 +29,7 @@ class TransformerModule(nn.Module):
         num_aux_layers: Number of auxiliary transformer layers.
         aux_layer: Layer at which to extract representations for auxiliary tasks.
         hidden_dim: Dimension of the hidden layers.
+        num_properties: Number of global properties to predict.
         dataset_embedder: The dataset embedder module.
         spacegroup_embedder: The spacegroup embedder module.
         activation: Activation function to use ("SiLU", "ReLU", "SwiGLU").
@@ -50,6 +51,7 @@ class TransformerModule(nn.Module):
         num_aux_layers: int,
         aux_layer: int,
         hidden_dim: int,
+        num_properties: int,
         dataset_embedder: nn.Module,
         spacegroup_embedder: nn.Module,
         activation: Literal["SiLU", "ReLU", "SwiGLU"] = "SiLU",
@@ -175,25 +177,47 @@ class TransformerModule(nn.Module):
                 batch_first=True,
                 norm_first=True,
             )
+            self.global_property_cross_attention = nn.TransformerDecoderLayer(
+                d_model=hidden_dim,
+                nhead=num_heads,
+                dim_feedforward=hidden_dim * 4,
+                batch_first=True,
+                norm_first=True,
+            )
+            self.global_energy_cross_attention = nn.TransformerDecoderLayer(
+                d_model=hidden_dim,
+                nhead=num_heads,
+                dim_feedforward=hidden_dim * 4,
+                batch_first=True,
+                norm_first=True,
+            )
+            self.atomic_forces_cross_attention = nn.TransformerDecoderLayer(
+                d_model=hidden_dim,
+                nhead=num_heads,
+                dim_feedforward=hidden_dim * 4,
+                batch_first=True,
+                norm_first=True,
+            )
 
         # Add auxiliary task heads
-        self.global_property_transformer = Transformer(
-            dim=hidden_dim,
-            num_heads=num_heads,
-            depth=num_aux_layers,
-        )
-        self.global_energy_transformer = Transformer(
-            dim=hidden_dim,
-            num_heads=num_heads,
-            depth=num_aux_layers,
-        )
-        self.atomic_forces_transformer = Transformer(
-            dim=hidden_dim,
-            num_heads=num_heads,
-            depth=num_aux_layers,
-        )
+        if self.num_aux_layers > 0:
+            self.global_property_transformer = Transformer(
+                dim=hidden_dim,
+                num_heads=num_heads,
+                depth=num_aux_layers,
+            )
+            self.global_energy_transformer = Transformer(
+                dim=hidden_dim,
+                num_heads=num_heads,
+                depth=num_aux_layers,
+            )
+            self.atomic_forces_transformer = Transformer(
+                dim=hidden_dim,
+                num_heads=num_heads,
+                depth=num_aux_layers,
+            )
 
-        self.global_property_head = nn.Linear(hidden_dim, 1, bias=True)
+        self.global_property_head = nn.Linear(hidden_dim, num_properties, bias=True)
         self.global_energy_head = nn.Linear(hidden_dim, 1, bias=True)
         self.atomic_forces_head = nn.Linear(hidden_dim, 3, bias=False)
 
@@ -263,7 +287,7 @@ class TransformerModule(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],
@@ -432,6 +456,24 @@ class TransformerModule(nn.Module):
                 tgt_key_padding_mask=padding_mask,
                 memory_key_padding_mask=padding_mask,
             )
+            h_global_property = self.global_property_cross_attention(
+                h_aux,
+                h_in,
+                tgt_key_padding_mask=padding_mask,
+                memory_key_padding_mask=padding_mask,
+            )
+            h_global_energy = self.global_energy_cross_attention(
+                h_aux,
+                h_in,
+                tgt_key_padding_mask=padding_mask,
+                memory_key_padding_mask=padding_mask,
+            )
+            h_atomic_forces = self.atomic_forces_cross_attention(
+                h_aux,
+                h_in,
+                tgt_key_padding_mask=padding_mask,
+                memory_key_padding_mask=padding_mask,
+            )
 
             out_atom_types = self.out_atom_types(h_atom)
             out_pos = self.out_pos(h_pos)
@@ -445,19 +487,24 @@ class TransformerModule(nn.Module):
             frac_coords = self.out_frac_coords(h_out)
             lengths_scaled = self.out_lengths_scaled(h_out.mean(-2, keepdim=True))
             angles_radians = self.out_angles_radians(h_out.mean(-2, keepdim=True))
+            h_global_property = h_aux
+            h_global_energy = h_aux
+            h_atomic_forces = h_aux
 
-        h_global_property = self.global_property_transformer(
-            h_aux,
-            padding_mask=padding_mask,
-        )
-        h_global_energy = self.global_energy_transformer(
-            h_aux,
-            padding_mask=padding_mask,
-        )
-        h_atomic_forces = self.atomic_forces_transformer(
-            h_aux,
-            padding_mask=padding_mask,
-        )
+        if self.num_aux_layers > 0:
+            h_global_property = self.global_property_transformer(
+                h_global_property,
+                padding_mask=padding_mask,
+            )
+            h_global_energy = self.global_energy_transformer(
+                h_global_energy,
+                padding_mask=padding_mask,
+            )
+            h_atomic_forces = self.atomic_forces_transformer(
+                h_atomic_forces,
+                padding_mask=padding_mask,
+            )
+
         global_property = (
             self.global_property_head(h_global_property.mean(-2, keepdim=True))
         ) * global_mask
@@ -517,7 +564,7 @@ class TransformerModule(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],

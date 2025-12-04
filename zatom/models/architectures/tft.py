@@ -120,9 +120,9 @@ class TFT(nn.Module):
         # Build multimodal model
         kwargs.pop("add_mask_atom_type", None)  # Remove if present
         self.model = multimodal_model(
-            hidden_dim=hidden_size,
-            num_layers=num_layers,
             num_heads=token_num_heads,
+            num_layers=num_layers,
+            hidden_dim=hidden_size,
             dataset_embedder=dataset_embedder,
             spacegroup_embedder=spacegroup_embedder,
             **kwargs,
@@ -534,15 +534,15 @@ class TFT(nn.Module):
 
         # Add auxiliary losses
         for aux_task in self.auxiliary_tasks:
-            aux_pred = pred[aux_task].squeeze(-1)
+            aux_pred = pred[aux_task]
             # Requested auxiliary task → compute loss
             if aux_task in path.x_1:
                 real_mask = 1 - path.x_1["padding_mask"].int()
                 aux_target = path.x_1[aux_task]
                 aux_mask = ~aux_target.isnan()
                 aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                if aux_target.squeeze().dim() == 1:
-                    err = (aux_pred - aux_target) * aux_mask
+                if aux_task in ("global_property", "global_energy"):
+                    err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
                     aux_mask = aux_mask * real_mask.unsqueeze(-1)
@@ -564,8 +564,10 @@ class TFT(nn.Module):
                     aux_target = path.x_1[aux_task]
                     aux_mask = ~aux_target.isnan()
                     aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                    n_tokens = real_mask.sum(dim=-1, keepdim=True).clamp(min=1.0)
-                    err = ((aux_pred / n_tokens) - (aux_target / n_tokens)) * aux_mask
+                    n_tokens = real_mask.sum(dim=-1, keepdim=True).clamp(min=1.0).unsqueeze(-2)
+                    err = (
+                        (aux_pred / n_tokens) - (aux_target.unsqueeze(-2) / n_tokens)
+                    ) * aux_mask.unsqueeze(-2)
                     per_atom_aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
                     per_atom_aux_loss_value = (aux_pred * 0.0).mean()

@@ -6,6 +6,7 @@ multimodal_model:
   _partial_: True
   spatial_dim: ${globals.spatial_dim}
   atom_dim: ${globals.max_num_elements}
+  num_properties: ${resolve_num_properties:${data.datamodule.datasets.qm9.global_property}}
   implementation: reimplemented # NOTE: must be one of (`reimplemented`,)
   cross_attention: true
 
@@ -114,7 +115,7 @@ angles_radians_interpolant:
 hidden_size: 128 # 128, 256, 512 -> 5M, 20M, 70M model sizes
 num_layers: 16
 num_aux_layers: 4
-aux_layer: 7 # NOTE: by default set to half of num_layers (zero-indexed)
+aux_layer: 15 # NOTE: by default set to half of num_layers (zero-indexed)
 token_num_heads: 8
 max_num_elements: ${globals.max_num_elements}
 batch_size_scale_factor: 2 # 2, 2, 1 -> 5M, 20M, 70M model sizes

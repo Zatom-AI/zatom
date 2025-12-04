@@ -4,6 +4,7 @@ import os
 from functools import partial
 from typing import Sequence
 
+import numpy as np
 import torch
 from lightning import LightningDataModule
 from omegaconf import DictConfig
@@ -67,18 +68,20 @@ def qm9_custom_transform(data: Data, removeHs: bool = True) -> Data:
 
 
 @typecheck
-def global_property_custom_transform(data: Data) -> Data:
+def global_property_custom_transform(data: Data, num_properties: int) -> Data:
     """Custom global property transformation for a dataset.
 
     Args:
         data: Input data object.
-        removeHs: Whether to remove hydrogen atoms.
+        num_properties: Number of global properties.
 
     Returns:
         Data: Transformed data object.
     """
     # PyG object attributes consistent with CrystalDataset
-    data.y = torch.tensor([[torch.nan]], dtype=torch.float32)  # Dummy target property
+    data.y = torch.tensor(
+        [[torch.nan] * num_properties], dtype=torch.float32
+    )  # Dummy target property
     return data
 
 
@@ -153,6 +156,13 @@ class JointDataModule(LightningDataModule):
             root=self.hparams.datasets.qm9.root,
             transform=partial(qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs),
         ).shuffle()
+        qm9_target_name = self.hparams.datasets.qm9.global_property
+        if qm9_target_name is None:
+            qm9_dataset.data.y = qm9_dataset.data.y[:, 0:1]  # Default to dipole moment (μ)
+        # Create generative modeling train, val, test splits (n.b., same as ADiT)
+        self.qm9_train_dataset = qm9_dataset[:100000]
+        self.qm9_val_dataset = qm9_dataset[100000:118000]
+        self.qm9_test_dataset = qm9_dataset[118000:]
         # # Save `num_nodes` histogram and SMILES strings for sampling from generative models
         # num_nodes = torch.tensor([data["num_nodes"] for data in qm9_dataset])
         # smiles = (
@@ -166,42 +176,66 @@ class JointDataModule(LightningDataModule):
         #     os.path.join(self.hparams.datasets.qm9.root, "num_nodes_bincount.pt"),
         # )
         # torch.save(smiles, os.path.join(self.hparams.datasets.qm9.root, "smiles.pt"))
-        # Normalize property prediction targets per data sample using training set statistics
-        qm9_train_dataset = qm9_dataset[:100000]
-        qm9_prop_mean = qm9_train_dataset.data.y.mean(dim=0, keepdim=True)
-        qm9_prop_std = qm9_train_dataset.data.y.std(dim=0, keepdim=True)
-        qm9_dataset.data.y = (qm9_dataset.data.y - qm9_prop_mean) / qm9_prop_std
-        # Reference: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
-        if self.hparams.datasets.qm9.global_property == "mu":
-            target = 0
-            qm9_dataset.data.y = qm9_dataset.data.y[:, target].unsqueeze(-1)
-            qm9_prop_mean, qm9_prop_std = (
-                qm9_prop_mean[:, target].item(),
-                qm9_prop_std[:, target].item(),
+        # Select target property if specified
+        qm9_all_targets = [
+            # Reference: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
+            "mu",
+            "alpha",
+            "homo",
+            "lumo",
+            "gap",
+            "r2",
+            "zpve",
+            "U0",
+            "U",
+            "H",
+            "G",
+            "Cv",
+            "U0_atom",
+            "U_atom",
+            "H_atom",
+            "G_atom",
+            "A",
+            "B",
+            "C",
+        ]
+        qm9_target_map = {name: i for i, name in enumerate(qm9_all_targets)}
+        if qm9_target_name is not None:
+            assert (
+                qm9_target_name == "all" or qm9_target_name in qm9_target_map
+            ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {qm9_all_targets}."
+            qm9_dataset = QM9(
+                root=self.hparams.datasets.qm9.root,
+                transform=partial(
+                    qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs
+                ),
             )
-            log.info(
-                f"QM9 dipole moment (μ) target normalization: mean={qm9_prop_mean:.4f}, std={qm9_prop_std:.4f}"
+            if qm9_target_name == "all":
+                log.info(
+                    f"QM9 target property set to 'all' ({qm9_dataset.data.y.shape[1]} properties)."
+                )
+            else:
+                qm9_target_idx = qm9_target_map[qm9_target_name]
+                qm9_dataset.data.y = qm9_dataset.data.y[:, qm9_target_idx : qm9_target_idx + 1]
+                log.info(
+                    f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
+                    f" with mean {qm9_dataset.data.y.mean().item():.4f} and std {qm9_dataset.data.y.std().item():.4f}."
+                )
+            # Create property prediction train/val/test splits (n.b., same as Platonic Transformer)
+            qm9_random_state = np.random.RandomState(seed=42)
+            qm9_perm = torch.from_numpy(qm9_random_state.permutation(np.arange(130831)))
+            qm9_train_idx, qm9_val_idx, qm9_test_idx = (
+                qm9_perm[:110000],
+                qm9_perm[110000:120000],
+                qm9_perm[120000:],
             )
-        elif self.hparams.datasets.qm9.global_property == "alpha":
-            target = 1
-            qm9_dataset.data.y = qm9_dataset.data.y[:, target].unsqueeze(-1)
-            qm9_prop_mean, qm9_prop_std = (
-                qm9_prop_mean[:, target].item(),
-                qm9_prop_std[:, target].item(),
-            )
-            log.info(
-                f"QM9 isotropic polarizability (α) target normalization: mean={qm9_prop_mean:.4f}, std={qm9_prop_std:.4f}"
-            )
-        elif self.hparams.datasets.qm9.global_property is not None:
-            raise ValueError(
-                f"QM9 target property '{self.hparams.datasets.qm9.global_property}' not recognized. Must be one of ('mu', 'alpha') or None."
-            )
-        else:
-            qm9_dataset.data.y = qm9_dataset.data.y[:, 0].unsqueeze(-1)  # Default to dipole moment
-        # Create train, val, test splits
-        self.qm9_train_dataset = qm9_train_dataset
-        self.qm9_val_dataset = qm9_dataset[100000:118000]
-        self.qm9_test_dataset = qm9_dataset[118000:]
+            # Normalize property prediction targets per data sample using training set statistics
+            qm9_train_prop_mean = qm9_dataset.data.y[qm9_train_idx].mean(dim=0, keepdim=True)
+            qm9_train_prop_std = qm9_dataset.data.y[qm9_train_idx].std(dim=0, keepdim=True)
+            qm9_dataset.data.y = (qm9_dataset.data.y - qm9_train_prop_mean) / qm9_train_prop_std
+            self.qm9_train_dataset = qm9_dataset[qm9_train_idx]
+            self.qm9_val_dataset = qm9_dataset[qm9_val_idx]
+            self.qm9_test_dataset = qm9_dataset[qm9_test_idx]
         # Retain subset of dataset; can be used to train on only one dataset, too
         qm9_train_subset_size = int(
             len(self.qm9_train_dataset) * self.hparams.datasets.qm9.proportion
@@ -221,9 +255,12 @@ class JointDataModule(LightningDataModule):
         ]
 
         # MP20 dataset
+        global_property_custom_transform_fn = partial(
+            global_property_custom_transform, num_properties=qm9_dataset.data.y.shape[1]
+        )  # Dummy property
         mp20_dataset = MP20(
             root=self.hparams.datasets.mp20.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
         )  # .shuffle()
         # # Save num_nodes histogram for sampling from generative models
         # num_nodes = torch.tensor([data["num_nodes"] for data in mp20_dataset])
@@ -256,7 +293,7 @@ class JointDataModule(LightningDataModule):
         # QMOF150 dataset
         qmof150_dataset = QMOF150(
             root=self.hparams.datasets.qmof150.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
         ).shuffle()
         # # Save num_nodes histogram for sampling from generative models
         # num_nodes = torch.tensor([data["num_nodes"] for data in qmof150_dataset])
@@ -364,19 +401,19 @@ class JointDataModule(LightningDataModule):
         # Create train, val, test splits
         self.geom_train_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
             load=self.hparams.datasets.geom.proportion > 0.0,
             split="train",
         )  # .shuffle()
         self.geom_val_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
             load=self.hparams.datasets.geom.proportion > 0.0,
             split="val",
         )
         self.geom_test_dataset = GEOM(
             root=self.hparams.datasets.geom.root,
-            transform=global_property_custom_transform,
+            transform=global_property_custom_transform_fn,
             load=self.hparams.datasets.geom.proportion > 0.0,
             split="test",
         )

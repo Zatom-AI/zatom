@@ -28,7 +28,7 @@ data:
         proportion: 0.0
       qm9:
         proportion: 1.0
-        global_property: mu
+        global_property: all
       qmof150:
         proportion: 0.0
       omol25:

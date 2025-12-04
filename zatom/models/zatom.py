@@ -1104,7 +1104,16 @@ class Zatom(LightningModule):
         ckpt_finetuning = checkpoint["hyper_parameters"].get("task_name", "") == "finetune_fm"
 
         if finetuning and not ckpt_finetuning:
-            # Initially remove loop and optimizer states to avoid
-            # issues when finetuning a subset of model parameters
+            # Initially remove loop, optimizer, and head
+            # states to avoid issues when finetuning heads
             del checkpoint["loops"]
             checkpoint["optimizer_states"] = []
+
+            heads_to_finetune = set()
+            for aux_task in self.model.auxiliary_tasks:
+                for state in checkpoint["state_dict"]:
+                    if f"{aux_task}_head" in state:
+                        heads_to_finetune.add(state)
+
+            for state in heads_to_finetune:
+                del checkpoint["state_dict"][state]
