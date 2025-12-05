@@ -208,6 +208,12 @@ sun_json=sun.json
 python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$ehulls_corrected_json"
 ```
 
+To evaluate Zatom's molecule property predictions
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=all model.architecture.num_aux_layers=4 +model.architecture.atom_types_interpolant.path_t_min=1.0 +model.architecture.pos_interpolant.path_t_min=1.0 +model.architecture.frac_coords_interpolant.path_t_min=1.0 +model.architecture.lengths_scaled_interpolant.path_t_min=1.0 +model.architecture.angles_radians_interpolant.path_t_min=1.0 model.sampling.num_samples=1 model.sampling.batch_size=1 trainer=gpu
+```
+
 ## For developers
 
 Set up `pre-commit` (one time only) for automatic code linting and formatting upon each `git commit`
