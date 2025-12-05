@@ -1145,7 +1145,11 @@ class Zatom(LightningModule):
             checkpoint: The checkpoint dictionary to be loaded.
         """
         finetuning = self.hparams.task_name == "finetune_fm"
-        init_run = Path(self.trainer.ckpt_path).samefile(Path(self.trainer.pretrained_ckpt_path))
+        init_run = (
+            self.trainer.ckpt_path is not None
+            and self.trainer.pretrained_ckpt_path is not None
+            and Path(self.trainer.ckpt_path).samefile(Path(self.trainer.pretrained_ckpt_path))
+        )
 
         if finetuning and init_run:
             # Reinitialize loop, optimizer, and relevant task
