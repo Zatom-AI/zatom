@@ -177,30 +177,32 @@ class TransformerModule(nn.Module):
                 batch_first=True,
                 norm_first=True,
             )
-            self.global_property_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
-            )
-            self.global_energy_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
-            )
-            self.atomic_forces_cross_attention = nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim * 4,
-                batch_first=True,
-                norm_first=True,
-            )
 
         # Add auxiliary task heads
         if self.num_aux_layers > 0:
+            if self.cross_attention:
+                self.global_property_cross_attention = nn.TransformerDecoderLayer(
+                    d_model=hidden_dim,
+                    nhead=num_heads,
+                    dim_feedforward=hidden_dim * 4,
+                    batch_first=True,
+                    norm_first=True,
+                )
+                self.global_energy_cross_attention = nn.TransformerDecoderLayer(
+                    d_model=hidden_dim,
+                    nhead=num_heads,
+                    dim_feedforward=hidden_dim * 4,
+                    batch_first=True,
+                    norm_first=True,
+                )
+                self.atomic_forces_cross_attention = nn.TransformerDecoderLayer(
+                    d_model=hidden_dim,
+                    nhead=num_heads,
+                    dim_feedforward=hidden_dim * 4,
+                    batch_first=True,
+                    norm_first=True,
+                )
+
             self.global_property_transformer = Transformer(
                 dim=hidden_dim,
                 num_heads=num_heads,
