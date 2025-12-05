@@ -26,6 +26,30 @@ from zatom.utils.typing_utils import typecheck
 
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
+QM9_TARGETS = [
+    # Reference: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
+    "mu",
+    "alpha",
+    "homo",
+    "lumo",
+    "gap",
+    "r2",
+    "zpve",
+    "U0",
+    "U",
+    "H",
+    "G",
+    "Cv",
+    "U0_atom",
+    "U_atom",
+    "H_atom",
+    "G_atom",
+    "A",
+    "B",
+    "C",
+]
+QM9_TARGET_NAME_TO_IDX = {name: i for i, name in enumerate(QM9_TARGETS)}
+
 
 @typecheck
 def qm9_custom_transform(data: Data, removeHs: bool = True) -> Data:
@@ -156,9 +180,6 @@ class JointDataModule(LightningDataModule):
             root=self.hparams.datasets.qm9.root,
             transform=partial(qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs),
         ).shuffle()
-        qm9_target_name = self.hparams.datasets.qm9.global_property
-        if qm9_target_name is None:
-            qm9_dataset.data.y = qm9_dataset.data.y[:, 0:1]  # Default to dipole moment (μ)
         # Create generative modeling train, val, test splits (n.b., same as ADiT)
         self.qm9_train_dataset = qm9_dataset[:100000]
         self.qm9_val_dataset = qm9_dataset[100000:118000]
@@ -177,33 +198,13 @@ class JointDataModule(LightningDataModule):
         # )
         # torch.save(smiles, os.path.join(self.hparams.datasets.qm9.root, "smiles.pt"))
         # Select target property if specified
-        qm9_all_targets = [
-            # Reference: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
-            "mu",
-            "alpha",
-            "homo",
-            "lumo",
-            "gap",
-            "r2",
-            "zpve",
-            "U0",
-            "U",
-            "H",
-            "G",
-            "Cv",
-            "U0_atom",
-            "U_atom",
-            "H_atom",
-            "G_atom",
-            "A",
-            "B",
-            "C",
-        ]
-        qm9_target_map = {name: i for i, name in enumerate(qm9_all_targets)}
-        if qm9_target_name is not None:
+        qm9_target_name = self.hparams.datasets.qm9.global_property
+        if qm9_target_name is None:
+            qm9_dataset.data.y = qm9_dataset.data.y[:, 0:1]  # Default to dipole moment (μ)
+        else:
             assert (
-                qm9_target_name == "all" or qm9_target_name in qm9_target_map
-            ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {qm9_all_targets}."
+                qm9_target_name == "all" or qm9_target_name in QM9_TARGET_NAME_TO_IDX
+            ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {QM9_TARGETS}."
             qm9_dataset = QM9(
                 root=self.hparams.datasets.qm9.root,
                 transform=partial(
@@ -215,7 +216,7 @@ class JointDataModule(LightningDataModule):
                     f"QM9 target property set to 'all' ({qm9_dataset.data.y.shape[1]} properties)."
                 )
             else:
-                qm9_target_idx = qm9_target_map[qm9_target_name]
+                qm9_target_idx = QM9_TARGET_NAME_TO_IDX[qm9_target_name]
                 qm9_dataset.data.y = qm9_dataset.data.y[:, qm9_target_idx : qm9_target_idx + 1]
                 log.info(
                     f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
@@ -230,9 +231,11 @@ class JointDataModule(LightningDataModule):
                 qm9_perm[120000:],
             )
             # Normalize property prediction targets per data sample using training set statistics
-            qm9_train_prop_mean = qm9_dataset.data.y[qm9_train_idx].mean(dim=0, keepdim=True)
-            qm9_train_prop_std = qm9_dataset.data.y[qm9_train_idx].std(dim=0, keepdim=True)
-            qm9_dataset.data.y = (qm9_dataset.data.y - qm9_train_prop_mean) / qm9_train_prop_std
+            self.qm9_train_prop_mean = qm9_dataset.data.y[qm9_train_idx].mean(dim=0, keepdim=True)
+            self.qm9_train_prop_std = qm9_dataset.data.y[qm9_train_idx].std(dim=0, keepdim=True)
+            qm9_dataset.data.y = (
+                qm9_dataset.data.y - self.qm9_train_prop_mean
+            ) / self.qm9_train_prop_std
             self.qm9_train_dataset = qm9_dataset[qm9_train_idx]
             self.qm9_val_dataset = qm9_dataset[qm9_val_idx]
             self.qm9_test_dataset = qm9_dataset[qm9_test_idx]

@@ -534,14 +534,17 @@ class TFT(nn.Module):
 
         # Add auxiliary losses
         for aux_task in self.auxiliary_tasks:
-            aux_pred = pred[aux_task]
+            aux_pred, aux_target, aux_mask = pred[aux_task], None, None
             # Requested auxiliary task → compute loss
             if aux_task in path.x_1:
                 real_mask = 1 - path.x_1["padding_mask"].int()
                 aux_target = path.x_1[aux_task]
                 aux_mask = ~aux_target.isnan()
                 aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                if aux_task in ("global_property", "global_energy"):
+                if aux_task == "global_property":
+                    err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
+                    aux_loss_value = err.abs().sum(0).squeeze(0) / (aux_mask.sum(0) + eps)
+                elif aux_task == "global_energy":
                     err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
                 else:
@@ -574,7 +577,13 @@ class TFT(nn.Module):
 
                 loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss_value
 
-            loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"]
+            loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"].sum()
+
+            # Cache auxiliary predictions and targets for logging
+            if aux_task == "global_property":
+                loss_dict[f"pred_aux_{aux_task}"] = aux_pred.squeeze(-2)
+                loss_dict[f"target_aux_{aux_task}"] = aux_target
+                loss_dict[f"mask_aux_{aux_task}"] = aux_mask
 
         return loss_dict, stats_dict
 
