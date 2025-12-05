@@ -15,7 +15,7 @@ precision: 32-true
 
 # check validation set every N training epochs
 val_check_interval: 1.0
-check_val_every_n_epoch: 20
+check_val_every_n_epoch: 50
 
 # # check validation set every N training batches
 # val_check_interval: 1000
