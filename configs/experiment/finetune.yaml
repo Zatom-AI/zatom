@@ -36,3 +36,7 @@ data:
         global_energy: null
       geom:
         proportion: 0.0
+
+model:
+  architecture:
+    num_aux_layers: 4

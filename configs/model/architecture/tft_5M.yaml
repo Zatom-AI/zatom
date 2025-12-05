@@ -114,7 +114,7 @@ angles_radians_interpolant:
 # General architecture parameters
 hidden_size: 128 # 128, 256, 512 -> 5M, 20M, 70M model sizes
 num_layers: 16
-num_aux_layers: 4
+num_aux_layers: 0
 aux_layer: 15 # NOTE: by default set to half of num_layers (zero-indexed)
 token_num_heads: 8
 max_num_elements: ${globals.max_num_elements}
