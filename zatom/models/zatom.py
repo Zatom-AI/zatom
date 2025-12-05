@@ -1116,16 +1116,23 @@ class Zatom(LightningModule):
             checkpoint: The checkpoint dictionary to be loaded.
         """
         finetuning = self.hparams.task_name == "finetune_fm"
-        ckpt_finetuning = checkpoint["hyper_parameters"].get("task_name", "") == "finetune_fm"
+        init_run = Path(self.trainer.ckpt_path).samefile(Path(self.trainer.pretrained_ckpt_path))
 
-        if finetuning and not ckpt_finetuning:
-            # Initially remove loop, optimizer, and head
-            # states to avoid issues when finetuning heads
+        if finetuning and init_run:
+            # Reinitialize loop, optimizer, and relevant task
+            # weights when beginning a new finetuning run
             del checkpoint["loops"]
             checkpoint["optimizer_states"] = []
 
+            aux_tasks = set()
+            if self.hparams.datasets["qm9"].global_property is not None:
+                aux_tasks.add("global_property")
+            if self.hparams.datasets["omol25"].global_energy is not None:
+                aux_tasks.add("global_energy")
+                aux_tasks.add("atomic_forces")
+
             heads_to_finetune = set()
-            for aux_task in self.model.auxiliary_tasks:
+            for aux_task in aux_tasks:
                 for state in checkpoint["state_dict"]:
                     if f"{aux_task}_head" in state:
                         heads_to_finetune.add(state)
