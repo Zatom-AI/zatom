@@ -29,6 +29,13 @@ from zatom.utils.typing_utils import typecheck
 log = pylogger.RankedLogger(__name__)
 
 
+INDEX_TO_IDX = {
+    0: 0,  # Periodic
+    1: 1,  # Non-periodic
+    2: 0,  # Periodic
+    3: 1,  # Non-periodic
+    4: 1,  # Non-periodic
+}
 INDEX_TO_DATASET = {
     0: "mp20",
     1: "qm9",
@@ -319,6 +326,11 @@ class Zatom(LightningModule):
             torch.tensor(list(PERIODIC_DATASETS.values()), dtype=torch.long),
             persistent=False,
         )
+        self.register_buffer(
+            "dataset_index_to_idx",
+            torch.tensor(list(INDEX_TO_IDX.values()), dtype=torch.long),
+            persistent=False,
+        )
 
     @typecheck
     def forward(self, batch: Batch) -> Dict[str, torch.Tensor]:
@@ -381,7 +393,7 @@ class Zatom(LightningModule):
 
         # Prepare conditioning inputs
         use_cfg = self.model.class_dropout_prob > 0
-        dataset_idx = batch.dataset_idx + int(
+        dataset_idx = self.dataset_index_to_idx[batch.dataset_idx] + int(
             use_cfg
         )  # 0 -> null class (for classifier-free guidance or CFG)
         # if not self.hparams.conditioning.dataset_idx:
