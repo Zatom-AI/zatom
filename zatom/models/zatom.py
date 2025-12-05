@@ -384,7 +384,10 @@ class Zatom(LightningModule):
         atom_types, mask = to_dense_batch(
             batch.atom_types, batch.batch, max_num_nodes=self.max_num_nodes
         )
-        pos, _ = to_dense_batch(batch.pos, batch.batch, max_num_nodes=self.max_num_nodes)
+        pos, _ = (
+            to_dense_batch(batch.pos, batch.batch, max_num_nodes=self.max_num_nodes)
+            * self.hparams.augmentations.scale
+        )
         frac_coords, _ = to_dense_batch(
             batch.frac_coords, batch.batch, max_num_nodes=self.max_num_nodes
         )
@@ -773,10 +776,7 @@ class Zatom(LightningModule):
                     _atom_types[_atom_types == self.hparams.sampling.mask_token_index] = (
                         1  # Mask atom type -> 1 (H) to prevent crash
                     )
-                    _pos = (
-                        out["pos"].narrow(0, start_idx, num_atom)
-                        * self.hparams.augmentations.scale
-                    )  # alternative units to Angstroms
+                    _pos = out["pos"].narrow(0, start_idx, num_atom)
                     _frac_coords = out["frac_coords"].narrow(0, start_idx, num_atom)
                     _lengths = out["lengths_scaled"][idx_in_batch] * float(num_atom) ** (
                         1 / 3
@@ -938,8 +938,11 @@ class Zatom(LightningModule):
         atom_types = torch.zeros(
             (batch_size, self.max_num_nodes), dtype=torch.long, device=self.device
         )
-        pos = torch.zeros(
-            (batch_size, self.max_num_nodes, 3), dtype=torch.float32, device=self.device
+        pos = (
+            torch.zeros(
+                (batch_size, self.max_num_nodes, 3), dtype=torch.float32, device=self.device
+            )
+            * self.hparams.augmentations.scale
         )
         frac_coords = torch.zeros(
             (batch_size, self.max_num_nodes, 3), dtype=torch.float32, device=self.device
@@ -1002,7 +1005,7 @@ class Zatom(LightningModule):
         # Collect final sample modalities and remove padding (to convert to PyG format)
         out = {
             "atom_types": sampled_x_1["atom_types"].argmax(-1)[token_mask],
-            "pos": sampled_x_1["pos"][token_mask],
+            "pos": sampled_x_1["pos"][token_mask] / self.hparams.augmentations.scale,
             "frac_coords": sampled_x_1["frac_coords"][token_mask],
             "lengths_scaled": sampled_x_1["lengths_scaled"].squeeze(-2),
             "angles_radians": sampled_x_1["angles_radians"].squeeze(-2),

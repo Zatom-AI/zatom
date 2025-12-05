@@ -7,8 +7,8 @@ architecture:
 augmentations:
   frac_coords: true
   pos: true
-  scale: 1.0
-  ref_scale: 1.0 # NOTE: currently applied (multiplicitively) to noisy atom `pos` after normalizing by `scale`
+  scale: 1.0 # NOTE: currently applied (multiplicatively) to target atom `pos` before adding noise
+  ref_scale: 1.0 # NOTE: currently applied (multiplicatively) to target atom `pos` after normalizing by `scale`
   multiplicity: 8 # number of copies per GPU
 
 sampling:
