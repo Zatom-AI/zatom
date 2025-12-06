@@ -131,8 +131,6 @@ class MFT(nn.Module):
         self.time_alpha_factor = time_alpha_factor
 
         self.vocab_size = max_num_elements
-        self.continuous_x_1_prediction = True
-        self.treat_discrete_modalities_as_continuous = False
 
         # Define time distribution
         if time_distribution == "uniform":
@@ -173,7 +171,6 @@ class MFT(nn.Module):
             max_num_elements=max_num_elements,
             use_length_condition=use_length_condition,
             add_mask_atom_type=False,
-            treat_discrete_modalities_as_continuous=self.treat_discrete_modalities_as_continuous,
             remove_t_conditioning=False,
             condition_on_input=condition_on_input,
             jvp_attn=jvp_attn,

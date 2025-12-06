@@ -119,15 +119,6 @@ class Zatom(LightningModule):
         # Also ensures init params will be stored in ckpt.
         self.save_hyperparameters(logger=False)
 
-        # Issue warning for troublesome configurations
-        if (
-            self.hparams.augmentations.frac_coords is True
-            and self.hparams.architecture.continuous_x_1_prediction is False
-        ):
-            log.warning(
-                "Using fractional coordinate augmentations with velocity parametrization of continuous modalities may lead to diminished performance."
-            )
-
         # Model architecture
         self.model = architecture
 
@@ -461,6 +452,7 @@ class Zatom(LightningModule):
             device=self.device,
         )
 
+        # Add auxiliary targets to dense batch if applicable
         is_qm9_dataset = (batch.dataset_idx == DATASET_TO_INDEX["qm9"]).any()
         is_omol25_dataset = (batch.dataset_idx == DATASET_TO_INDEX["omol25"]).any()
 
