@@ -833,7 +833,7 @@ class Zatom(LightningModule):
             gen_metrics_dict = generation_evaluators[dataset].get_metrics(
                 save=self.hparams.sampling.visualize,
                 save_dir=save_dir,
-                n_jobs=8,
+                n_jobs=16,
             )
             gen_metrics_dict["sampling_time"] = t_end - t_start
             for k, v in gen_metrics_dict.items():
