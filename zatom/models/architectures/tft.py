@@ -192,7 +192,7 @@ class TFT(nn.Module):
         t: torch.Tensor | None = None,
         noise_batch: TensorDict | None = None,
     ) -> FlowPath:
-        """Generate `(x_0, x_t, dx_t)` tensors for a random or given time `t`.
+        """Generate `(x_0, x_t, dx_t, x_1, t)` tensors for a random or given time `t`.
 
         Args:
             x_1: A TensorDict containing the clean data at time t=1.
@@ -211,19 +211,19 @@ class TFT(nn.Module):
         if noise_batch is None:
             noise_batch = self._sample_noise_like_batch(x_1)
 
-        x_0_atom_types, x_t_atom_types, dx_t_atom_types = self.atom_types_interpolant.create_path(
+        x_0_atom_types, x_t_atom_types, dx_t_atom_types, x_1_atom_types = (
+            self.atom_types_interpolant.create_path(x_1=x_1, t=t, x_0=noise_batch)
+        )
+        x_0_pos, x_t_pos, dx_t_pos, x_1_pos = self.pos_interpolant.create_path(
             x_1=x_1, t=t, x_0=noise_batch
         )
-        x_0_pos, x_t_pos, dx_t_pos = self.pos_interpolant.create_path(
-            x_1=x_1, t=t, x_0=noise_batch
-        )
-        x_0_frac_coords, x_t_frac_coords, dx_t_frac_coords = (
+        x_0_frac_coords, x_t_frac_coords, dx_t_frac_coords, x_1_frac_coords = (
             self.frac_coords_interpolant.create_path(x_1=x_1, t=t, x_0=noise_batch)
         )
-        x_0_lengths_scaled, x_t_lengths_scaled, dx_t_lengths_scaled = (
+        x_0_lengths_scaled, x_t_lengths_scaled, dx_t_lengths_scaled, x_1_lengths_scaled = (
             self.lengths_scaled_interpolant.create_path(x_1=x_1, t=t, x_0=noise_batch)
         )
-        x_0_angles_radians, x_t_angles_radians, dx_t_angles_radians = (
+        x_0_angles_radians, x_t_angles_radians, dx_t_angles_radians, x_1_angles_radians = (
             self.angles_radians_interpolant.create_path(x_1=x_1, t=t, x_0=noise_batch)
         )
 
@@ -264,6 +264,17 @@ class TFT(nn.Module):
             },
             batch_size=batch_size,
             device=x_1.device,
+        )
+
+        x_1.update(
+            {
+                "atom_types": x_1_atom_types,
+                "pos": x_1_pos,
+                "frac_coords": x_1_frac_coords,
+                "lengths_scaled": x_1_lengths_scaled[:, 0:1, :],
+                "angles_radians": x_1_angles_radians[:, 0:1, :],
+            },
+            inplace=True,
         )
 
         t = TensorDict(

@@ -83,8 +83,8 @@ class Interpolant(ABC):
     @abstractmethod
     def create_path(
         self, x_1: TensorDict, t: Tensor, x_0: TensorDict | None = None
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Construct the interpolation triple `(x_0, x_t, dx_t)` for time `t`.
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Construct the interpolation triple `(x_0, x_t, dx_t, x_1)` for time `t`.
 
         Args:
             x_1: TensorDict containing the reference data point at *t = 1*.
@@ -96,6 +96,7 @@ class Interpolant(ABC):
             * x_0: Initial noise state.
             * x_t: Interpolated state at time `t`.
             * dx_t: Velocity, typically `x_1 - x_0`.
+            * x_1: Ground truth data point at time `t = 1`.
         """
         pass
 
@@ -164,7 +165,7 @@ class DiscreteInterpolant(Interpolant):
     @typecheck
     def create_path(
         self, x_1: TensorDict, t: Tensor, x_0: TensorDict | None = None
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Create a path for a ground truth point and a time step.
 
         Args:
@@ -177,6 +178,7 @@ class DiscreteInterpolant(Interpolant):
             * x_0: Initial noise state.
             * x_t: Interpolated state at time `t`.
             * dx_t: Velocity, typically `x_1 - x_0`.
+            * x_1: Ground truth data point at time `t = 1`.
         """
         if x_0 is None:
             x_0_tensor = self.sample_noise(x_1[self.key].shape, x_1[self.key_pad_mask])
@@ -198,7 +200,7 @@ class DiscreteInterpolant(Interpolant):
 
         dx_t = x_1[self.key] - x_0_tensor
 
-        return x_0_tensor, x_t, dx_t
+        return x_0_tensor, x_t, dx_t, x_1[self.key]
 
     @typecheck
     def compute_loss(
@@ -319,8 +321,8 @@ class CenteredMetricInterpolant(Interpolant):
     @typecheck
     def create_path(
         self, x_1: TensorDict, t: Tensor, x_0: TensorDict | None = None
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Generate `(x_0, x_t, dx_t)` via linear interpolation in Euclidean space.
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Generate `(x_0, x_t, dx_t, x_1)` via linear interpolation in Euclidean space.
 
         Args:
             x_1: TensorDict containing the reference data point at *t = 1*.
@@ -332,6 +334,7 @@ class CenteredMetricInterpolant(Interpolant):
             * x_0: Initial noise state.
             * x_t: Interpolated state at time `t`.
             * dx_t: Velocity, typically `x_1 - x_0`.
+            * x_1: Ground truth data point at time `t = 1`.
         """
         if x_0 is None:
             x_0_tensor = self.sample_noise(x_1[self.key].shape, x_1[self.key_pad_mask])
@@ -348,13 +351,12 @@ class CenteredMetricInterpolant(Interpolant):
         t = t.clamp(self.path_t_min, self.path_t_max)
 
         x_0_tensor = self.mask_fn(x_0_tensor, x_1[self.key_pad_mask])
-        # TODO: Check if `x_1[self.key]` needs to be masked in-place here as well
         x_1_tensor = self.mask_fn(x_1[self.key], x_1[self.key_pad_mask])
 
         x_t = (1.0 - t) * x_0_tensor + t * x_1_tensor
         dx_t = x_1_tensor - x_0_tensor
 
-        return x_0_tensor, x_t, dx_t
+        return x_0_tensor, x_t, dx_t, x_1_tensor
 
     @typecheck
     def compute_loss(
