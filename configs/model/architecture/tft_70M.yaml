@@ -118,7 +118,6 @@ num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 8
-max_num_elements: ${globals.max_num_elements}
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # note: must be one of (`uniform`, `beta`, `histogram`)
 time_alpha_factor: 1.8
