@@ -3,7 +3,7 @@
 # Options for evaluation:
 # - /model: [zatom]
 # - /model/architecture:
-#         [tft_5M, tft_20M, tft_70M,
+#         [tft_70M, tft_160M, tft_300M,
 #          mft_80M, mft_180M, mft_500M,
 #          mfp_80M, mfp_180M, mfp_500M]
 # - /logger: [null, wandb]
@@ -12,7 +12,7 @@
 defaults:
   - override /data: joint
   - override /model: zatom
-  - override /model/architecture: tft_20M
+  - override /model/architecture: tft_70M
   - override /callbacks: default
   - override /logger: wandb
   - override /strategy: default

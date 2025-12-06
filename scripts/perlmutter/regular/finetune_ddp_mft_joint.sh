@@ -10,7 +10,7 @@
 #SBATCH --gpus-per-node=2                                     # request A100 GPU resource(s)
 #SBATCH --ntasks-per-node=2                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
 #SBATCH --time=00-23:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=finetune-tft-20M-joint                     # job name
+#SBATCH --job-name=finetune-tft-70M-joint                     # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
 
@@ -38,7 +38,7 @@ DEFAULT_RUN_ID="v8zoszir"                 # NOTE: Generate a unique ID for each 
 DEFAULT_RUN_DATE="2025-11-20_18-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
-DEFAULT_ARCHITECTURE="tft_20M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_5M`, `{tft,}_20M`, `{tft,}_70M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
+DEFAULT_ARCHITECTURE="tft_70M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_70M`, `{tft,}_160M`, `{tft,}_300M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided
@@ -50,7 +50,7 @@ ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architectu
 TASK_NAME="finetune_fm"                                                # Name of the task to perform
 RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_joint"     # Name of the model type and dataset configuration
 
-PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_tabasco_model-zatom2_arch-tft_20M_joint_2025-11-15_17-00-00/checkpoints/model-epoch@919-step@228160-val_qm9_posebusters_rate@0.9764-val_mp20_valid_rate@0.8610.ckpt"  # Path at which to find (initial) pretrained model checkpoint
+PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_model-zatom_arch-tft_70M_joint_2025-11-22_10-00-00/checkpoints/model-epoch@779-step@386880-val_qm9_posebusters_rate@0.9877-val_mp20_valid_rate@0.8865.ckpt"  # Path at which to find (initial) pretrained model checkpoint
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
 mkdir -p "$CKPT_PATH"
 
@@ -91,7 +91,7 @@ bash -c "
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.max_time='02:00:00:00'
+    trainer.max_time='04:00:00:00'
 "
 
 # Inform user of run completion

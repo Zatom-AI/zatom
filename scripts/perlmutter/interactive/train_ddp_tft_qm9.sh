@@ -9,7 +9,7 @@
 #        --gpus-per-node=2 \
 #        --ntasks-per-node=2 \
 #        --time=04:00:00 \
-#        --job-name=tft-20M-qm9
+#        --job-name=tft-70M-qm9
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -32,7 +32,7 @@ DEFAULT_RUN_ID="qei2uzza"                 # NOTE: Generate a unique ID for each 
 DEFAULT_RUN_DATE="2025-11-15_16-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="train"                # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
-DEFAULT_ARCHITECTURE="tft_20M"             # NOTE: Set the model architecture to be used, must be one of (`{tft,}_5M`, `{tft,}_20M`, `{tft,}_70M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
+DEFAULT_ARCHITECTURE="tft_70M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_70M`, `{tft,}_160M`, `{tft,}_300M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided

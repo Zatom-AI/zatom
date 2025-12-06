@@ -112,13 +112,13 @@ angles_radians_interpolant:
     eps: 1e-6
 
 # General architecture parameters
-hidden_size: 128 # 128, 256, 512 -> 5M, 20M, 70M model sizes
+batch_size_scale_factor: 0.5 # 2, 1, 0.5 -> 70M, 160M, 300M model sizes
+hidden_size: 1024 # 512, 768, 1024 -> 70M, 160M, 300M model sizes
 num_layers: 16
-num_aux_layers: 0
-aux_layer: 15 # NOTE: by default set to half of num_layers (zero-indexed)
+num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
+aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 8
 max_num_elements: ${globals.max_num_elements}
-batch_size_scale_factor: 2 # 2, 2, 1 -> 5M, 20M, 70M model sizes
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # note: must be one of (`uniform`, `beta`, `histogram`)
 time_alpha_factor: 1.8
