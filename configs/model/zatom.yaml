@@ -2,7 +2,6 @@ _target_: zatom.models.zatom.Zatom
 
 architecture:
   max_num_elements: ${globals.max_num_elements}
-  add_mask_atom_type: true
 
 augmentations:
   frac_coords: true

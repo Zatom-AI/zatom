@@ -116,7 +116,6 @@ class TFT(nn.Module):
             )
 
         # Build multimodal model
-        kwargs.pop("add_mask_atom_type", None)  # Remove if present
         self.model = multimodal_model(
             num_heads=token_num_heads,
             num_layers=num_layers,

@@ -148,7 +148,6 @@ class MFT(nn.Module):
             )
 
         # Build multimodal model
-        kwargs.pop("add_mask_atom_type", None)  # Remove if present
         self.model = multimodal_model(
             time_embedder=time_embedder,
             dataset_embedder=dataset_embedder,
@@ -170,7 +169,6 @@ class MFT(nn.Module):
             atom_n_keys_dec=atom_n_keys_dec,
             max_num_elements=max_num_elements,
             use_length_condition=use_length_condition,
-            add_mask_atom_type=False,
             remove_t_conditioning=False,
             condition_on_input=condition_on_input,
             jvp_attn=jvp_attn,
