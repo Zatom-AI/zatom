@@ -99,8 +99,6 @@ class TFT(nn.Module):
         self.vocab_size = max_num_elements
 
         self.jvp_attn = False
-        self.continuous_x_1_prediction = True
-        self.treat_discrete_modalities_as_continuous = False
 
         # Define time distribution
         if time_distribution == "uniform":
