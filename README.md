@@ -119,7 +119,7 @@ shifterimg -v pull registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
 
 Train model with default configuration
 
-> 💡 Note: The first time (only) you run the code, you'll need to uncomment Line 75 (`datamodule.setup()`) of `zatom/train_fm.py` to download each dataset's metadata for subsequent training runs.
+> 💡 Note: The first time (only) you run the code, you'll need to uncomment Line 75 (`datamodule.setup()`) of `zatom/train_fm.py` to download each dataset's metadata for subsequent training or evaluation runs.
 
 ```bash
 # train on CPU
@@ -158,6 +158,12 @@ To generate Zatom's initial evaluation metrics for molecule and material generat
 
 ```bash
 python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt trainer=gpu
+```
+
+To evaluate Zatom's molecule property predictions
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=all model.architecture.num_aux_layers=4 +model.architecture.atom_types_interpolant.path_t_min=1.0 +model.architecture.pos_interpolant.path_t_min=1.0 +model.architecture.frac_coords_interpolant.path_t_min=1.0 +model.architecture.lengths_scaled_interpolant.path_t_min=1.0 +model.architecture.angles_radians_interpolant.path_t_min=1.0 model.sampling.num_samples=1 model.sampling.batch_size=1 seed=42 trainer=gpu
 ```
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
@@ -206,12 +212,6 @@ python forks/flowmm/scripts_analysis/ehull_correction.py "$eval_for_dft_json" "$
 # S.U.N.
 sun_json=sun.json
 python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$ehulls_corrected_json"
-```
-
-To evaluate Zatom's molecule property predictions
-
-```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=all model.architecture.num_aux_layers=4 +model.architecture.atom_types_interpolant.path_t_min=1.0 +model.architecture.pos_interpolant.path_t_min=1.0 +model.architecture.frac_coords_interpolant.path_t_min=1.0 +model.architecture.lengths_scaled_interpolant.path_t_min=1.0 +model.architecture.angles_radians_interpolant.path_t_min=1.0 model.sampling.num_samples=1 model.sampling.batch_size=1 trainer=gpu
 ```
 
 ## For developers

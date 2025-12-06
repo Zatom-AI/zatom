@@ -129,8 +129,8 @@ pos_interpolant:
   noise_scale: 1.0
   langevin_sampling_schedule:
     _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
-    cutoff: 0.9
-  white_noise_sampling_scale: 0.01
+    cutoff: 0.95
+  white_noise_sampling_scale: 50.0
   time_factor:
     _target_: zatom.flow.time_factor.InverseTimeFactor
     max_value: 100.0
