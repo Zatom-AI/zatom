@@ -512,8 +512,6 @@ class JointDataModule(LightningDataModule):
             multiprocessing_context=(
                 "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
             ),  # Use spawn to avoid CUDA/fork issues
-            persistent_workers=self.hparams.datasets.omol25.proportion > 0.0
-            and self.hparams.num_workers.train > 0,
         )
 
     def val_dataloader(self) -> Sequence[DataLoader]:
@@ -553,8 +551,6 @@ class JointDataModule(LightningDataModule):
                 multiprocessing_context=(
                     "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
                 ),  # Use spawn to avoid CUDA/fork issues
-                persistent_workers=self.hparams.datasets.omol25.proportion > 0.0
-                and self.hparams.num_workers.val > 0,
             ),
             DataLoader(
                 dataset=self.geom_val_dataset,
@@ -602,8 +598,6 @@ class JointDataModule(LightningDataModule):
                 multiprocessing_context=(
                     "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
                 ),  # Use spawn to avoid CUDA/fork issues
-                persistent_workers=self.hparams.datasets.omol25.proportion > 0.0
-                and self.hparams.num_workers.test > 0,
             ),
             DataLoader(
                 dataset=self.geom_test_dataset,
