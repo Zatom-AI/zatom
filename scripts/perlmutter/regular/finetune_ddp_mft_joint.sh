@@ -107,7 +107,7 @@ bash -c "
     trainer.max_time='10:00:00:00' \
     trainer.val_check_interval=10000 \
     trainer.check_val_every_n_epoch=null \
-    trainer.limit_val_batches=0.25
+    +trainer.limit_val_batches=0.25
 "
 
 # Inform user of run completion
