@@ -86,9 +86,9 @@ bash -c "
     data.datamodule.batch_size.train=32 \
     data.datamodule.batch_size.val=32 \
     data.datamodule.batch_size.test=32 \
-    data.datamodule.num_workers.train=0 \
-    data.datamodule.num_workers.val=0 \
-    data.datamodule.num_workers.test=0 \
+    data.datamodule.num_workers.train=2 \
+    data.datamodule.num_workers.val=2 \
+    data.datamodule.num_workers.test=2 \
     data.datamodule.datasets.qm9.proportion=0.0 \
     data.datamodule.datasets.qm9.global_property=null \
     data.datamodule.datasets.omol25.proportion=1.0 \

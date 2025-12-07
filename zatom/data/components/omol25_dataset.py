@@ -1,4 +1,5 @@
 import os
+import threading
 import warnings
 from typing import Callable, List, Literal, Optional
 
@@ -113,6 +114,10 @@ ELEMENT_SYMBOLS = [
     "U",
 ]
 
+# A simple length cache for database
+LENGTH_CACHE = {}
+LENGTH_LOCK = threading.Lock()
+
 
 class OMol25(Dataset):
     """The OMol25 dataset from FAIR at Meta, as a PyG Dataset.
@@ -175,7 +180,24 @@ class OMol25(Dataset):
 
         super().__init__(root, transform, pre_transform, pre_filter, force_reload=force_reload)
 
-        self.dataset = AseDBDataset({"src": self.dataset_path})
+        # Avoid creating AseDBDataset here - defer to workers
+        # Instead, just get dataset length safely
+        self.dataset = None  # NOTE: Each thread/process will have its own instance
+
+        # Get dataset length safely (using cache)
+        cache_key = self.dataset_path
+        with LENGTH_LOCK:
+            if cache_key in LENGTH_CACHE:
+                dataset_length = LENGTH_CACHE[cache_key]
+            else:
+                # One-time initialization in the main process only for length
+                # NOTE: This instance will be discarded immediately after getting length
+                tmp_dataset = AseDBDataset({"src": self.dataset_path})
+                dataset_length = len(tmp_dataset)
+                LENGTH_CACHE[cache_key] = dataset_length
+                del tmp_dataset
+
+        self.dataset_length = dataset_length
         self.dataset_info = {
             "name": "omol25",
             "atom_encoder": {
@@ -202,6 +224,12 @@ class OMol25(Dataset):
             else [f"{self.split}{self.subset}.tar.gz"]
         )
 
+    def _init_dataset(self):
+        """Safely initialize dataset in the worker process when needed."""
+        if self.dataset is None:
+            self.dataset = AseDBDataset({"src": self.dataset_path})
+        return self.dataset
+
     def download(self) -> None:
         """Download the dataset."""
         # Dataset files
@@ -223,11 +251,12 @@ class OMol25(Dataset):
 
     def len(self) -> int:
         """Return the number of examples."""
-        return len(self.dataset)
+        return self.dataset_length
 
     def get(self, idx) -> Data:
         """Get a single example."""
-        atoms = self.dataset.get_atoms(idx)
+        dataset = self._init_dataset()
+        atoms = dataset.get_atoms(idx)
 
         num_atoms = len(atoms)
         atoms_to_keep = torch.ones((num_atoms,), dtype=torch.bool)

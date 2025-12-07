@@ -502,9 +502,14 @@ class JointDataModule(LightningDataModule):
             dataset=self.train_dataset,
             batch_size=self.hparams.batch_size.train,
             num_workers=self.hparams.num_workers.train,
-            pin_memory=False,
+            pin_memory=self.hparams.datasets.omol25.proportion > 0.0,
             shuffle=True,
             drop_last=True,
+            multiprocessing_context=(
+                "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
+            ),  # Use spawn to avoid CUDA/fork issues
+            persistent_workers=self.hparams.datasets.omol25.proportion > 0.0
+            and self.hparams.num_workers.train > 0,
         )
 
     def val_dataloader(self) -> Sequence[DataLoader]:
@@ -539,8 +544,13 @@ class JointDataModule(LightningDataModule):
                 dataset=self.omol25_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                pin_memory=self.hparams.datasets.omol25.proportion > 0.0,
                 shuffle=False,
+                multiprocessing_context=(
+                    "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
+                ),  # Use spawn to avoid CUDA/fork issues
+                persistent_workers=self.hparams.datasets.omol25.proportion > 0.0
+                and self.hparams.num_workers.val > 0,
             ),
             DataLoader(
                 dataset=self.geom_val_dataset,
@@ -583,8 +593,13 @@ class JointDataModule(LightningDataModule):
                 dataset=self.omol25_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                pin_memory=self.hparams.datasets.omol25.proportion > 0.0,
                 shuffle=False,
+                multiprocessing_context=(
+                    "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
+                ),  # Use spawn to avoid CUDA/fork issues
+                persistent_workers=self.hparams.datasets.omol25.proportion > 0.0
+                and self.hparams.num_workers.test > 0,
             ),
             DataLoader(
                 dataset=self.geom_test_dataset,
