@@ -26,24 +26,26 @@ from zatom.utils.typing_utils import typecheck
 
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
+EV_TO_MEV = 1000.0  # 1 electronvolt (eV) = 1000 millielectronvolts (meV)
 QM9_TARGET_NAME_TO_LITERATURE_SCALE = {
+    # eVs are converted to meVs where applicable
     # Reference: https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
     "mu": 1.0,
     "alpha": 1.0,
-    "homo": 1000.0,
-    "lumo": 1000.0,
-    "gap": 1000.0,
+    "homo": EV_TO_MEV,
+    "lumo": EV_TO_MEV,
+    "gap": EV_TO_MEV,
     "r2": 1.0,
-    "zpve": 1000.0,
-    "U0": 1000.0,
-    "U": 1000.0,
-    "H": 1000.0,
-    "G": 1000.0,
+    "zpve": EV_TO_MEV,
+    "U0": EV_TO_MEV,
+    "U": EV_TO_MEV,
+    "H": EV_TO_MEV,
+    "G": EV_TO_MEV,
     "Cv": 1.0,
-    "U0_atom": 1000.0,
-    "U_atom": 1000.0,
-    "H_atom": 1000.0,
-    "G_atom": 1000.0,
+    "U0_atom": EV_TO_MEV,
+    "U_atom": EV_TO_MEV,
+    "H_atom": EV_TO_MEV,
+    "G_atom": EV_TO_MEV,
     "A": 1.0,
     "B": 1.0,
     "C": 1.0,

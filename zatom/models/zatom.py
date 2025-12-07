@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 from zatom.data.components.preprocessing_utils import lattice_params_to_matrix_torch
 from zatom.data.joint_datamodule import (
+    EV_TO_MEV,
     QM9_TARGET_NAME_TO_IDX,
     QM9_TARGET_NAME_TO_LITERATURE_SCALE,
     QM9_TARGETS,
@@ -170,14 +171,17 @@ class Zatom(LightningModule):
                 "loss": MeanMetric(),
                 "aux_global_property_loss": MeanMetric(),
                 "aux_global_energy_loss": MeanMetric(),
-                "aux_global_energy_per_atom_loss": MeanMetric(),
                 "aux_atomic_forces_loss": MeanMetric(),
                 "dataset_idx": MeanMetric(),
             }
         )
         if self.hparams.datasets["qm9"].global_property == "all":
             for target in QM9_TARGETS:
-                self.train_metrics[f"aux_global_property_loss_{target}"] = MeanMetric()
+                self.train_metrics[f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
+        if self.hparams.datasets["omol25"].global_energy is not None:
+            self.train_metrics["aux_global_energy_loss_scaled"] = MeanMetric()
+            self.train_metrics["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
+            self.train_metrics["aux_atomic_forces_loss_scaled"] = MeanMetric()
 
         val_metrics = {}
         for dataset in self.hparams.datasets:
@@ -193,7 +197,6 @@ class Zatom(LightningModule):
                 "loss": MeanMetric(),
                 "aux_global_property_loss": MeanMetric(),
                 "aux_global_energy_loss": MeanMetric(),
-                "aux_global_energy_per_atom_loss": MeanMetric(),
                 "aux_atomic_forces_loss": MeanMetric(),
                 "valid_rate": MeanMetric(),
                 "unique_rate": MeanMetric(),
@@ -201,7 +204,13 @@ class Zatom(LightningModule):
             }
             if self.hparams.datasets["qm9"].global_property == "all":
                 for target in QM9_TARGETS:
-                    val_metrics[dataset][f"aux_global_property_loss_{target}"] = MeanMetric()
+                    val_metrics[dataset][
+                        f"aux_global_property_loss_{target}_scaled"
+                    ] = MeanMetric()
+            if self.hparams.datasets["omol25"].global_energy is not None:
+                val_metrics[dataset]["aux_global_energy_loss_scaled"] = MeanMetric()
+                val_metrics[dataset]["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
+                val_metrics[dataset]["aux_atomic_forces_loss_scaled"] = MeanMetric()
             # Periodic sample evaluation metrics
             if dataset in PERIODIC_DATASETS:
                 if dataset == "qmof150":
@@ -493,18 +502,66 @@ class Zatom(LightningModule):
         if self.hparams.datasets["qm9"].global_property == "all":
             for name, idx in QM9_TARGET_NAME_TO_IDX.items():
                 if is_qm9_dataset:
-                    aux_scale = self.trainer.datamodule.qm9_train_prop_std[0, idx]
-                    aux_shift = self.trainer.datamodule.qm9_train_prop_mean[0, idx]
-                    aux_pred = pred_aux_global_property[:, idx] * aux_scale + aux_shift
-                    aux_target = target_aux_global_property[:, idx] * aux_scale + aux_shift
-                    aux_mask = mask_aux_global_property[:, idx]
-                    aux_err = (aux_pred - aux_target) * aux_mask
-                    aux_loss_value = (
-                        aux_err.abs().sum() / (aux_mask.sum() + 1e-6)
+                    aux_prop_scale = self.trainer.datamodule.qm9_train_prop_std[0, idx]
+                    aux_prop_shift = self.trainer.datamodule.qm9_train_prop_mean[0, idx]
+                    aux_prop_pred = (
+                        pred_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
                     ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                    aux_prop_target = (
+                        target_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
+                    ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                    aux_prop_mask = mask_aux_global_property[:, idx]
+                    aux_prop_err = (aux_prop_pred - aux_prop_target) * aux_prop_mask
+                    aux_prop_loss_value = aux_prop_err.abs().sum() / (aux_prop_mask.sum() + 1e-6)
                 else:
-                    aux_loss_value = torch.tensor(0.0, device=self.device)
-                loss_dict[f"aux_global_property_loss_{name}"] = aux_loss_value
+                    aux_prop_loss_value = torch.tensor(0.0, device=self.device)
+                loss_dict[f"aux_global_property_loss_{name}_scaled"] = aux_prop_loss_value
+
+        # Prepare OMol25 global energy and atomic forces predictions/targets for logging
+        pred_aux_global_energy = loss_dict.pop("pred_aux_global_energy")
+        pred_aux_atomic_forces = loss_dict.pop("pred_aux_atomic_forces")
+        target_aux_global_energy = loss_dict.pop("target_aux_global_energy")
+        target_aux_atomic_forces = loss_dict.pop("target_aux_atomic_forces")
+        mask_aux_global_energy = loss_dict.pop("mask_aux_global_energy")
+        mask_aux_atomic_forces = loss_dict.pop("mask_aux_atomic_forces")
+        if self.hparams.datasets["omol25"].global_energy is not None:
+            if is_omol25_dataset:
+                # Global energy mean absolute error (in meV <- eV)
+                aux_omol25_scale = self.omol25_train_dataset.scale
+                aux_omol25_shift = self.omol25_train_dataset.shift
+                aux_energy_pred = (
+                    pred_aux_global_energy * aux_omol25_scale + aux_omol25_shift
+                ) * EV_TO_MEV
+                aux_energy_target = (
+                    target_aux_global_energy * aux_omol25_scale + aux_omol25_shift
+                ) * EV_TO_MEV
+                aux_energy_err = (aux_energy_pred - aux_energy_target) * mask_aux_global_energy
+                aux_energy_loss_value = aux_energy_err.abs().sum() / (
+                    mask_aux_global_energy.sum() + 1e-6
+                )
+                # Global energy per atom mean absolute error (in meV <- eV)
+                aux_energy_pred_per_atom = aux_energy_pred / max_num_tokens.unsqueeze(-1)
+                aux_energy_target_per_atom = aux_energy_target / max_num_tokens.unsqueeze(-1)
+                aux_energy_per_atom_err = (
+                    aux_energy_pred_per_atom - aux_energy_target_per_atom
+                ) * mask_aux_global_energy
+                aux_energy_per_atom_loss_value = aux_energy_per_atom_err.abs().sum() / (
+                    mask_aux_global_energy.sum() + 1e-6
+                )
+                # Atomic forces mean absolute error (in meV/Å <- eV/Å)
+                aux_force_pred = pred_aux_atomic_forces * aux_omol25_scale * EV_TO_MEV
+                aux_force_target = target_aux_atomic_forces * aux_omol25_scale * EV_TO_MEV
+                aux_force_err = (aux_force_pred - aux_force_target) * mask_aux_atomic_forces
+                aux_force_loss_value = aux_force_err.abs().sum() / (
+                    mask_aux_atomic_forces.sum() + 1e-6
+                )
+            else:
+                aux_energy_loss_value = torch.tensor(0.0, device=self.device)
+                aux_energy_per_atom_loss_value = torch.tensor(0.0, device=self.device)
+                aux_force_loss_value = torch.tensor(0.0, device=self.device)
+            loss_dict["aux_global_energy_loss_scaled"] = aux_energy_loss_value
+            loss_dict["aux_global_energy_per_atom_loss_scaled"] = aux_energy_per_atom_loss_value
+            loss_dict["aux_atomic_forces_loss_scaled"] = aux_force_loss_value
 
         return loss_dict
 

@@ -2,6 +2,7 @@ _target_: zatom.models.zatom.Zatom
 
 architecture:
   max_num_elements: ${globals.max_num_elements}
+  force_loss_weight: 5.0
 
 augmentations:
   frac_coords: true
