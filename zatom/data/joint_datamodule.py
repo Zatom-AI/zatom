@@ -509,12 +509,6 @@ class JointDataModule(LightningDataModule):
             pin_memory=False,
             shuffle=True,
             drop_last=True,
-            multiprocessing_context=(
-                "spawn"
-                if self.hparams.num_workers.train > 0.0
-                and self.hparams.datasets.omol25.proportion > 0.0
-                else None
-            ),  # Use spawn to avoid CUDA/fork issues
         )
 
     def val_dataloader(self) -> Sequence[DataLoader]:
@@ -551,12 +545,6 @@ class JointDataModule(LightningDataModule):
                 num_workers=self.hparams.num_workers.val,
                 pin_memory=False,
                 shuffle=False,
-                multiprocessing_context=(
-                    "spawn"
-                    if self.hparams.num_workers.val > 0.0
-                    and self.hparams.datasets.omol25.proportion > 0.0
-                    else None
-                ),  # Use spawn to avoid CUDA/fork issues
             ),
             DataLoader(
                 dataset=self.geom_val_dataset,
@@ -601,12 +589,6 @@ class JointDataModule(LightningDataModule):
                 num_workers=self.hparams.num_workers.test,
                 pin_memory=False,
                 shuffle=False,
-                multiprocessing_context=(
-                    "spawn"
-                    if self.hparams.num_workers.test > 0.0
-                    and self.hparams.datasets.omol25.proportion > 0.0
-                    else None
-                ),  # Use spawn to avoid CUDA/fork issues
             ),
             DataLoader(
                 dataset=self.geom_test_dataset,
