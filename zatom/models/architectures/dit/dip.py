@@ -86,7 +86,7 @@ class MultimodalDiP(nn.Module):
         atom_n_keys_dec: int = 128,
         max_num_elements: int = 100,
         use_length_condition: bool = True,
-        add_mask_atom_type: bool = True,
+        add_mask_atom_type: bool = False,
         treat_discrete_modalities_as_continuous: bool = False,
         remove_t_conditioning: bool = False,
         condition_on_input: bool = False,

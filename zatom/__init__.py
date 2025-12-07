@@ -103,7 +103,3 @@ def register_custom_omegaconf_resolvers():
         "resolve_grad_accum_steps",
         lambda base_steps, scale_factor: resolve_grad_accum_steps(base_steps, scale_factor),
     )
-    OmegaConf.register_new_resolver(
-        "resolve_num_properties",
-        lambda global_property: 19 if global_property == "all" else 1,
-    )

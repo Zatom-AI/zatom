@@ -58,6 +58,7 @@ class TFT(nn.Module):
         interdist_loss: Type of interatomic distance loss to use. If None, no interatomic distance loss is used.
         time_distribution: Distribution to sample time points from. Must be one of (`uniform`, `beta`, `histogram`).
         time_alpha_factor: Alpha factor for beta time distribution.
+        force_loss_weight: Weighting factor for force loss when performing auxiliary force prediction.
         test_so3_equivariance: Whether to test the model for SO(3) equivariance after each forward pass.
     """
 
@@ -79,6 +80,7 @@ class TFT(nn.Module):
         interdist_loss: InterDistancesLoss | None = None,
         time_distribution: Literal["uniform", "beta", "histogram"] = "beta",
         time_alpha_factor: float = 2.0,
+        force_loss_weight: float = 5.0,
         test_so3_equivariance: bool = False,
         **kwargs: Any,
     ):
@@ -94,6 +96,7 @@ class TFT(nn.Module):
         self.class_dropout_prob = dataset_embedder.dropout_prob
         self.interdist_loss = interdist_loss
         self.time_alpha_factor = time_alpha_factor
+        self.force_loss_weight = force_loss_weight
         self.test_so3_equivariance = test_so3_equivariance
 
         self.vocab_size = max_num_elements
@@ -116,7 +119,6 @@ class TFT(nn.Module):
             )
 
         # Build multimodal model
-        kwargs.pop("add_mask_atom_type", None)  # Remove if present
         self.model = multimodal_model(
             num_heads=token_num_heads,
             num_layers=num_layers,
@@ -551,48 +553,34 @@ class TFT(nn.Module):
                 aux_mask = ~aux_target.isnan()
                 aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
                 if aux_task == "global_property":
+                    # Mean absolute error per example
                     err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = err.abs().sum(0).squeeze(0) / (aux_mask.sum(0) + eps)
                 elif aux_task == "global_energy":
+                    # Mean squared error per example
                     err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
-                    aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
-                else:
+                    aux_loss_value = torch.sum(err.pow(2)) / (aux_mask.sum() + eps)
+                elif aux_task == "atomic_forces":
+                    # Mean absolute error (in eV/Å) per atom
                     aux_mask = aux_mask * real_mask.unsqueeze(-1)
                     n_tokens = aux_mask.all(-1).sum(dim=-1)
-                    err = (aux_pred - aux_target) * aux_mask
-                    aux_loss = torch.sum(err.abs(), dim=(-1, -2)) / (
-                        n_tokens * err.shape[-1] + eps
-                    )
-                    aux_loss_value = aux_loss.sum() / (real_mask.any(-1).sum() + eps)
+                    err = ((aux_pred - aux_target) * aux_mask).pow(2).sum(-1).sqrt()
+                    aux_loss_value = err.sum() / ((real_mask.any(-1) * n_tokens).sum() + eps)
+                    aux_loss_value = aux_loss_value * self.force_loss_weight
+                else:
+                    raise ValueError(f"Unknown auxiliary task: {aux_task}")
                 loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value
             # Unused auxiliary task → add zero loss to computational graph
             else:
                 loss_dict[f"aux_{aux_task}_loss"] = (aux_pred * 0.0).mean()
 
-            # Log per-atom auxiliary loss
-            if aux_task == "global_energy":
-                if aux_task in path.x_1:
-                    real_mask = 1 - path.x_1["padding_mask"].int()
-                    aux_target = path.x_1[aux_task]
-                    aux_mask = ~aux_target.isnan()
-                    aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                    n_tokens = real_mask.sum(dim=-1, keepdim=True).clamp(min=1.0).unsqueeze(-2)
-                    err = (
-                        (aux_pred / n_tokens) - (aux_target.unsqueeze(-2) / n_tokens)
-                    ) * aux_mask.unsqueeze(-2)
-                    per_atom_aux_loss_value = torch.sum(err.abs()) / (aux_mask.sum() + eps)
-                else:
-                    per_atom_aux_loss_value = (aux_pred * 0.0).mean()
-
-                loss_dict[f"aux_{aux_task}_per_atom_loss"] = per_atom_aux_loss_value
-
+            # Accumulate auxiliary loss per (sub)task
             loss_dict["loss"] += loss_dict[f"aux_{aux_task}_loss"].sum()
 
             # Cache auxiliary predictions and targets for logging
-            if aux_task == "global_property":
-                loss_dict[f"pred_aux_{aux_task}"] = aux_pred.squeeze(-2)
-                loss_dict[f"target_aux_{aux_task}"] = aux_target
-                loss_dict[f"mask_aux_{aux_task}"] = aux_mask
+            loss_dict[f"pred_aux_{aux_task}"] = aux_pred.squeeze(-2)
+            loss_dict[f"target_aux_{aux_task}"] = aux_target
+            loss_dict[f"mask_aux_{aux_task}"] = aux_mask
 
         return loss_dict, stats_dict
 

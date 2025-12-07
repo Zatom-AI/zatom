@@ -242,7 +242,7 @@ class OMol25(Dataset):
             forces = torch.from_numpy(atoms.get_forces().astype(np.float32))
 
             energy = (energy - self.shift) / self.scale
-            forces = (forces - self.shift) / self.scale
+            forces = forces / self.scale
 
             y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
 
