@@ -506,7 +506,7 @@ class JointDataModule(LightningDataModule):
             dataset=self.train_dataset,
             batch_size=self.hparams.batch_size.train,
             num_workers=self.hparams.num_workers.train,
-            pin_memory=self.hparams.datasets.omol25.proportion > 0.0,
+            pin_memory=False,
             shuffle=True,
             drop_last=True,
             multiprocessing_context=(
@@ -548,7 +548,7 @@ class JointDataModule(LightningDataModule):
                 dataset=self.omol25_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=self.hparams.datasets.omol25.proportion > 0.0,
+                pin_memory=False,
                 shuffle=False,
                 multiprocessing_context=(
                     "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
@@ -597,7 +597,7 @@ class JointDataModule(LightningDataModule):
                 dataset=self.omol25_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=self.hparams.datasets.omol25.proportion > 0.0,
+                pin_memory=False,
                 shuffle=False,
                 multiprocessing_context=(
                     "spawn" if self.hparams.datasets.omol25.proportion > 0.0 else None
