@@ -175,9 +175,10 @@ class Zatom(LightningModule):
                 "dataset_idx": MeanMetric(),
             }
         )
-        if self.hparams.datasets["qm9"].global_property == "all":
+        if self.hparams.datasets["qm9"].global_property is not None:
             for target in QM9_TARGETS:
-                self.train_metrics[f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
+                if self.hparams.datasets["qm9"].global_property in ("all", target):
+                    self.train_metrics[f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
         if self.hparams.datasets["omol25"].global_energy is not None:
             self.train_metrics["aux_global_energy_loss_scaled"] = MeanMetric()
             self.train_metrics["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
@@ -202,11 +203,12 @@ class Zatom(LightningModule):
                 "unique_rate": MeanMetric(),
                 "sampling_time": MeanMetric(),
             }
-            if self.hparams.datasets["qm9"].global_property == "all":
+            if self.hparams.datasets["qm9"].global_property is not None:
                 for target in QM9_TARGETS:
-                    val_metrics[dataset][
-                        f"aux_global_property_loss_{target}_scaled"
-                    ] = MeanMetric()
+                    if self.hparams.datasets["qm9"].global_property in ("all", target):
+                        val_metrics[dataset][
+                            f"aux_global_property_loss_{target}_scaled"
+                        ] = MeanMetric()
             if self.hparams.datasets["omol25"].global_energy is not None:
                 val_metrics[dataset]["aux_global_energy_loss_scaled"] = MeanMetric()
                 val_metrics[dataset]["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
@@ -499,23 +501,26 @@ class Zatom(LightningModule):
         pred_aux_global_property = loss_dict.pop("pred_aux_global_property")
         target_aux_global_property = loss_dict.pop("target_aux_global_property")
         mask_aux_global_property = loss_dict.pop("mask_aux_global_property")
-        if self.hparams.datasets["qm9"].global_property == "all":
+        if self.hparams.datasets["qm9"].global_property is not None:
             for name, idx in QM9_TARGET_NAME_TO_IDX.items():
-                if is_qm9_dataset:
-                    aux_prop_scale = self.trainer.datamodule.qm9_train_prop_std[0, idx]
-                    aux_prop_shift = self.trainer.datamodule.qm9_train_prop_mean[0, idx]
-                    aux_prop_pred = (
-                        pred_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
-                    ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
-                    aux_prop_target = (
-                        target_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
-                    ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
-                    aux_prop_mask = mask_aux_global_property[:, idx]
-                    aux_prop_err = (aux_prop_pred - aux_prop_target) * aux_prop_mask
-                    aux_prop_loss_value = aux_prop_err.abs().sum() / (aux_prop_mask.sum() + 1e-6)
-                else:
-                    aux_prop_loss_value = torch.tensor(0.0, device=self.device)
-                loss_dict[f"aux_global_property_loss_{name}_scaled"] = aux_prop_loss_value
+                if self.hparams.datasets["qm9"].global_property in ("all", name):
+                    if is_qm9_dataset:
+                        aux_prop_scale = self.trainer.datamodule.qm9_train_prop_std[0, idx]
+                        aux_prop_shift = self.trainer.datamodule.qm9_train_prop_mean[0, idx]
+                        aux_prop_pred = (
+                            pred_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
+                        ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                        aux_prop_target = (
+                            target_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
+                        ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                        aux_prop_mask = mask_aux_global_property[:, idx]
+                        aux_prop_err = (aux_prop_pred - aux_prop_target) * aux_prop_mask
+                        aux_prop_loss_value = aux_prop_err.abs().sum() / (
+                            aux_prop_mask.sum() + 1e-6
+                        )
+                    else:
+                        aux_prop_loss_value = torch.tensor(0.0, device=self.device)
+                    loss_dict[f"aux_global_property_loss_{name}_scaled"] = aux_prop_loss_value
 
         # Prepare OMol25 global energy and atomic forces predictions/targets for logging
         pred_aux_global_energy = loss_dict.pop("pred_aux_global_energy")

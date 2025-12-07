@@ -202,9 +202,7 @@ class JointDataModule(LightningDataModule):
         # torch.save(smiles, os.path.join(self.hparams.datasets.qm9.root, "smiles.pt"))
         # Select target property if specified
         qm9_target_name = self.hparams.datasets.qm9.global_property
-        if qm9_target_name is None:
-            qm9_dataset.data.y = qm9_dataset.data.y[:, 0:1]  # Default to dipole moment (μ)
-        else:
+        if qm9_target_name is not None:
             assert (
                 qm9_target_name == "all" or qm9_target_name in QM9_TARGET_NAME_TO_IDX
             ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {QM9_TARGETS}."
@@ -220,10 +218,17 @@ class JointDataModule(LightningDataModule):
                 )
             else:
                 qm9_target_idx = QM9_TARGET_NAME_TO_IDX[qm9_target_name]
-                qm9_dataset.data.y = qm9_dataset.data.y[:, qm9_target_idx : qm9_target_idx + 1]
+                qm9_dataset.data.y = torch.where(
+                    torch.arange(
+                        qm9_dataset.data.y.size(1), device=qm9_dataset.data.y.device
+                    ).unsqueeze(0)
+                    == qm9_target_idx,
+                    qm9_dataset.data.y,
+                    float("nan"),
+                )
                 log.info(
                     f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
-                    f" with mean {qm9_dataset.data.y.mean().item():.4f} and std {qm9_dataset.data.y.std().item():.4f}."
+                    f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean().item():.4f} and std {qm9_dataset.data.y[:, qm9_target_idx].std().item():.4f}."
                 )
             # Create property prediction train/val/test splits (n.b., same as Platonic Transformer)
             qm9_random_state = np.random.RandomState(seed=42)

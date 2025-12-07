@@ -205,7 +205,7 @@ atom_n_queries_enc: null # NOTE: if null, user-provided `mask` will be used inst
 atom_n_keys_enc: null # NOTE: if null, user-provided `mask` will be used instead
 atom_n_queries_dec: null # NOTE: if null, user-provided `mask` will be used instead
 atom_n_keys_dec: null # NOTE: if null, user-provided `mask` will be used instead
-num_properties: ${resolve_num_properties:${data.datamodule.datasets.qm9.global_property}}
+num_properties: ${globals.num_global_properties}
 batch_size_scale_factor: 2 # 2, 1, 0.5 -> 80M, 180M, 500M model sizes
 use_length_condition: true
 condition_on_input: false
