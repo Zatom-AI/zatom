@@ -824,8 +824,8 @@ class Zatom(LightningModule):
             self.log(
                 f"{stage}_{INDEX_TO_DATASET[dataloader_idx]}/{k}",
                 metrics[k],
-                on_step=False,
-                on_epoch=True,
+                on_step=True,
+                on_epoch=False,
                 prog_bar=False,
                 sync_dist=True,
                 add_dataloader_idx=False,
