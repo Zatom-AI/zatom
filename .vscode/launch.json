@@ -57,7 +57,8 @@
             },
             "args": [
                 "pretrained_ckpt_path=logs/finetune_fm/runs/finetune_model-zatom_arch-tft_70M_joint_all_props_2025-12-03_12-00-00/checkpoints/model-epoch@619-step@265980-val_qm9_property_loss@0.0175-val_omol25_energy_loss@0.0000.ckpt",
-                // "ckpt_path=logs/finetune_fm/runs/finetune_arch-tft_70M_joint_2025-11-17_14-00-00/checkpoints/0-42.ckpt",
+                "ckpt_path=logs/finetune_fm/runs/finetune_arch-tft_70M_joint_2025-12-08_10-00-00/checkpoints/",
+                "callbacks.model_checkpoint.monitor=val_omol25/aux_atomic_forces_loss",
                 // "resume_from_last_step_dir=false",
                 "data.datamodule.batch_size.train=2",
                 "data.datamodule.batch_size.val=2",
@@ -72,7 +73,8 @@
                 "data.datamodule.datasets.qm9.proportion=0.0",
                 "date=2025-12-08_10-00-00",
                 "experiment=finetune",
-                "logger=csv",
+                // "logger=csv",
+                "logger.wandb.id=mzmhepa1",
                 "model=zatom",
                 "model/architecture=tft_70M",
                 "model.augmentations.scale=1.0",
@@ -81,7 +83,7 @@
                 "strategy=default",
                 // "trainer=ddp",
                 "trainer=mps",
-                "trainer.check_val_every_n_epoch=10000",
+                "trainer.check_val_every_n_epoch=30000",
                 "trainer.max_time=04:00:00:00",
                 "trainer.overfit_batches=1",
             ]

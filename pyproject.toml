@@ -26,7 +26,7 @@ dependencies = [
     # --------- pytorch --------- #
     "torch==2.8.0",
     "torchvision==0.23",
-    "lightning==2.5.3",
+    "lightning==2.6.0",
     "torchmetrics==1.8.1",
     "lovely_tensors==0.1.18",
     "einops==0.8.1",
@@ -102,6 +102,7 @@ dependencies = [
     "libigl==2.6.1",
     "tensordict==0.10.0",
     "ase-db-backends==0.11.0",
+    "ray[serve]>=2.52.1",
     "flow_matching @ git+https://github.com/amorehead/flow_matching.git@mm",
     "fairchem-core @ git+https://github.com/facebookresearch/fairchem.git@a9287b37469a80f9286151d70ceb184f91dfad8e#subdirectory=packages/fairchem-core",
     "platonic_transformers @ git+https://github.com/amorehead/PlatonicTransformers.git@packaging",
