@@ -68,7 +68,7 @@ dependencies = [
     "biopython==1.84",
     "scipy==1.13.1",
     "sympy==1.13.3",
-    "numba==0.61.2",
+    "numba==0.62.1",
     "gemmi==0.6.5",
     "scikit-learn==1.6.1",
     "chembl_structure_pipeline==1.2.2",
@@ -101,8 +101,9 @@ dependencies = [
     "seaborn==0.13.2",
     "libigl==2.6.1",
     "tensordict==0.10.0",
+    "ase-db-backends==0.11.0",
     "flow_matching @ git+https://github.com/amorehead/flow_matching.git@mm",
-    "fairchem-core @ git+https://github.com/amorehead/fairchem.git@torch-2.6.0-plus#subdirectory=packages/fairchem-core",
+    "fairchem-core @ git+https://github.com/facebookresearch/fairchem.git@a9287b37469a80f9286151d70ceb184f91dfad8e#subdirectory=packages/fairchem-core",
     "platonic_transformers @ git+https://github.com/amorehead/PlatonicTransformers.git@packaging",
 ]
 
