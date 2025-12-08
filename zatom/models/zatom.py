@@ -1058,6 +1058,9 @@ class Zatom(LightningModule):
         token_is_periodic = torch.zeros_like(token_mask)
         token_is_periodic[sample_is_periodic] = True
 
+        charge = torch.zeros(batch_size, dtype=torch.float32, device=self.device)
+        spin = torch.zeros(batch_size, dtype=torch.long, device=self.device)
+
         # Prepare batch for sampling
         max_num_tokens = token_mask.sum(dim=1)  # (batch_size,)
         dense_batch = TensorDict(
@@ -1071,6 +1074,8 @@ class Zatom(LightningModule):
                 # features for conditioning
                 "dataset_idx": dataset_idx,
                 "spacegroup": spacegroup,
+                "charge": charge,
+                "spin": spin,
                 "ref_pos": ref_pos,
                 "ref_space_uid": atom_to_token_idx,
                 "atom_to_token": atom_to_token,
