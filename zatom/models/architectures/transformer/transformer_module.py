@@ -34,6 +34,7 @@ class TransformerModule(nn.Module):
         spacegroup_embedder: The spacegroup embedder module.
         activation: Activation function to use ("SiLU", "ReLU", "SwiGLU").
         implementation: Implementation type ("reimplemented",).
+        qk_layernorm: Whether to apply layer normalization to query and key in attention.
         cross_attention: Whether to use cross-attention layers.
         add_sinusoid_posenc: Whether to add sinusoidal positional encoding.
         concat_combine_input: Whether to concatenate and combine inputs.
@@ -56,6 +57,7 @@ class TransformerModule(nn.Module):
         spacegroup_embedder: nn.Module,
         activation: Literal["SiLU", "ReLU", "SwiGLU"] = "SiLU",
         implementation: Literal["reimplemented"] = "reimplemented",
+        qk_layernorm: bool = False,
         cross_attention: bool = False,
         add_sinusoid_posenc: bool = True,
         concat_combine_input: bool = False,
@@ -111,9 +113,10 @@ class TransformerModule(nn.Module):
         if self.implementation == "reimplemented":
             self.transformer = Transformer(
                 dim=hidden_dim,
-                num_heads=num_heads,
                 depth=num_layers,
+                num_heads=num_heads,
                 repr_layer=aux_layer,
+                qk_layernorm=qk_layernorm,
             )
         else:
             raise ValueError(f"Invalid implementation: {self.implementation}")
@@ -222,16 +225,19 @@ class TransformerModule(nn.Module):
                 dim=hidden_dim,
                 num_heads=num_heads,
                 depth=num_aux_layers,
+                qk_layernorm=qk_layernorm,
             )
             self.global_energy_transformer = Transformer(
                 dim=hidden_dim,
                 num_heads=num_heads,
                 depth=num_aux_layers,
+                qk_layernorm=qk_layernorm,
             )
             self.atomic_forces_transformer = Transformer(
                 dim=hidden_dim,
                 num_heads=num_heads,
                 depth=num_aux_layers,
+                qk_layernorm=qk_layernorm,
             )
 
         self.global_property_head = nn.Linear(hidden_dim, num_properties, bias=True)

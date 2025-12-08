@@ -19,6 +19,7 @@ class Attention(nn.Module):
         num_heads: Number of attention heads
         dropout: Dropout probability for attention weights
         bias: Whether to include bias terms in the projection layers
+        qk_layernorm: Whether to apply layer normalization to query and key
         batch_first: Whether input tensors are in batch-first format (batch, seq, features)
     """
 
@@ -29,9 +30,12 @@ class Attention(nn.Module):
         num_heads: int,
         dropout: float = 0.0,
         bias: bool = True,
+        qk_layernorm: bool = False,
         batch_first: bool = True,
     ):
         super().__init__()
+        self.q_layernorm = nn.LayerNorm(dim) if qk_layernorm else nn.Identity()
+        self.k_layernorm = nn.LayerNorm(dim) if qk_layernorm else nn.Identity()
         self.mha = nn.MultiheadAttention(
             embed_dim=dim,
             num_heads=num_heads,
@@ -70,8 +74,8 @@ class Attention(nn.Module):
         value = key if value is None else value
 
         attn_output, attn_weights = self.mha(
-            query=query,
-            key=key,
+            query=self.q_layernorm(query),
+            key=self.k_layernorm(key),
             value=value,
             key_padding_mask=key_padding_mask,
             attn_mask=attn_mask,
@@ -92,6 +96,7 @@ class AttentionBlock(nn.Module):
         num_heads: Number of attention heads
         dropout: Dropout probability
         bias: Whether to use bias in linear projections
+        qk_layernorm: Whether to apply layer normalization to query and key
         batch_first: Whether input is batch-first (batch, seq, features)
         norm_eps: Epsilon value for layer normalization
     """
@@ -103,6 +108,7 @@ class AttentionBlock(nn.Module):
         num_heads: int,
         dropout: float = 0.0,
         bias: bool = True,
+        qk_layernorm: bool = False,
         batch_first: bool = True,
         norm_eps: float = 1e-5,
     ):
@@ -114,6 +120,7 @@ class AttentionBlock(nn.Module):
             num_heads=num_heads,
             dropout=dropout,
             bias=bias,
+            qk_layernorm=qk_layernorm,
             batch_first=batch_first,
         )
 

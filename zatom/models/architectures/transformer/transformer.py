@@ -21,6 +21,7 @@ class TransformerBlock(nn.Module):
         num_heads: Number of attention heads
         mlp_dim: Hidden dimension for the feed-forward network (defaults to 4x input dim)
         dropout: Dropout probability
+        qk_layernorm: Whether to apply layer normalization to query and key in attention
         activation_type: Type of activation to use in the feed-forward network
         norm_eps: Epsilon value for layer normalization
     """
@@ -32,6 +33,7 @@ class TransformerBlock(nn.Module):
         num_heads: int,
         mlp_dim: int = None,
         dropout: float = 0.0,
+        qk_layernorm: bool = False,
         activation_type: str = "swiglu",
         norm_eps: float = 1e-5,
     ):
@@ -39,7 +41,11 @@ class TransformerBlock(nn.Module):
 
         # Self-attention block
         self.attn_block = AttentionBlock(
-            dim=dim, num_heads=num_heads, dropout=dropout, norm_eps=norm_eps
+            dim=dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            qk_layernorm=qk_layernorm,
+            norm_eps=norm_eps,
         )
 
         # Feed-forward network
@@ -94,6 +100,7 @@ class Transformer(nn.Module):
         repr_layer: Layer at which to additionally extract intermediate representations. If None, no intermediate representation is extracted.
         mlp_dim: Hidden dimension for feed-forward networks (defaults to 4x dim)
         dropout: Dropout probability
+        qk_layernorm: Whether to apply layer normalization to query and key in attention
         activation_type: Type of activation to use in feed-forward networks
         norm_eps: Epsilon value for layer normalization
     """
@@ -107,6 +114,7 @@ class Transformer(nn.Module):
         repr_layer: Optional[int] = None,
         mlp_dim: Optional[int] = None,
         dropout: float = 0.0,
+        qk_layernorm: bool = False,
         activation_type: str = "gelu",
         norm_eps: float = 1e-5,
     ):
@@ -125,6 +133,7 @@ class Transformer(nn.Module):
                     num_heads=num_heads,
                     mlp_dim=mlp_dim,
                     dropout=dropout,
+                    qk_layernorm=qk_layernorm,
                     activation_type=activation_type,
                     norm_eps=norm_eps,
                 )
