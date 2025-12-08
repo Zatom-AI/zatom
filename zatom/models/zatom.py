@@ -607,9 +607,8 @@ class Zatom(LightningModule):
             batch.node_is_periodic = sample_is_periodic[batch.batch]
 
             # Center non-periodic molecules at origin before any augmentations
-            batch.pos[~batch.node_is_periodic] -= scatter_mean_torch(
-                src=batch.pos, index=batch.batch, dim=0
-            )[batch.batch][~batch.node_is_periodic]
+            pos_mean = scatter_mean_torch(src=batch.pos, index=batch.batch, dim=0)
+            batch.pos[~batch.node_is_periodic] -= pos_mean[batch.batch][~batch.node_is_periodic]
 
             if self.hparams.augmentations.multiplicity > 1:
                 # Augment batch (e.g., by random 3D rotations and translations) multiple times
@@ -645,6 +644,17 @@ class Zatom(LightningModule):
                 #     rtol=1e-3,
                 #     atol=1e-3,
                 # )
+
+                is_omol25_dataset = batch.dataset_idx == DATASET_TO_INDEX["omol25"]
+                if is_omol25_dataset.any():
+                    # Rotate atomic forces accordingly
+                    assert (
+                        is_omol25_dataset.all()
+                    ), "All samples in batch must be from OMol25 dataset when applying force rotation."
+                    forces_aug = torch.einsum(
+                        "bi,bij->bj", batch.y[:, 1:4], rot_for_nodes.transpose(-2, -1)
+                    )
+                    batch.y[:, 1:4] = forces_aug
 
             if self.hparams.augmentations.frac_coords is True:
                 if batch.sample_is_periodic.any():
