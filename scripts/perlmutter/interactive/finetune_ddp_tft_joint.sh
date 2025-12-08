@@ -28,8 +28,8 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="dleuinni"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-12-08_12-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="f87lowlu"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-12-08_15-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
 DEFAULT_ARCHITECTURE="tft_70M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_70M`, `{tft,}_160M`, `{tft,}_300M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
@@ -80,9 +80,6 @@ bash -c "
     data.datamodule.batch_size.train=32 \
     data.datamodule.batch_size.val=32 \
     data.datamodule.batch_size.test=32 \
-    data.datamodule.num_workers.train=2 \
-    data.datamodule.num_workers.val=2 \
-    data.datamodule.num_workers.test=2 \
     data.datamodule.datasets.qm9.proportion=0.0 \
     data.datamodule.datasets.qm9.global_property=null \
     data.datamodule.datasets.omol25.proportion=1.0 \
