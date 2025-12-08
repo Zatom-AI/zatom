@@ -718,6 +718,8 @@ class TFT(nn.Module):
             {
                 "dataset_idx": batch["dataset_idx"],
                 "spacegroup": batch["spacegroup"],
+                "charge": batch["charge"],
+                "spin": batch["spin"],
                 "ref_pos": batch["ref_pos"],
                 "ref_space_uid": batch["ref_space_uid"],
                 "atom_to_token": batch["atom_to_token"],
