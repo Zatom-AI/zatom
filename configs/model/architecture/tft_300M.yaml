@@ -7,7 +7,7 @@ multimodal_model:
   spatial_dim: ${globals.spatial_dim}
   atom_dim: ${globals.max_num_elements}
   num_properties: ${globals.num_global_properties}
-  implementation: reimplemented # NOTE: must be one of (`reimplemented`,)
+  implementation: reimplemented # NOTE: must be one of (`reimplemented`, `reimplemented_modern`)
   cross_attention: true
 
 dataset_embedder:

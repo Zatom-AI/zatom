@@ -1,10 +1,13 @@
 """Adapted from https://github.com/carlosinator/tabasco."""
 
+import math
 from typing import Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
+from zatom.models.architectures.transformer.common import apply_rotary_embeddings
 from zatom.utils.typing_utils import typecheck
 
 
@@ -19,7 +22,6 @@ class Attention(nn.Module):
         num_heads: Number of attention heads
         dropout: Dropout probability for attention weights
         bias: Whether to include bias terms in the projection layers
-        qk_layernorm: Whether to apply layer normalization to query and key
         batch_first: Whether input tensors are in batch-first format (batch, seq, features)
     """
 
@@ -30,12 +32,9 @@ class Attention(nn.Module):
         num_heads: int,
         dropout: float = 0.0,
         bias: bool = True,
-        qk_layernorm: bool = False,
         batch_first: bool = True,
     ):
         super().__init__()
-        self.q_layernorm = nn.LayerNorm(dim) if qk_layernorm else nn.Identity()
-        self.k_layernorm = nn.LayerNorm(dim) if qk_layernorm else nn.Identity()
         self.mha = nn.MultiheadAttention(
             embed_dim=dim,
             num_heads=num_heads,
@@ -74,8 +73,8 @@ class Attention(nn.Module):
         value = key if value is None else value
 
         attn_output, attn_weights = self.mha(
-            query=self.q_layernorm(query),
-            key=self.k_layernorm(key),
+            query=query,
+            key=key,
             value=value,
             key_padding_mask=key_padding_mask,
             attn_mask=attn_mask,
@@ -88,6 +87,94 @@ class Attention(nn.Module):
         return attn_output
 
 
+class ModernSelfAttention(nn.Module):
+    """Modern self-attention module with rotary embeddings and optional SDPA.
+
+    Args:
+        dim: Input dimension
+        n_heads: Number of attention heads
+        use_qk_norm: Whether to apply RMS normalization to queries and keys
+        use_sdpa: Whether to use PyTorch's scaled dot-product attention
+    """
+
+    @typecheck
+    def __init__(self, dim: int, n_heads: int, use_qk_norm: bool = True, use_sdpa: bool = True):
+        super().__init__()
+        assert dim % n_heads == 0, "dim must be divisible by n_heads"
+
+        self.dim = dim
+        self.n_heads = n_heads
+        self.head_dim = dim // n_heads
+        self.use_sdpa = use_sdpa
+
+        self.q_proj = nn.Linear(dim, dim, bias=False)
+        self.k_proj = nn.Linear(dim, dim, bias=False)
+        self.v_proj = nn.Linear(dim, dim, bias=False)
+        self.o_proj = nn.Linear(dim, dim, bias=False)
+
+        self.use_qk_norm = use_qk_norm
+        if self.use_qk_norm:
+            self.q_norm = nn.RMSNorm(self.head_dim)
+            self.k_norm = nn.RMSNorm(self.head_dim)
+
+    @typecheck
+    def forward(
+        self, x: torch.Tensor, freqs_complex: torch.Tensor, attn_mask: torch.Tensor
+    ) -> torch.Tensor:
+        """Forward pass through the modern self-attention layer.
+
+        Args:
+            x: Input tensor of shape [batch_size, seq_len, dim]
+            freqs_complex: Precomputed rotary frequency tensor of shape [seq_len, head_dim]
+            attn_mask: Attention mask of shape [batch_size, n_heads, seq_len, seq_len]
+
+        Returns:
+            Output tensor of shape [batch_size, seq_len, dim]
+        """
+        batch_size, seq_len, _ = x.shape
+
+        q = self.q_proj(x)
+        k = self.k_proj(x)
+        v = self.v_proj(x)
+
+        q = q.reshape(batch_size, seq_len, self.n_heads, self.head_dim)
+        k = k.reshape(batch_size, seq_len, self.n_heads, self.head_dim)
+        v = v.reshape(batch_size, seq_len, self.n_heads, self.head_dim)
+
+        if self.use_qk_norm:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
+
+        q = apply_rotary_embeddings(q, freqs_complex, device=x.device)
+        k = apply_rotary_embeddings(k, freqs_complex, device=x.device)
+
+        # Transpose for attention calculation: (B, H, Seq_Len, Head_Dim)
+        q = q.transpose(1, 2)
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
+
+        if self.use_sdpa:
+            # Use PyTorch's optimized scaled dot-product attention.
+            output = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+        else:
+            # Manual implementation for comparison or environments where SDPA is not available.
+            scores = torch.matmul(q, k.transpose(2, 3)) / math.sqrt(self.head_dim)
+            if attn_mask is not None:
+                if attn_mask.dtype == torch.bool:
+                    # For boolean masks, False positions are masked.
+                    # We need to invert the mask if True means "keep".
+                    scores.masked_fill_(~attn_mask, float("-inf"))
+                else:
+                    # For float masks, we directly add it.
+                    scores = scores + attn_mask
+            scores = F.softmax(scores.float(), dim=-1).type_as(q)
+            output = torch.matmul(scores, v)
+
+        # (B, H, Seq_Len, Head_Dim) -> (B, Seq_Len, H, Head_Dim) -> (B, Seq_Len, Dim)
+        output = output.transpose(1, 2).contiguous().reshape(batch_size, seq_len, self.dim)
+        return self.o_proj(output)
+
+
 class AttentionBlock(nn.Module):
     """A block of attention layers with layer normalization.
 
@@ -96,7 +183,6 @@ class AttentionBlock(nn.Module):
         num_heads: Number of attention heads
         dropout: Dropout probability
         bias: Whether to use bias in linear projections
-        qk_layernorm: Whether to apply layer normalization to query and key
         batch_first: Whether input is batch-first (batch, seq, features)
         norm_eps: Epsilon value for layer normalization
     """
@@ -108,7 +194,6 @@ class AttentionBlock(nn.Module):
         num_heads: int,
         dropout: float = 0.0,
         bias: bool = True,
-        qk_layernorm: bool = False,
         batch_first: bool = True,
         norm_eps: float = 1e-5,
     ):
@@ -120,7 +205,6 @@ class AttentionBlock(nn.Module):
             num_heads=num_heads,
             dropout=dropout,
             bias=bias,
-            qk_layernorm=qk_layernorm,
             batch_first=batch_first,
         )
 

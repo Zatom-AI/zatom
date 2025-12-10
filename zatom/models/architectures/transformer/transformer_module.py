@@ -11,7 +11,10 @@ from zatom.models.architectures.transformer.positional_encoder import (
     SinusoidEncoding,
     TimeFourierEncoding,
 )
-from zatom.models.architectures.transformer.transformer import Transformer
+from zatom.models.architectures.transformer.transformer import (
+    ModernTransformer,
+    Transformer,
+)
 from zatom.utils.pylogger import RankedLogger
 from zatom.utils.typing_utils import Bool, Float, Int, typecheck
 
@@ -112,6 +115,16 @@ class TransformerModule(nn.Module):
 
         if self.implementation == "reimplemented":
             self.transformer = Transformer(
+                dim=hidden_dim,
+                depth=num_layers,
+                num_heads=num_heads,
+                repr_layer=aux_layer,
+            )
+        elif self.implementation == "reimplemented_modern":
+            raise NotImplementedError(
+                "'reimplemented_modern' is not yet supported in TransformerModule."
+            )
+            self.transformer = ModernTransformer(
                 dim=hidden_dim,
                 depth=num_layers,
                 num_heads=num_heads,

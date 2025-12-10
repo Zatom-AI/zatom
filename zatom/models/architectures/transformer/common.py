@@ -7,12 +7,93 @@ from torch import Tensor, nn
 from zatom.utils.typing_utils import typecheck
 
 
+@typecheck
+def precompute_rope_theta(
+    head_dim: int, seq_len: int, device: str, theta: float = 10000.0
+) -> Tensor:
+    """Precompute the rotary frequency tensor for RoPE.
+
+    Args:
+        head_dim: Dimension of each attention head.
+        seq_len: Length of the input sequence.
+        device: Device to place the tensor on.
+        theta: Base frequency for RoPE.
+
+    Returns:
+        A tensor of shape [seq_len, head_dim] containing the precomputed rotary frequencies.
+    """
+    theta_arange = torch.arange(0, head_dim, 2).float()
+    theta = 1.0 / (theta.pow(theta_arange / head_dim))
+    m = torch.arange(seq_len, device=device)
+    freqs = torch.outer(m, theta).float()
+    freqs_complex = torch.polar(torch.ones_like(freqs), freqs)
+    return freqs_complex
+
+
+@typecheck
+def apply_rotary_embeddings(
+    x: torch.Tensor, freqs_complex: torch.Tensor, device: str
+) -> torch.Tensor:
+    """Apply rotary positional embeddings to the input tensor.
+
+    Args:
+        x: Input tensor of shape [batch_size, seq_len, num_heads, head_dim]
+        freqs_complex: Precomputed rotary frequency tensor of shape [seq_len, head_dim]
+        device: Device to place the output tensor on.
+
+    Returns:
+        Output tensor of the same shape as x with rotary embeddings applied.
+    """
+    x_complex = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
+    freqs_complex = freqs_complex.unsqueeze(0).unsqueeze(2)
+    x_rotated = x_complex * freqs_complex
+    x_out = torch.view_as_real(x_rotated)
+    x_out = x_out.reshape(*x.shape)
+    return x_out.type_as(x).to(device)
+
+
 class SwiGLU(nn.Module):
     """SwiGLU activation function."""
 
+    @typecheck
     def forward(self, x: Tensor) -> Tensor:
         x, gates = x.chunk(2, dim=-1)
         return F.silu(gates) * x
+
+
+class SwiGLUFeedForward(nn.Module):
+    """Feed-forward network with SwiGLU activation.
+
+    Args:
+        dim: Input and output dimension.
+        hidden_dim: Hidden layer dimension.
+        multiple_of: Ensure hidden_dim is a multiple of this value.
+    """
+
+    @typecheck
+    def __init__(self, dim: int, hidden_dim: int, multiple_of: int = 256):
+        super().__init__()
+        hidden_dim = int(2 * hidden_dim / 3)
+        hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+
+        self.w1 = nn.Linear(dim, hidden_dim, bias=False)
+        self.w2 = nn.Linear(hidden_dim, dim, bias=False)
+        self.w3 = nn.Linear(dim, hidden_dim, bias=False)
+
+    @typecheck
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass through the SwiGLU feed-forward network.
+
+        Args:
+            x (Tensor): Input tensor of shape (..., dim).
+
+        Returns:
+            Tensor: Output tensor of shape (..., dim).
+        """
+        swish = F.silu(self.w1(x))
+        x_V = self.w3(x)
+        x = swish * x_V
+        return self.w2(x)
 
 
 class ChargeSpinEmbedding(nn.Module):
