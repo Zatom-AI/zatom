@@ -31,6 +31,12 @@ datamodule:
       root: ${paths.data_dir}/geom
       proportion: 0.0
 
+    mptrj:
+      _target_: zatom.data.components.mptrj_dataset.MPtrj
+      root: ${paths.data_dir}/mptrj
+      proportion: 0.0
+      global_energy: null # NOTE: if true, predict *both* global energy and per-atom forces; if false or null, skip energy and force prediction
+
   batch_size:
     base_accumulate_grad_batches: 2
     train: ${resolve_batch_size:64,${model.architecture.batch_size_scale_factor}}

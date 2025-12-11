@@ -1,7 +1,7 @@
 import os
 import pickle  # nosec
 import tarfile
-from typing import Any
+from typing import Any, Dict
 
 import ase
 import numpy as np
@@ -66,6 +66,57 @@ def get_omol25_per_atom_energy_and_stats(
             return per_elm_energy, dataset_stats
 
     return compute_per_atom_energy_and_stat(dataset, save_path=coef_path, include_hof=include_hof)
+
+
+@typecheck
+def get_mptrj_stats(
+    dataset: Dataset,
+    coef_path: str | None = None,
+    recalculate: bool = False,
+) -> Dict[str, Any]:
+    """Get mean and std of energy, either loading from file or computing.
+
+    Args:
+        dataset: An MPtrj dataset instance
+        coef_path: Path to save/load coefficients. If None, coefficients won't be saved.
+        recalculate: Force recalculation even if file exists.
+
+    Returns:
+        Dataset statistics.
+    """
+    # Try to load from file if path provided and not forcing recalculation
+    coef_path = os.path.join(coef_path, "stats.pkl")
+
+    if os.path.exists(coef_path) and not recalculate:
+        log.info(f"Loading MPtrj energy normalization coefficients from {coef_path}")
+        with open(coef_path, "rb") as f:
+            dataset_stats = pickle.load(f)  # nosec
+            return dataset_stats
+
+    energies = []
+    for idx in tqdm(dataset.indices()):
+        data = dataset.get(idx)
+        energy_dft = data.y[0, 0].item()
+        energies.append(energy_dft)
+
+    energies = np.array(energies)
+    mean_energy = float(np.mean(energies))
+    scale = float(np.std(energies))
+    dataset_stats = {
+        "shift": mean_energy,
+        "scale": scale,
+    }
+
+    log.info(
+        f"MPtrj dataset statistics - energy mean: {dataset_stats['shift']:.4f}, scale (std): {dataset_stats['scale']:.4f}"
+    )
+    if coef_path:
+        os.makedirs(os.path.dirname(coef_path), exist_ok=True)
+        with open(coef_path, "wb") as f:
+            pickle.dump(dataset_stats, f)
+        log.info(f"Saved dataset statistics to {coef_path}")
+
+    return dataset_stats
 
 
 @typecheck

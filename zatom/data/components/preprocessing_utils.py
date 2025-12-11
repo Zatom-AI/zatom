@@ -29,6 +29,7 @@ log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 faulthandler.enable()
 
+FLOAT_TYPE = float | np.float32 | np.float64 | torch.FloatTensor
 
 # Tensor of unit cells. Assumes 27 cells in -1, 0, 1 offsets in the x and y dimensions.
 # Note that differing from OCP, we have 27 offsets here because we are in 3D.
@@ -360,9 +361,7 @@ def build_crystal_graph(crystal: Structure, graph_method: str = "crystalnn") -> 
 
 
 @typecheck
-def abs_cap(
-    val: float | np.float64 | torch.Tensor, max_abs_val: float = 1
-) -> float | np.float64 | torch.Tensor:
+def abs_cap(val: FLOAT_TYPE, max_abs_val: float = 1) -> FLOAT_TYPE:
     """Return the value with its absolute value capped at `max_abs_val`. Particularly useful in
     passing values to trigonometric functions where numerical errors may result in an argument > 1
     being passed in.
@@ -382,7 +381,12 @@ def abs_cap(
 
 @typecheck
 def lattice_params_to_matrix(
-    a: float, b: float, c: float, alpha: float, beta: float, gamma: float
+    a: FLOAT_TYPE,
+    b: FLOAT_TYPE,
+    c: FLOAT_TYPE,
+    alpha: FLOAT_TYPE,
+    beta: FLOAT_TYPE,
+    gamma: FLOAT_TYPE,
 ) -> np.ndarray:
     """Convert lattice from abc, angles to matrix.
 
@@ -498,12 +502,12 @@ def lengths_angles_to_volume(lengths: torch.Tensor, angles: torch.Tensor) -> tor
 
 @typecheck
 def lattice_matrix_to_params(
-    matrix: torch.Tensor,
-) -> Tuple[float, float, float, float, float, float]:
+    matrix: np.ndarray,
+) -> Tuple[FLOAT_TYPE, FLOAT_TYPE, FLOAT_TYPE, FLOAT_TYPE, FLOAT_TYPE, FLOAT_TYPE]:
     """Convert a lattice matrix to its parameters.
 
     Args:
-        matrix: Tensor of shape (3, 3) representing the lattice matrix.
+        matrix: Array of shape (3, 3) representing the lattice matrix.
 
     Returns:
         A tuple (a, b, c, alpha, beta, gamma) representing the lattice parameters.
@@ -550,21 +554,21 @@ def lattices_to_params_shape(lattices: torch.Tensor) -> Tuple[torch.Tensor, torc
 @typecheck
 def frac_to_cart_coords(
     frac_coords: torch.Tensor,
-    lengths: torch.Tensor,
-    angles: torch.Tensor,
     num_atoms: int,
-    regularized: bool = True,
+    lengths: torch.Tensor | None = None,
+    angles: torch.Tensor | None = None,
     lattices: torch.Tensor | None = None,
+    regularized: bool = True,
 ) -> torch.Tensor:
     """Convert fractional coordinates to Cartesian coordinates.
 
     Args:
         frac_coords: Tensor of shape (N, 3) representing the fractional coordinates.
-        lengths: Tensor of shape (N, 3) representing the lattice lengths.
-        angles: Tensor of shape (N, 3) representing the lattice angles.
         num_atoms: Number of atoms in the system.
+        lengths: Optional tensor of shape (N, 3) representing the lattice lengths.
+        angles: Optional tensor of shape (N, 3) representing the lattice angles.
+        lattices: Optional tensor of shape (N, 3, 3) directly representing the lattice matrices.
         regularized: Whether to regularize the fractional coordinates.
-        lattices: Optional tensor of shape (N, 3, 3) representing the lattice matrices.
 
     Returns:
         Tensor of shape (N, 3) representing the Cartesian coordinates.
@@ -582,26 +586,32 @@ def frac_to_cart_coords(
 @typecheck
 def cart_to_frac_coords(
     cart_coords: torch.Tensor,
-    lengths: torch.Tensor,
-    angles: torch.Tensor,
     num_atoms: int,
+    lengths: torch.Tensor | None = None,
+    angles: torch.Tensor | None = None,
+    lattices: torch.Tensor | None = None,
     regularized: bool = True,
 ) -> torch.Tensor:
     """Convert Cartesian coordinates to fractional coordinates.
 
     Args:
         cart_coords: Tensor of shape (N, 3) representing the Cartesian coordinates.
-        lengths: Tensor of shape (N, 3) representing the lattice lengths.
-        angles: Tensor of shape (N, 3) representing the lattice angles.
         num_atoms: Number of atoms in the system.
+        lengths: Optional tensor of shape (1, 3) representing the lattice lengths.
+        angles: Optional tensor of shape (1, 3) representing the lattice angles.
+        lattices: Optional tensor of shape (1, 3, 3) directly representing the lattice matrices.
         regularized: Whether to regularize the fractional coordinates.
 
     Returns:
         Tensor of shape (N, 3) representing the fractional coordinates.
     """
-    lattice = lattice_params_to_matrix_torch(lengths, angles)
+    if lattices is None:
+        if lengths is None or angles is None:
+            raise ValueError("Either 'lattices' or both 'lengths' and 'angles' must be provided.")
+        lattices = lattice_params_to_matrix_torch(lengths, angles)
+
     # Use `pinv` in case the predicted lattice is not rank 3
-    inv_lattice = torch.linalg.pinv(lattice)
+    inv_lattice = torch.linalg.pinv(lattices)
     inv_lattice_nodes = torch.repeat_interleave(inv_lattice, num_atoms, dim=0)
     frac_coords = torch.einsum("bi,bij->bj", cart_coords, inv_lattice_nodes)
     if regularized:
@@ -694,7 +704,9 @@ def radius_graph_pbc_wrapper(
             - unit_cell: Tensor of shape (batch_size, 3, 3) containing the unit cell vectors.
             - num_neighbors_image: Tensor of shape (batch_size,) containing the number of neighbors per image.
     """
-    cart_coords = frac_to_cart_coords(data.frac_coords, data.lengths, data.angles, data.num_atoms)
+    cart_coords = frac_to_cart_coords(
+        data.frac_coords, lengths=data.lengths, angles=data.angles, num_atoms=data.num_atoms
+    )
     return radius_graph_pbc(
         cart_coords,
         data.lengths,
@@ -1454,6 +1466,51 @@ def process_one(
 
 
 @typecheck
+def process_one_parquet(
+    row: pd.Series,
+    prop_list: List[str],
+) -> Dict[str, Any]:
+    """Process a single row (i.e., series) of the DataFrame.
+
+    Args:
+        row: A Pandas Series representing a single row of the DataFrame.
+        prop_list: The list of properties to extract from the row.
+
+    Returns:
+        A dictionary containing the processed information for the crystal.
+    """
+    result_dict = {"graph_arrays": {}, "spacegroup": 1, "mp_id": row["mp_id"]}
+
+    # --- Direct use of the original lattice matrix ---
+    original_lattice_matrix = np.stack(row["cell"])
+    original_cart_coords = torch.from_numpy(np.stack(row["positions"])).float()
+    lattice_torch = torch.from_numpy(original_lattice_matrix).float().unsqueeze(0)  # Add batch dim
+
+    result_dict["graph_arrays"]["num_atoms"] = int(row["num_atoms"])
+    result_dict["graph_arrays"]["atom_types"] = row["numbers"]
+    result_dict["graph_arrays"]["cell"] = original_lattice_matrix
+
+    # Calculate and store the lattice params for use elsewhere
+    a, b, c, alpha, beta, gamma = lattice_matrix_to_params(original_lattice_matrix)
+    result_dict["graph_arrays"]["lengths"] = np.array([a, b, c])
+    result_dict["graph_arrays"]["angles"] = np.array([alpha, beta, gamma])
+    result_dict["graph_arrays"]["lattices"] = np.concatenate(
+        [result_dict["graph_arrays"]["lengths"], result_dict["graph_arrays"]["angles"]]
+    )
+
+    # --- Perform conversions using the ORIGINAL lattice matrix ---
+    result_dict["graph_arrays"]["frac_coords"] = cart_to_frac_coords(
+        cart_coords=original_cart_coords,
+        lattices=lattice_torch,
+        num_atoms=result_dict["graph_arrays"]["num_atoms"],
+    ).numpy()
+
+    result_dict.update({k: row[k] for k in prop_list if k in row.keys()})
+
+    return result_dict
+
+
+@typecheck
 def preprocess(
     input_file: str,
     num_workers: int,
@@ -1495,5 +1552,34 @@ def preprocess(
 
     mpid_to_results = {result["mp_id"]: result for result in unordered_results}
     ordered_results = [mpid_to_results[df.iloc[idx]["material_id"]] for idx in range(len(df))]
+
+    return ordered_results
+
+
+@typecheck
+def preprocess_parquet(
+    df: pd.DataFrame,
+    num_workers: int,
+    prop_list: List[str],
+) -> List[Dict[str, Any]]:
+    """Preprocess the input data.
+
+    Args:
+        df: The path to the input Parquet DataFrame
+        num_workers: The number of worker processes to use.
+        prop_list: The list of properties to extract from the DataFrame.
+
+    Returns:
+        A list of dictionaries containing the processed information for each crystal.
+    """
+    unordered_results = p_umap(
+        process_one_parquet,
+        [df.iloc[idx] for idx in range(len(df))],
+        [prop_list] * len(df),
+        num_cpus=num_workers,
+    )
+
+    mpid_to_results = {result["mp_id"]: result for result in unordered_results}
+    ordered_results = [mpid_to_results[df.iloc[idx]["mp_id"]] for idx in range(len(df))]
 
     return ordered_results

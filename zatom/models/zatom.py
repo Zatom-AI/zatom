@@ -41,6 +41,7 @@ INDEX_TO_IDX = {
     2: 0,  # Periodic
     3: 1,  # Non-periodic
     4: 1,  # Non-periodic
+    5: 0,  # Periodic
 }
 INDEX_TO_DATASET = {
     0: "mp20",
@@ -48,6 +49,7 @@ INDEX_TO_DATASET = {
     2: "qmof150",
     3: "omol25",
     4: "geom",
+    5: "mptrj",
 }
 DATASET_TO_INDEX = {v: k for k, v in INDEX_TO_DATASET.items()}
 DATASET_TO_IDX = {
@@ -56,10 +58,12 @@ DATASET_TO_IDX = {
     "qmof150": 0,  # Periodic
     "omol25": 1,  # Non-periodic
     "geom": 1,  # Non-periodic
+    "mptrj": 0,  # Periodic
 }
 PERIODIC_DATASETS = {
     "mp20": 0,
     "qmof150": 2,
+    "mptrj": 5,
 }
 NON_PERIODIC_DATASETS = {
     "qm9": 1,
@@ -157,6 +161,7 @@ class Zatom(LightningModule):
                 ),
                 removeHs=self.hparams.sampling.removeHs,
             ),
+            "mptrj": CrystalGenerationEvaluator(dataset_cif_list=None),
         }
         self.test_generation_evaluators = copy.deepcopy(self.val_generation_evaluators)
 
@@ -179,7 +184,10 @@ class Zatom(LightningModule):
             for target in QM9_TARGETS:
                 if self.hparams.datasets["qm9"].global_property in ("all", target):
                     self.train_metrics[f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
-        if self.hparams.datasets["omol25"].global_energy is not None:
+        if (
+            self.hparams.datasets["omol25"].global_energy is not None
+            or self.hparams.datasets["mptrj"].global_energy is not None
+        ):
             self.train_metrics["aux_global_energy_loss_scaled"] = MeanMetric()
             self.train_metrics["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
             self.train_metrics["aux_atomic_forces_loss_scaled"] = MeanMetric()
@@ -209,7 +217,10 @@ class Zatom(LightningModule):
                         val_metrics[dataset][
                             f"aux_global_property_loss_{target}_scaled"
                         ] = MeanMetric()
-            if self.hparams.datasets["omol25"].global_energy is not None:
+            if (
+                self.hparams.datasets["omol25"].global_energy is not None
+                or self.hparams.datasets["mptrj"].global_energy is not None
+            ):
                 val_metrics[dataset]["aux_global_energy_loss_scaled"] = MeanMetric()
                 val_metrics[dataset]["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
                 val_metrics[dataset]["aux_atomic_forces_loss_scaled"] = MeanMetric()
@@ -311,6 +322,13 @@ class Zatom(LightningModule):
                 ),
                 requires_grad=False,
             ),
+            "mptrj": torch.nn.Parameter(
+                torch.load(  # nosec
+                    os.path.join(self.hparams.sampling.data_dir, "mptrj", "num_nodes_bincount.pt"),
+                    map_location="cpu",
+                ),
+                requires_grad=False,
+            ),
         }
         self.spacegroups_bincount = {
             "mp20": torch.nn.Parameter(
@@ -325,9 +343,30 @@ class Zatom(LightningModule):
                 requires_grad=False,
             ),
             "qm9": None,
-            "qmof150": None,
+            "qmof150": torch.nn.Parameter(
+                torch.load(  # nosec
+                    os.path.join(
+                        self.hparams.sampling.data_dir,
+                        "qmof",
+                        "spacegroups_bincount.pt",
+                    ),
+                    map_location="cpu",
+                ),
+                requires_grad=False,
+            ),
             "omol25": None,
             "geom": None,
+            "mptrj": torch.nn.Parameter(
+                torch.load(  # nosec
+                    os.path.join(
+                        self.hparams.sampling.data_dir,
+                        "mptrj",
+                        "spacegroups_bincount.pt",
+                    ),
+                    map_location="cpu",
+                ),
+                requires_grad=False,
+            ),
         }
 
         # Model configuration state
@@ -444,7 +483,6 @@ class Zatom(LightningModule):
                 # # auxiliary prediction tasks
                 # "global_property": torch.randn((batch.batch_size, 1), device=self.device),
                 # "global_energy": torch.randn((batch.batch_size, 1), device=self.device),
-                # "global_energy_per_atom": torch.randn((batch.batch_size, 1), device=self.device),
                 # "atomic_forces": torch.randn_like(pos),
                 # features for conditioning
                 "dataset_idx": dataset_idx,
@@ -468,11 +506,19 @@ class Zatom(LightningModule):
         # Add auxiliary targets to dense batch if applicable
         is_qm9_dataset = (batch.dataset_idx == DATASET_TO_INDEX["qm9"]).any()
         is_omol25_dataset = (batch.dataset_idx == DATASET_TO_INDEX["omol25"]).any()
+        is_mptrj_dataset = (batch.dataset_idx == DATASET_TO_INDEX["mptrj"]).any()
+
+        is_omol25_energy_training = (
+            is_omol25_dataset and self.hparams.datasets["omol25"].global_energy is not None
+        )
+        is_mptrj_energy_training = (
+            is_mptrj_dataset and self.hparams.datasets["mptrj"].global_energy is not None
+        )
 
         if is_qm9_dataset and self.hparams.datasets["qm9"].global_property is not None:
             dense_batch["global_property"] = batch.y
 
-        if is_omol25_dataset and self.hparams.datasets["omol25"].global_energy is not None:
+        if is_omol25_energy_training or is_mptrj_energy_training:
             global_energy, _ = to_dense_batch(
                 batch.y[:, 0:1],
                 batch.batch,
@@ -483,9 +529,7 @@ class Zatom(LightningModule):
                 batch.batch,
                 max_num_nodes=self.max_num_nodes,
             )
-            dense_batch["global_energy"] = dense_batch["global_energy_per_atom"] = global_energy[
-                :, 0, :
-            ]
+            dense_batch["global_energy"] = global_energy[:, 0, :]
             dense_batch["atomic_forces"] = atomic_forces
 
         # Run forward pass
@@ -531,16 +575,23 @@ class Zatom(LightningModule):
         target_aux_atomic_forces = loss_dict.pop("target_aux_atomic_forces")
         mask_aux_global_energy = loss_dict.pop("mask_aux_global_energy")
         mask_aux_atomic_forces = loss_dict.pop("mask_aux_atomic_forces")
-        if self.hparams.datasets["omol25"].global_energy is not None:
+        if (
+            self.hparams.datasets["omol25"].global_energy is not None
+            or self.hparams.datasets["mptrj"].global_energy is not None
+        ):
             if is_omol25_dataset:
+                aux_energy_scale = self.trainer.datamodule.omol25_train_dataset.scale
+                aux_energy_shift = self.trainer.datamodule.omol25_train_dataset.shift
+            elif is_mptrj_dataset:
+                aux_energy_scale = self.trainer.datamodule.mptrj_train_dataset.scale
+                aux_energy_shift = self.trainer.datamodule.mptrj_train_dataset.shift
+            if is_omol25_dataset or is_mptrj_dataset:
                 # Global energy mean absolute error (in meV <- eV)
-                aux_omol25_scale = self.trainer.datamodule.omol25_train_dataset.scale
-                aux_omol25_shift = self.trainer.datamodule.omol25_train_dataset.shift
                 aux_energy_pred = (
-                    pred_aux_global_energy * aux_omol25_scale + aux_omol25_shift
+                    pred_aux_global_energy * aux_energy_scale + aux_energy_shift
                 ) * EV_TO_MEV
                 aux_energy_target = (
-                    target_aux_global_energy * aux_omol25_scale + aux_omol25_shift
+                    target_aux_global_energy * aux_energy_scale + aux_energy_shift
                 ) * EV_TO_MEV
                 aux_energy_err = (aux_energy_pred - aux_energy_target) * mask_aux_global_energy
                 aux_energy_loss_value = aux_energy_err.abs().sum() / (
@@ -556,8 +607,8 @@ class Zatom(LightningModule):
                     mask_aux_global_energy.sum() + 1e-6
                 )
                 # Atomic forces mean absolute error (in meV/Å <- eV/Å)
-                aux_force_pred = pred_aux_atomic_forces * aux_omol25_scale * EV_TO_MEV
-                aux_force_target = target_aux_atomic_forces * aux_omol25_scale * EV_TO_MEV
+                aux_force_pred = pred_aux_atomic_forces * aux_energy_scale * EV_TO_MEV
+                aux_force_target = target_aux_atomic_forces * aux_energy_scale * EV_TO_MEV
                 aux_force_err = (aux_force_pred - aux_force_target) * mask_aux_atomic_forces
                 aux_force_loss_value = aux_force_err.abs().sum() / (
                     mask_aux_atomic_forces.sum() + 1e-6
@@ -646,6 +697,7 @@ class Zatom(LightningModule):
                 # )
 
                 is_omol25_dataset = batch.dataset_idx == DATASET_TO_INDEX["omol25"]
+                is_mptrj_dataset = batch.dataset_idx == DATASET_TO_INDEX["mptrj"]
                 if is_omol25_dataset.any():
                     # Rotate atomic forces accordingly
                     assert (
@@ -655,6 +707,10 @@ class Zatom(LightningModule):
                         "bi,bij->bj", batch.y[:, 1:4], rot_for_nodes.transpose(-2, -1)
                     )
                     batch.y[:, 1:4] = forces_aug
+                if is_mptrj_dataset.any():
+                    raise NotImplementedError(
+                        "Force rotation augmentation is not implemented for MPtrj dataset samples."
+                    )
 
             if self.hparams.augmentations.frac_coords is True:
                 if batch.sample_is_periodic.any():
@@ -697,6 +753,12 @@ class Zatom(LightningModule):
                     #     rtol=1e-3,
                     #     atol=1e-3,
                     # )
+
+                    is_mptrj_dataset = batch.dataset_idx == DATASET_TO_INDEX["mptrj"]
+                    if is_mptrj_dataset.any():
+                        raise NotImplementedError(
+                            "Fractional coordinate augmentation is not implemented for MPtrj dataset samples."
+                        )
 
         # Forward pass with loss calculation
         loss_dict = self.forward(batch)
@@ -1237,7 +1299,10 @@ class Zatom(LightningModule):
             aux_tasks = set()
             if self.hparams.datasets["qm9"].global_property is not None:
                 aux_tasks.add("global_property")
-            if self.hparams.datasets["omol25"].global_energy is not None:
+            if (
+                self.hparams.datasets["omol25"].global_energy is not None
+                or self.hparams.datasets["mp20"].global_energy is not None
+            ):
                 aux_tasks.add("global_energy")
                 aux_tasks.add("atomic_forces")
 
