@@ -150,8 +150,8 @@ class QMOF150(InMemoryDataset):
                     ),  # Special attribute used for PyG batching
                     token_idx=torch.arange(num_atoms),
                     dataset_idx=torch.tensor(
-                        [0], dtype=torch.long
-                    ),  # 0 --> Indicates periodic/crystal
+                        [2], dtype=torch.long
+                    ),  # 2 --> Indicates periodic/crystal
                 )
                 # 3D coordinates (NOTE: do not zero-center prior to graph construction)
                 data.pos = torch.einsum(

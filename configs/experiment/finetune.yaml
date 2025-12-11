@@ -36,6 +36,9 @@ data:
         global_energy: null
       geom:
         proportion: 0.0
+      mptrj:
+        proportion: 0.0
+        global_energy: null
 
 model:
   architecture:

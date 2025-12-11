@@ -44,9 +44,10 @@ class GEOM(InMemoryDataset):
             `torch_geometric.data.Data` object and returns a boolean
             value, indicating whether the data object should be included in the
             final dataset. (default: `None`)
+        load: (bool, optional): Whether to load the processed dataset into memory.
+            (default: `True`)
         force_reload (bool, optional): Whether to re-process the dataset.
             (default: `False`)
-        load: (bool, optional): Whether to load the processed dataset into memory.
         split: The dataset split to load (train, val, test).
             (default: `train`)
     """
@@ -57,8 +58,8 @@ class GEOM(InMemoryDataset):
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
-        force_reload: bool = False,
         load: bool = True,
+        force_reload: bool = False,
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         self.split = split
