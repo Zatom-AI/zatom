@@ -88,6 +88,9 @@ class CrystalGenerationEvaluator:
     def _dataset_cif_to_struct(self, n_jobs: int = -4):
         """Convert dataset CIFs to Structure objects for novelty evaluation."""
         if self.dataset_struct_list is None:
+            assert (
+                self.dataset_cif_list is not None
+            ), "No dataset CIFs provided for novelty evaluation."
             self.dataset_struct_list = joblib_map(
                 partial(Structure.from_str, fmt="cif"),
                 self.dataset_cif_list,

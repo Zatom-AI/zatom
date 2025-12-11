@@ -51,6 +51,8 @@ data:
         proportion: 0.0
       geom:
         proportion: 0.0
+      mptrj:
+        proportion: 0.0
 
 model:
   log_grads_every_n_steps: 100
