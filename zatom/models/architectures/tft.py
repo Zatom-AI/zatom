@@ -51,6 +51,7 @@ class TFT(nn.Module):
         lengths_scaled_interpolant: Interpolant for scaled lengths modality.
         angles_radians_interpolant: Interpolant for angles in radians modality.
         hidden_size: Hidden size of the model.
+        aux_hidden_size: Hidden size for auxiliary task projections.
         num_layers: Number of transformer layers in the token trunk.
         token_num_heads: Number of (token) attention heads in the token trunk.
         max_num_elements: Maximum number of elements in the dataset.
@@ -72,7 +73,8 @@ class TFT(nn.Module):
         frac_coords_interpolant: Interpolant,
         lengths_scaled_interpolant: Interpolant,
         angles_radians_interpolant: Interpolant,
-        hidden_size: int = 256,
+        hidden_size: int = 512,
+        aux_hidden_size: int = 512,
         num_layers: int = 16,
         token_num_heads: int = 8,
         max_num_elements: int = 100,
@@ -123,6 +125,7 @@ class TFT(nn.Module):
             num_heads=token_num_heads,
             num_layers=num_layers,
             hidden_dim=hidden_size,
+            aux_hidden_dim=aux_hidden_size,
             dataset_embedder=dataset_embedder,
             spacegroup_embedder=spacegroup_embedder,
             **kwargs,

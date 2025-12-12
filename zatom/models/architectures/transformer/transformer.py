@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from zatom.models.architectures.transformer.attention import (
     AttentionBlock,
-    ModernSelfAttention,
+    ModernAttention,
 )
 from zatom.models.architectures.transformer.common import SwiGLUFeedForward
 from zatom.models.architectures.transformer.transition import Transition
@@ -89,7 +89,7 @@ class TransformerBlock(nn.Module):
 
 
 class ModernTransformerBlock(nn.Module):
-    """A transformer block using ModernSelfAttention and SwiGLUFeedForward.
+    """A self-attention transformer block using ModernAttention and SwiGLUFeedForward.
 
     Args:
         dim: Input and output dimension
@@ -113,7 +113,7 @@ class ModernTransformerBlock(nn.Module):
         jvp_attn: bool = False,
     ):
         super().__init__()
-        self.attention = ModernSelfAttention(
+        self.attention = ModernAttention(
             dim,
             n_heads,
             context_length=context_length,
@@ -151,6 +151,100 @@ class ModernTransformerBlock(nn.Module):
         """
         h = x + self.attention(
             self.attention_norm(x), pos_ids=pos_ids, padding_mask=padding_mask, attn_mask=attn_mask
+        )
+        out = h + self.feed_forward(self.ffn_norm(h))
+        return out
+
+
+class ModernTransformerDecoderBlock(nn.Module):
+    """A transformer decoder block using ModernAttention and SwiGLUFeedForward.
+
+    Args:
+        dim: Input and output dimension
+        n_heads: Number of attention heads
+        context_length: Maximum context length for rotary embeddings
+        rope_base: Base frequency for rotary embeddings
+        qk_layernorm: Whether to apply RMS normalization to queries and keys
+        use_sdpa: Whether to use PyTorch's scaled dot-product attention
+        jvp_attn: Whether to use JVP-compatible attention
+    """
+
+    @typecheck
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        context_length: Optional[int] = 2048,
+        rope_base: Optional[int] = 10_000,
+        qk_layernorm: bool = True,
+        use_sdpa: bool = True,
+        jvp_attn: bool = False,
+    ):
+        super().__init__()
+        self.self_attention = ModernAttention(
+            dim,
+            n_heads,
+            context_length=context_length,
+            rope_base=rope_base,
+            use_qk_norm=qk_layernorm,
+            use_sdpa=use_sdpa,
+            jvp_attn=jvp_attn,
+        )
+        self.cross_attention = ModernAttention(
+            dim,
+            n_heads,
+            context_length=context_length,
+            rope_base=rope_base,
+            use_qk_norm=qk_layernorm,
+            use_sdpa=use_sdpa,
+            jvp_attn=jvp_attn,
+        )
+        self.feed_forward = SwiGLUFeedForward(dim=dim, hidden_dim=4 * dim)
+
+        self.self_attention_norm = nn.RMSNorm(dim)
+        self.cross_attention_norm = nn.RMSNorm(dim)
+        self.ffn_norm = nn.RMSNorm(dim)
+
+    @typecheck
+    def forward(
+        self,
+        x: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
+        pos_ids: Optional[torch.Tensor] = None,
+        tgt_key_padding_mask: Optional[torch.Tensor] = None,
+        memory_key_padding_mask: Optional[torch.Tensor] = None,
+        attn_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Forward pass through the modern transformer block.
+
+        Args:
+            x: Input tensor of shape [batch_size, seq_len, dim]
+            memory: Optional memory tensor for cross-attention
+                Shape: [batch_size, seq_len, dim]
+            pos_ids: Position ids for rotary embeddings
+                Shape: [batch_size, seq_len]
+            tgt_key_padding_mask: Boolean mask for target padding tokens (True means ignore)
+                Shape: [batch_size, seq_len]
+            memory_key_padding_mask: Boolean mask for memory padding tokens (True means ignore)
+                Shape: [batch_size, seq_len]
+            attn_mask: Attention mask of shape [batch_size, n_heads, seq_len, seq_len],
+                where False indicates positions to mask or the float -inf denotes masked positions
+
+        Returns:
+            Output tensor of shape [batch_size, seq_len, dim]
+        """
+        h = x + self.self_attention(
+            self.self_attention_norm(x),
+            pos_ids=pos_ids,
+            padding_mask=tgt_key_padding_mask,
+            attn_mask=attn_mask,
+        )
+        h = h + self.cross_attention(
+            self.cross_attention_norm(h),
+            memory=memory,
+            pos_ids=pos_ids,
+            padding_mask=memory_key_padding_mask,
+            attn_mask=attn_mask,
         )
         out = h + self.feed_forward(self.ffn_norm(h))
         return out

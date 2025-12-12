@@ -105,7 +105,6 @@ class SinusoidEncoding(PositionalEncoding):
         return self.posenc_dim
 
 
-@typecheck
 class RotaryPositionalEmbeddings(PositionalEncoding):
     """
     This class implements Rotary Positional Embeddings (RoPE)
@@ -129,6 +128,7 @@ class RotaryPositionalEmbeddings(PositionalEncoding):
             the rotation angles.
     """
 
+    @typecheck
     def __init__(
         self,
         dim: int,

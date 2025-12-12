@@ -90,8 +90,8 @@ class Attention(nn.Module):
         return attn_output
 
 
-class ModernSelfAttention(nn.Module):
-    """Modern self-attention module with rotary position embeddings and optional SDPA.
+class ModernAttention(nn.Module):
+    """Modern attention module with rotary position embeddings and optional SDPA.
 
     Args:
         dim: Input dimension
@@ -149,14 +149,17 @@ class ModernSelfAttention(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
         pos_ids: Optional[torch.Tensor] = None,
         padding_mask: Optional[torch.Tensor] = None,
         attn_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Forward pass through the modern self-attention layer.
+        """Forward pass through the modern attention layer.
 
         Args:
             x: Input tensor of shape [batch_size, seq_len, dim]
+            memory: Optional memory tensor for cross-attention
+                Shape: [batch_size, seq_len, dim]
             pos_ids: Position ids tensor of shape [batch_size, seq_len]
             padding_mask: Boolean mask for padding tokens (True means ignore)
                 Shape: [batch_size, seq_len]
@@ -169,8 +172,8 @@ class ModernSelfAttention(nn.Module):
         batch_size, seq_len, _ = x.shape
 
         q = self.q_proj(x)
-        k = self.k_proj(x)
-        v = self.v_proj(x)
+        k = self.k_proj(memory if memory is not None else x)
+        v = self.v_proj(memory if memory is not None else x)
 
         q = q.reshape(batch_size, seq_len, self.n_heads, self.head_dim)
         k = k.reshape(batch_size, seq_len, self.n_heads, self.head_dim)
