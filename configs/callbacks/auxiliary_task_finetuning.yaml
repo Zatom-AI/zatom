@@ -5,5 +5,5 @@
 auxiliary_task_finetuning:
   _target_: zatom.callbacks.finetuning.FlowMatchingAuxiliaryTaskFinetuning
   # Time range inspired by https://arxiv.org/abs/2502.07001
-  t_min: 0.98
+  t_min: 1.0
   t_max: 1.0
