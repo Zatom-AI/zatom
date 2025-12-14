@@ -136,7 +136,7 @@ class ModernAttention(nn.Module):
 
         self.rotary_emb = (
             RotaryPositionalEmbeddings(
-                # rotary embeddings on half the dims per head
+                # Rotary embeddings on half the dims per head
                 dim=self.head_dim,
                 max_seq_len=context_length,
                 base=rope_base,
