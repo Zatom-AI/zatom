@@ -31,7 +31,7 @@ class LayerNormPlatonic(nn.Module):
     @typecheck
     def __init__(
         self,
-        solid_name: str,  # in PLATONIC_GROUPS_3d.keys()
+        solid_name: str,  # in PLATONIC_GROUPS_3D.keys()
         hidden_dim: int,
         normalize_per_g: bool,
         eps: float = 1e-05,
