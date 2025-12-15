@@ -9,6 +9,7 @@ max_time: "04:00:00:00" # max training time in D:H:M:S format
 
 accelerator: cpu
 devices: 1
+num_nodes: 1
 
 # mixed precision for extra speed-up
 precision: 32-true

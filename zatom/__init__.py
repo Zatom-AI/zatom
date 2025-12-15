@@ -37,29 +37,29 @@ def generate_index(length: int = 8) -> str:
 
 def resolve_omegaconf_variable(variable_path: str) -> Any:
     """Resolve an OmegaConf variable path to its value."""
-    # split the string into parts using the dot separator
+    # Split the string into parts using the dot separator
     parts = variable_path.rsplit(".", 1)
 
-    # get the module name from the first part of the path
+    # Get the module name from the first part of the path
     module_name = parts[0]
 
-    # dynamically import the module using the module name
+    # Dynamically import the module using the module name
     try:
         module = importlib.import_module(module_name)
-        # use the imported module to get the requested attribute value
+        # Use the imported module to get the requested attribute value
         attribute = getattr(module, parts[1])
     except Exception:
         module = importlib.import_module(".".join(module_name.split(".")[:-1]))
         inner_module = ".".join(module_name.split(".")[-1:])
-        # use the imported module to get the requested attribute value
+        # Use the imported module to get the requested attribute value
         attribute = getattr(getattr(module, inner_module), parts[1])
 
     return attribute
 
 
-def resolve_lr(lr: float, scale_factor: float) -> float:
-    """Resolve learning rate based on base learning rate and scale factor."""
-    return lr * scale_factor
+def resolve_lr(lr: float, base_world_size: int, world_size: int, scale_factor: float) -> float:
+    """Resolve learning rate based on base learning rate, (base) world size, and scale factor."""
+    return lr * scale_factor * (world_size / base_world_size)  # Apply linear scaling rule
 
 
 def resolve_batch_size(base_size: int, scale_factor: float) -> int:
@@ -82,7 +82,9 @@ def register_custom_omegaconf_resolvers():
     )
     OmegaConf.register_new_resolver(
         "resolve_lr",
-        lambda lr, scale_factor: resolve_lr(lr, scale_factor),
+        lambda lr, base_world_size, world_size, scale_factor: resolve_lr(
+            lr, base_world_size, world_size, scale_factor
+        ),
     )
     OmegaConf.register_new_resolver(
         "resolve_lr_scheduler",

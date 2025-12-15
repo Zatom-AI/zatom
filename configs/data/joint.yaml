@@ -56,6 +56,7 @@ datamodule:
       type_label: 0 # Periodic
 
   batch_size:
+    base_world_size: 2
     base_accumulate_grad_batches: 2
     train: ${resolve_batch_size:64,${model.architecture.batch_size_scale_factor}}
     val: ${resolve_batch_size:64,${model.architecture.batch_size_scale_factor}}
