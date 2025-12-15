@@ -14,7 +14,7 @@ multimodal_model:
   use_sdpa: true
   jvp_attn: false
   cross_attention: true
-  add_sinusoid_posenc: false
+  add_sinusoid_posenc: true
 
 dataset_embedder:
   _target_: zatom.models.architectures.dit.layers.LabelEmbedder

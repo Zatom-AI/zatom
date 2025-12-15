@@ -69,7 +69,7 @@ class TransformerModule(nn.Module):
         activation: Literal["SiLU", "ReLU", "SwiGLU"] = "SiLU",
         implementation: Literal["reimplemented", "reimplemented_modern"] = "reimplemented",
         context_length: Optional[int] = 2048,
-        rope_base: Optional[int] = 10_000,
+        rope_base: Optional[int] = None,
         qk_layernorm: bool = False,
         use_sdpa: bool = True,
         jvp_attn: bool = False,
