@@ -34,6 +34,7 @@ class TransformerModule(nn.Module):
         spacegroup_embedder: The spacegroup embedder module.
         activation: Activation function to use ("SiLU", "ReLU", "SwiGLU").
         implementation: Implementation type ("reimplemented",).
+        context_length: Maximum context length for positional encoding.
         qk_layernorm: Whether to apply layer normalization to query and key in attention.
         cross_attention: Whether to use cross-attention layers.
         add_sinusoid_posenc: Whether to add sinusoidal positional encoding.
@@ -57,6 +58,7 @@ class TransformerModule(nn.Module):
         spacegroup_embedder: nn.Module,
         activation: Literal["SiLU", "ReLU", "SwiGLU"] = "SiLU",
         implementation: Literal["reimplemented"] = "reimplemented",
+        context_length: int = 2048,
         qk_layernorm: bool = False,
         cross_attention: bool = False,
         add_sinusoid_posenc: bool = True,
@@ -79,6 +81,7 @@ class TransformerModule(nn.Module):
         self.num_layers = num_layers
         self.num_aux_layers = num_aux_layers
         self.implementation = implementation
+        self.context_length = context_length
         self.cross_attention = cross_attention
         self.add_sinusoid_posenc = add_sinusoid_posenc
         self.concat_combine_input = concat_combine_input
@@ -94,7 +97,9 @@ class TransformerModule(nn.Module):
         self.angles_radians_embed = nn.Linear(spatial_dim, hidden_dim, bias=False)
 
         if self.add_sinusoid_posenc:
-            self.positional_encoding = SinusoidEncoding(posenc_dim=hidden_dim, max_len=450)
+            self.positional_encoding = SinusoidEncoding(
+                posenc_dim=hidden_dim, max_len=context_length
+            )
 
         if self.concat_combine_input:
             self.combine_input = nn.Linear(self.cond_dim * hidden_dim, hidden_dim)

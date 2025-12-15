@@ -8,6 +8,7 @@ multimodal_model:
   atom_dim: ${globals.max_num_elements}
   num_properties: ${globals.num_global_properties}
   implementation: reimplemented # NOTE: must be one of (`reimplemented`,)
+  context_length: ${globals.max_num_atoms}
   cross_attention: true
 
 dataset_embedder:

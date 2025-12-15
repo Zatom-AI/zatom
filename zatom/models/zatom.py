@@ -394,6 +394,13 @@ class Zatom(LightningModule):
             min_num_nodes = max(self.max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()
             self.max_num_nodes = int(closest_power_of_2)
+        if (
+            hasattr(self.model.model, "context_length")
+            and self.model.model.context_length < self.max_num_nodes
+        ):
+            raise ValueError(
+                f"Model context length ({self.model.model.context_length}) is smaller than max_num_nodes ({self.max_num_nodes})."
+            )
 
         # Densify batch
         token_is_periodic, _ = to_dense_batch(
