@@ -59,11 +59,12 @@ def resolve_omegaconf_variable(variable_path: str) -> Any:
 
 
 def resolve_lr(
-    lr: float, base_world_size: int, world_size: int, scale_factor: float, max_lr: float
+    lr: float, base_world_size: int, world_size: int, scale_factor: float, max_lr: float = 2.5e-3
 ) -> float:
     """Resolve learning rate based on base learning rate, (base) world size, and scale factor.
 
     Applies square root scaling rule based on the world size to preserve the variance of gradients.
+    A maximum learning rate can be specified to avoid overly large learning rates when scaling up.
     Reference: https://github.com/Lightning-AI/pytorch-lightning/discussions/3706#discussioncomment-3960433.
     """
     return min(lr * scale_factor * math.sqrt(world_size / base_world_size), max_lr)
@@ -89,8 +90,8 @@ def register_custom_omegaconf_resolvers():
     )
     OmegaConf.register_new_resolver(
         "resolve_lr",
-        lambda lr, base_world_size, world_size, scale_factor: resolve_lr(
-            lr, base_world_size, world_size, scale_factor
+        lambda lr, base_world_size, world_size, scale_factor, max_lr: resolve_lr(
+            lr, base_world_size, world_size, scale_factor, max_lr
         ),
     )
     OmegaConf.register_new_resolver(
