@@ -68,12 +68,15 @@ class ConstantScheduleWithWarmup:
     def __call__(self, current_step: int) -> float:
         """Compute the learning rate factor based on the current step.
 
+        NOTE: Assumes that `current_step` is zero-indexed.
+
         Args:
-            current_step: The current training step.
+            current_step: The current training step/epoch.
 
         Returns:
             A float representing the learning rate factor.
         """
+        current_step += 1  # Make step count 1-indexed
         if current_step < self.warmup_steps:
             return float(current_step) / float(max(1, self.warmup_steps))
         return 1.0
@@ -122,12 +125,15 @@ class CosineScheduleWithWarmup:
     def __call__(self, current_step: int) -> float:
         """Compute the LR factor based on the current step.
 
+        NOTE: Assumes that `current_step` is zero-indexed.
+
         Args:
-            current_step: The current training step.
+            current_step: The current training step/epoch.
 
         Returns:
             A float representing the learning rate factor.
         """
+        current_step += 1  # Make step count 1-indexed
         if current_step < self.warmup_steps:
             return float(current_step) / float(max(1, self.warmup_steps))
 
