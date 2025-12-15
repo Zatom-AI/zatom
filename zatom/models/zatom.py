@@ -1229,7 +1229,11 @@ class Zatom(LightningModule):
         Examples:
             https://lightning.ai/docs/pytorch/latest/common/lightning_module.html#configure-optimizers
 
-        :return: A dict containing the configured optimizers and learning-rate schedulers to be used for training.
+        Applies scheduler only if provided and the current world size is greater than the base world size.
+        Reference: https://arxiv.org/abs/1706.02677.
+
+        Returns:
+            A dict containing the configured optimizers and learning-rate schedulers to be used for training.
         """
         trainable_parameters = list(
             filter(lambda p: p.requires_grad, self.trainer.model.parameters())
@@ -1240,7 +1244,10 @@ class Zatom(LightningModule):
             # NOTE: Strategies such as DeepSpeed require `params` to instead be specified as `model_params`
             optimizer = self.hparams.optimizer(model_params=trainable_parameters)
 
-        if self.hparams.scheduler is not None:
+        use_scheduler = (
+            self.trainer.world_size > self.trainer.datamodule.hparams.batch_size.base_world_size
+        )
+        if self.hparams.scheduler is not None and use_scheduler:
             scheduler = self.hparams.scheduler(optimizer=optimizer)
             return {
                 "optimizer": optimizer,
