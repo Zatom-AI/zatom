@@ -58,13 +58,16 @@ def resolve_omegaconf_variable(variable_path: str) -> Any:
     return attribute
 
 
-def resolve_lr(lr: float, base_world_size: int, world_size: int, scale_factor: float) -> float:
+def resolve_lr(
+    lr: float, base_world_size: int, world_size: int, scale_factor: float, max_lr: float = 2.5e-3
+) -> float:
     """Resolve learning rate based on base learning rate, (base) world size, and scale factor.
 
     Applies square root scaling rule based on the world size to preserve the variance of gradients.
+    The maximum learning rate is capped based on experiments scaling to 16 distributed devices.
     Reference: https://github.com/Lightning-AI/pytorch-lightning/discussions/3706#discussioncomment-3960433.
     """
-    return lr * scale_factor * math.sqrt(world_size / base_world_size)
+    return min(lr * scale_factor * math.sqrt(world_size / base_world_size), max_lr)
 
 
 def resolve_batch_size(base_size: int, scale_factor: float) -> int:
