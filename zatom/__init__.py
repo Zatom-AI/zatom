@@ -1,4 +1,5 @@
 import importlib
+import math
 import secrets
 import string
 from typing import Any
@@ -60,10 +61,10 @@ def resolve_omegaconf_variable(variable_path: str) -> Any:
 def resolve_lr(lr: float, base_world_size: int, world_size: int, scale_factor: float) -> float:
     """Resolve learning rate based on base learning rate, (base) world size, and scale factor.
 
-    Applies linear scaling rule based on the world size.
-    Reference: https://arxiv.org/abs/1706.02677.
+    Applies square root scaling rule based on the world size to preserve the variance of gradients.
+    Reference: https://github.com/Lightning-AI/pytorch-lightning/discussions/3706#discussioncomment-3960433.
     """
-    return lr * scale_factor * (world_size / base_world_size)
+    return lr * scale_factor * math.sqrt(world_size / base_world_size)
 
 
 def resolve_batch_size(base_size: int, scale_factor: float) -> int:
