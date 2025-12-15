@@ -1232,7 +1232,8 @@ class Zatom(LightningModule):
         Applies scheduler only if provided and the current world size is greater than the base world size.
         Reference: https://arxiv.org/abs/1706.02677.
 
-        :return: A dict containing the configured optimizers and learning-rate schedulers to be used for training.
+        Returns:
+            A dict containing the configured optimizers and learning-rate schedulers to be used for training.
         """
         trainable_parameters = list(
             filter(lambda p: p.requires_grad, self.trainer.model.parameters())

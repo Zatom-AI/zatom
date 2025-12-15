@@ -26,10 +26,13 @@ def spfhp_add_pack(
 ):
     """Filter out packs that reached maximum length or number of sequences for the SPFHP algorithm.
 
-    :param pack: List of sequence lengths in the pack. :param count: Number of sequences in the
-    pack. :param tmp: Temporary dictionary to hold packs that are not yet     finalized. :param
-    final: Final dictionary to hold completed packs. :param limit: Maximum number of sequences per
-    pack. :param offset: Offset to adjust the pack length.
+    Args:
+        pack: List of sequence lengths in the pack.
+        count: Number of sequences in the pack.
+        tmp: Temporary dictionary to hold packs that are not yet finalized.
+        final: Final dictionary to hold completed packs.
+        limit: Maximum number of sequences per pack.
+        offset: Offset to adjust the pack length.
     """
     if len(pack) == limit or offset == 0:
         final[offset].append((count, pack))
@@ -52,14 +55,14 @@ def lpfhp_add_pack(
     Adapted from
     https://github.com/graphcore/examples/blob/v3.2.0/tutorials/blogs_code/packedBERT/lpfhp.py.
 
-    :param pack: List of sequence lengths in the pack.
-    :param count: Number of sequences in the pack.
-    :param tmp: Temporary dictionary to hold packs that are not yet
-    finalized.
-    :param final: Final dictionary to hold completed packs.
-    :param limit: Maximum number of sequences per pack.
-    :param offset: Offset to adjust the pack length.
-    :param max_sequence_length: Maximum sequence length allowed.
+    Args:
+        pack: List of sequence lengths in the pack.
+        count: Number of sequences in the pack.
+        tmp: Temporary dictionary to hold packs that are not yet finalized.
+        final: Final dictionary to hold completed packs.
+        limit: Maximum number of sequences per pack.
+        offset: Offset to adjust the pack length.
+        max_sequence_length: Maximum sequence length allowed.
     """
     assert max_sequence_length - sum(pack) == offset, "Incorrect offset."
     assert offset >= 0, "Too small offset."
@@ -81,14 +84,14 @@ def pack_using_spfhp(
     Adapted from
     https://github.com/graphcore/examples/blob/v3.2.0/tutorials/blogs_code/packedBERT/spfhp.py.
 
-    :param histogram: Histogram (NumPy array) of sequence lengths.
-    :param max_sequence_length: Maximum sequence length.
-    :param max_sequences_per_pack: Maximum number of sequences per pack,
-    or "max" for no limit.
-    :param verbose: Whether to print detailed information about the
-    packing process.
-    :return: A tuple containing a list of packed sequences and a NumPy
-    array of their counts.
+    Args:
+        histogram: Histogram (NumPy array) of sequence lengths.
+        max_sequence_length: Maximum sequence length.
+        max_sequences_per_pack: Maximum number of sequences per pack, or "max" for no limit.
+        verbose: Whether to print detailed information about the packing process.
+
+    Returns:
+        A tuple containing a list of packed sequences and a NumPy array of their counts.
     """
     start = time.time()
     reversed_histogram = np.flip(histogram)
@@ -205,16 +208,16 @@ def pack_using_lpfhp(
     Adapted from
     https://github.com/graphcore/examples/blob/v3.2.0/tutorials/blogs_code/packedBERT/lpfhp.py.
 
-    :param histogram: Histogram (NumPy array) of sequence lengths.
-    :param max_sequence_length: Maximum sequence length.
-    :param max_sequences_per_pack: Maximum number of sequences per pack,
-    or "max" for no limit.
-    :param distribute: Whether to distribute sequences evenly across
-    packs.
-    :param verbose: Whether to print detailed information about the
-    packing process.
-    :return: A tuple containing a list of packed sequences and a NumPy
-    array of their counts.
+    Args:
+        histogram: Histogram (NumPy array) of sequence lengths.
+        max_sequence_length: Maximum sequence length.
+        max_sequences_per_pack: Maximum number of sequences per pack,
+        or "max" for no limit.
+        distribute: Whether to distribute sequences evenly across packs.
+        verbose: Whether to print detailed information about the packing process.
+
+    Returns:
+        A tuple containing a list of packed sequences and a NumPy array of their counts.
     """
     start = time.time()
     reversed_histogram = np.flip(histogram)
@@ -353,31 +356,32 @@ class PackedDataset(Dataset):
     """Dataset that packs examples from a tokenized dataset into packs of sequences, by default
     using a pack-first histogram-packing (PFHP) algorithm.
 
-    :param tokenized_dataset: The tokenized dataset to pack.
-    :param tokenized_data_len_key: Key in the dataset that contains the
-        sequence lengths. Defaults to "seq" which will be prefixed
-        by `data_features_prefix`.
-    :param data_features_prefix: Prefix for the keys in the
-        dataset that contain the features to pack. Defaults to an empty
-        string.
-    :param data_features: List of features to pack from the dataset.
-        Defaults to ["seq"]. Position IDs (pos_ids) and sequence IDs
-        (seq_ids) are automatically added to the packed features.
-    :param packing_fn: Function to use for packing sequences, defaults
-        to "lpfhp" (longest-pack-first histogram-packing). Can also be
-        "spfhp" (shortest-pack-first histogram-packing).
-    :param max_seq_len: Maximum length of sequences in the
-        dataset.
-    :param max_seq_per_pack: Maximum number of sequences in a pack,
-        or "max" for no limit.
-    :param distribute: Whether to distribute sequences evenly across
-        packs.
-    :param plot_distribution: Whether to plot the distribution of
-        sequence lengths in the packs.
-    :param overfitting: If True, only uses the first two examples for
-        overfitting purposes.
-    :param verbose: Whether to print detailed information about the
-        packing process.
+    Args:
+        tokenized_dataset: The tokenized dataset to pack.
+        tokenized_data_len_key: Key in the dataset that contains the
+            sequence lengths. Defaults to "seq" which will be prefixed
+            by `data_features_prefix`.
+        data_features_prefix: Prefix for the keys in the
+            dataset that contain the features to pack. Defaults to an empty
+            string.
+        data_features: List of features to pack from the dataset.
+            Defaults to ["seq"]. Position IDs (pos_ids) and sequence IDs
+            (seq_ids) are automatically added to the packed features.
+        packing_fn: Function to use for packing sequences, defaults
+            to "lpfhp" (longest-pack-first histogram-packing). Can also be
+            "spfhp" (shortest-pack-first histogram-packing).
+        max_seq_len: Maximum length of sequences in the
+            dataset.
+        max_seq_per_pack: Maximum number of sequences in a pack,
+            or "max" for no limit.
+        distribute: Whether to distribute sequences evenly across
+            packs.
+        plot_distribution: Whether to plot the distribution of
+            sequence lengths in the packs.
+        overfitting: If True, only uses the first two examples for
+            overfitting purposes.
+        verbose: Whether to print detailed information about the
+            packing process.
     """
 
     def __init__(
@@ -482,8 +486,11 @@ class PackedDataset(Dataset):
     def __getitem__(self, pack_idx: int) -> Dict[str, torch.Tensor]:
         """Return a pack of sequences by its index.
 
-        :param pack_idx: Index of the pack to retrieve. :return: A dictionary containing the packed
-        features for the     specified pack index.
+        Args:
+            pack_idx: Index of the pack to retrieve.
+
+        Returns:
+            A dictionary containing the packed features for the specified pack index.
         """
         prefix = self.data_features_prefix
         ids = [0, 1] if self.overfitting else self.packs[pack_idx]
