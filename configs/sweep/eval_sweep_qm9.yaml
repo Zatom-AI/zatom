@@ -7,7 +7,7 @@ method: grid
 
 metric: # Does not matter, as we are using sweep to run the experiment.
   goal: maximize
-  name: test_qm9/posebusters_rate
+  name: test_qm9/valid_rate
 
 parameters:
   ckpt_path:
