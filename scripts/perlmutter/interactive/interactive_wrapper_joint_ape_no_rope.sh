@@ -15,8 +15,8 @@ while [ $COUNT -le $MAX_RETRIES ]; do
            --gpus-per-node=4 \
            --ntasks-per-node=4 \
            --time=04:00:00 \
-           --job-name=tft-70M-joint-ape-reimp \
-           bash -c "bash scripts/perlmutter/interactive/train_ddp_tft_joint_ape_reimp.sh"
+           --job-name=tft-70M-joint-ape-no-rope \
+           bash -c "bash scripts/perlmutter/interactive/train_ddp_tft_joint_ape_no_rope.sh"
 
     echo "Job finished or timed out. Restarting..."
     COUNT=$((COUNT + 1))

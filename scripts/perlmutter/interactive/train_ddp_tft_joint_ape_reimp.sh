@@ -9,7 +9,7 @@
 #        --gpus-per-node=4 \
 #        --ntasks-per-node=4 \
 #        --time=04:00:00 \
-#        --job-name=tft-70M-joint-ape-reimp
+#        --job-name=tft-70M-joint-ape-no-rope
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -28,8 +28,8 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="3hlkumax"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-12-14_15-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="f1i38z90"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-12-14_17-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="train"                # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
 DEFAULT_ARCHITECTURE="tft_70M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_70M`, `{tft,}_160M`, `{tft,}_300M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
@@ -41,8 +41,8 @@ MODEL=${4:-$DEFAULT_MODEL}                # Fourth argument or default model if 
 EXPERIMENT=${5:-$DEFAULT_EXPERIMENT}      # Fifth argument or default experiment if not provided
 ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architecture if not provided
 
-TASK_NAME="train_fm"                                                             # Name of the task to perform
-RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_joint_ape_reimp"     # Name of the model type and dataset configuration
+TASK_NAME="train_fm"                                                               # Name of the task to perform
+RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_joint_ape_no_rope"     # Name of the model type and dataset configuration
 
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at which to find model checkpoints
 mkdir -p "$CKPT_PATH"
@@ -77,9 +77,9 @@ bash -c "
     data=$DATASET \
     date=$RUN_DATE \
     experiment=$EXPERIMENT \
+    globals.rope_base=null \
     model=$MODEL \
     model/architecture=$ARCHITECTURE \
-    model.architecture.multimodal_model.implementation=reimplemented \
     model.architecture.multimodal_model.add_sinusoid_posenc=true \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
