@@ -159,6 +159,8 @@ class ModernTransformerBlock(nn.Module):
 class ModernTransformerDecoderBlock(nn.Module):
     """A transformer decoder block using ModernAttention and SwiGLUFeedForward.
 
+    Can be used as a drop-in replacement for `nn.TransformerDecoderLayer`.
+
     Args:
         dim: Input and output dimension
         n_heads: Number of attention heads
@@ -349,7 +351,7 @@ class Transformer(nn.Module):
 
 
 class ModernTransformer(nn.Module):
-    """A modern Transformer model with RoPE embeddings, optional query-key normalization, and
+    """A modern Transformer model with optional RoPE embeddings, query-key normalization, and
     scaled dot-product attention.
 
     Args:

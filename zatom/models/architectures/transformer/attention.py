@@ -219,12 +219,12 @@ class ModernAttention(nn.Module):
                 final_mask = final_mask & pad_mask
 
         if self.use_sdpa:
-            # Use PyTorch's optimized scaled dot-product attention.
+            # Use PyTorch's optimized scaled dot-product attention (SDPA)
             output = F.scaled_dot_product_attention(q, k, v, attn_mask=final_mask)
         elif self.jvp_attn:
             output = JVPAttn.fwd_dual(q, k, v, attn_mask=final_mask)
         else:
-            # Manual implementation for comparison or environments where SDPA is not available.
+            # Use manual implementation for comparison or environments where SDPA is not available
             scores = torch.matmul(q, k.transpose(-1, -2)) / math.sqrt(self.head_dim)
 
             if final_mask is not None and final_mask.is_floating_point():
