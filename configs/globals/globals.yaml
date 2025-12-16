@@ -4,4 +4,4 @@ num_dataset_classes: 2
 num_spacegroup_classes: 230
 num_global_properties: 19
 max_num_atoms: 2048
-rope_base: null
+rope_base: null # NOTE: RoPE is disabled by default due to its poor performance for 3D materials generation.
