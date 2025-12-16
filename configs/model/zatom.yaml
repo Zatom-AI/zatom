@@ -31,14 +31,14 @@ datasets: ${data.datamodule.datasets}
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
-  lr: ${resolve_lr:5e-4,${data.datamodule.batch_size.base_world_size},${multiply:${trainer.devices},${trainer.num_nodes}},${model.architecture.batch_size_scale_factor}}
+  lr: ${resolve_lr:5e-4,${data.datamodule.batch_size.base_world_size},${multiply:${trainer.devices},${trainer.num_nodes}},${model.architecture.batch_size_scale_factor},False}
   weight_decay: 0.0
   betas: [0.9, 0.995]
 
 scheduler:
-  _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
-  _partial_: true
-  lr_lambda: ${resolve_lr_scheduler:constant_schedule_with_warmup,5}
+  # _target_: ${resolve_variable:torch.optim.lr_scheduler.LambdaLR}
+  # _partial_: true
+  # lr_lambda: ${resolve_lr_scheduler:constant_schedule_with_warmup,50}
 
 scheduler_frequency: 1
 # scheduler_frequency: ${trainer.check_val_every_n_epoch}
