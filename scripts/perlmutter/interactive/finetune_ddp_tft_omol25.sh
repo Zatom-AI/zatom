@@ -1,21 +1,15 @@
 #!/bin/bash -l
 
-######################### Batch Headers #########################
-#SBATCH -C gpu&hbm80g                                         # request GPU nodes
-#SBATCH --qos=shared                                          # use specified partition for job
-#SBATCH --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 # use specified container image
-#SBATCH --module=gpu,nccl-plugin                              # load GPU and optimized NCCL plugin modules
-#SBATCH --account=m5008                                       # use specified account for billing (e.g., `m5008_g` for AI4Science proposal, `dasrepo` for all else)
-#SBATCH --nodes=1                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
-#SBATCH --gpus-per-node=2                                     # request A100 GPU resource(s)
-#SBATCH --ntasks-per-node=2                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
-#SBATCH --time=00-23:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=finetune-tft-70M-joint                     # job name
-#SBATCH --output=scripts/perlmutter/regular/logs/train%j.out  # output log file
-#SBATCH --error=scripts/perlmutter/regular/logs/train%j.err   # error log file
-
-# Wait for 5-10 seconds randomly to avoid race condition
-sleep $((RANDOM % 6 + 5))
+# salloc -C "gpu&hbm80g" \
+#        --qos=shared_interactive \
+#        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
+#        --module=gpu,nccl-plugin \
+#        --account=m5008 \
+#        --nodes=1 \
+#        --gpus-per-node=2 \
+#        --ntasks-per-node=2 \
+#        --time=04:00:00 \
+#        --job-name=finetune-tft-70M-omol25
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -48,14 +42,14 @@ EXPERIMENT=${5:-$DEFAULT_EXPERIMENT}      # Fifth argument or default experiment
 ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architecture if not provided
 
 TASK_NAME="finetune_fm"                                                # Name of the task to perform
-RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_joint"     # Name of the model type and dataset configuration
+RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_omol25"     # Name of the model type and dataset configuration
 
 PRETRAINED_CKPT_PATH="logs/finetune_fm/runs/finetune_model-zatom_arch-tft_70M_joint_all_props_2025-12-03_12-00-00/checkpoints/model-epoch@619-step@265980-val_qm9_property_loss@0.0175-val_omol25_energy_loss@0.0000.ckpt"  # Path at which to find (initial) pretrained model checkpoint
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
 mkdir -p "$CKPT_PATH"
 
 # Inform user of job details
-echo -e "Job details:\n==================\n"
+echo -e "Job details:\n========================================================================\n"
 
 echo "Run name: $RUN_NAME"
 echo "Run ID: $RUN_ID"
@@ -73,7 +67,7 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script train_fm.py:\n==================\n"
+echo -e "\nExecuting script train_fm.py:\n========================================================================\n"
 
 # Run script
 bash -c "
