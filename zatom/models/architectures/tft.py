@@ -103,8 +103,6 @@ class TFT(nn.Module):
 
         self.vocab_size = max_num_elements
 
-        self.jvp_attn = False
-
         # Define time distribution
         if time_distribution == "uniform":
             self.time_distribution = torch.distributions.Uniform(0, 1)
@@ -130,6 +128,14 @@ class TFT(nn.Module):
             spacegroup_embedder=spacegroup_embedder,
             **kwargs,
         )
+
+        assert hasattr(
+            self.model, "context_length"
+        ), "Multimodal model must have `context_length` attribute."
+        assert hasattr(self.model, "jvp_attn"), "Multimodal model must have `jvp_attn` attribute."
+
+        self.context_length = self.model.context_length
+        self.jvp_attn = self.model.jvp_attn
 
         # Define modalities and auxiliary tasks
         self.modals = [

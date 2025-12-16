@@ -95,6 +95,7 @@ class TransformerModule(nn.Module):
         self.num_aux_layers = num_aux_layers
         self.implementation = implementation
         self.context_length = context_length
+        self.jvp_attn = jvp_attn
         self.cross_attention = cross_attention
         self.add_sinusoid_posenc = add_sinusoid_posenc
         self.concat_combine_input = concat_combine_input
