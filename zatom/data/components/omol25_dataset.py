@@ -275,7 +275,7 @@ class OMol25(Dataset):
 
             y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
 
-        spin_graph = atoms.info.get("spin", atoms.info.get("multiplicity", 0))  # int multiplicity
+        spin_graph = atoms.info.get("spin", atoms.info.get("multiplicity", 0))  # Int multiplicity
         charge_graph = atoms.info.get("charge", 0)
 
         data = Data(

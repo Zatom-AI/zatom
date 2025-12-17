@@ -206,4 +206,7 @@ class MPtrj(InMemoryDataset):
         num_atoms = data.num_atoms.item()
         data.y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
 
+        data.charge = torch.tensor(0, dtype=torch.float32)
+        data.spin = torch.tensor(0, dtype=torch.long)
+
         return data
