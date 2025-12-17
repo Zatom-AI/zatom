@@ -152,8 +152,16 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     updated_state_dict = {k: v for k, v in old_state_dict.items() if k in new_state_dict}
     model.load_state_dict(updated_state_dict, strict=False)
 
-    log.info("Starting testing!")
-    trainer.test(model=model, datamodule=datamodule)
+    if cfg.eval_split == "val":
+        log.info("Starting validation!")
+        trainer.validate(model=model, datamodule=datamodule)
+    elif cfg.eval_split == "test":
+        log.info("Starting testing!")
+        trainer.test(model=model, datamodule=datamodule)
+    else:
+        raise ValueError(
+            f"Evaluation data split {cfg.eval_split} is not supported. Must be one of (`val`, `test`)."
+        )
 
     # For predictions use trainer.predict(...)
     # predictions = trainer.predict(model=model, dataloaders=dataloaders, ckpt_path=cfg.ckpt_path)
