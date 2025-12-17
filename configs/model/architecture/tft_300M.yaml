@@ -7,9 +7,14 @@ multimodal_model:
   spatial_dim: ${globals.spatial_dim}
   atom_dim: ${globals.max_num_elements}
   num_properties: ${globals.num_global_properties}
-  implementation: reimplemented # NOTE: must be one of (`reimplemented`,)
+  implementation: modern_transformer # NOTE: must be one of (`transformer`, `modern_transformer`)
   context_length: ${globals.max_num_atoms}
+  rope_base: ${globals.rope_base}
+  qk_layernorm: true
+  use_sdpa: true
+  jvp_attn: false
   cross_attention: true
+  add_sinusoid_posenc: true
 
 dataset_embedder:
   _target_: zatom.models.architectures.dit.layers.LabelEmbedder
@@ -117,6 +122,7 @@ batch_size_scale_factor: 0.5 # 2, 1, 0.5 -> 70M, 160M, 300M model sizes
 hidden_size: 1024 # 512, 768, 1024 -> 70M, 160M, 300M model sizes
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
+aux_hidden_size: 512 # (fixed) hidden size for auxiliary task layers
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 8
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)

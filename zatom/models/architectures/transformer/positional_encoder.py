@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from zatom.utils.typing_utils import typecheck
+from zatom.utils.typing_utils import Float, Int, typecheck
 
 
 class PositionalEncoding(ABC, nn.Module):
@@ -103,6 +103,133 @@ class SinusoidEncoding(PositionalEncoding):
             Integer representing the output dimension.
         """
         return self.posenc_dim
+
+
+class RotaryPositionalEmbeddings(PositionalEncoding):
+    """
+    This class implements Rotary Positional Embeddings (RoPE)
+    proposed in https://arxiv.org/abs/2104.09864.
+
+    A reference implementation (used for correctness verification)
+    can be found here:
+    https://github.com/meta-llama/llama/blob/main/llama/model.py#L80
+
+    In this implementation we cache the embeddings for each position up to
+    ``max_seq_len`` by computing this during init.
+
+    Adapted from https://github.com/pytorch/torchtune.
+
+    Args:
+        dim: Embedding dimension. This is usually set to the dim of each
+            head in the attention module computed as ``embed_dim // num_heads``.
+        max_seq_len: Maximum expected sequence length for the
+            model, if exceeded the cached freqs will be recomputed.
+        base: The base for the geometric progression used to compute
+            the rotation angles.
+    """
+
+    @typecheck
+    def __init__(
+        self,
+        dim: int,
+        max_seq_len: int = 2048,
+        base: int = 10_000,
+    ) -> None:
+        super().__init__()
+        self.dim = dim
+        self.base = base
+        self.max_seq_len = max_seq_len
+
+        self.rope_init()
+
+    def rope_init(self):
+        """Initialize the RoPE parameters."""
+        theta = 1.0 / (
+            self.base ** (torch.arange(0, self.dim, 2)[: (self.dim // 2)].float() / self.dim)
+        )
+        self.register_buffer("theta", theta, persistent=False)
+        self.build_rope_cache(self.max_seq_len)
+
+    @typecheck
+    def build_rope_cache(self, max_seq_len: int = 2048):
+        """Build the RoPE cache for the given maximum sequence length.
+
+        Args:
+            max_seq_len: Maximum sequence length for which to build
+            the cache. If the sequence length exceeds this, the cache
+            will be recomputed.
+        """
+        # Create position indexes `[0, 1, ..., max_seq_len - 1]`
+        seq_idx = torch.arange(max_seq_len, dtype=self.theta.dtype, device=self.theta.device)
+
+        # Perform outer product of theta and position index
+        # NOTE: Output tensor has a shape of [max_seq_len, dim // 2]
+        idx_theta = torch.einsum("i, j -> ij", seq_idx, self.theta).float()
+
+        # Cache both the cos and sin components,
+        # so the output shape is [max_seq_len, dim // 2, 2]
+        cache = torch.stack([torch.cos(idx_theta), torch.sin(idx_theta)], dim=-1)
+        self.register_buffer("cache", cache, persistent=False)
+
+    @typecheck
+    def forward(
+        self, x: Float["b m h c"], *, input_pos: Int["b m"] | None = None  # type: ignore
+    ) -> Float["b m h c"]:  # type: ignore
+        """Forward pass for Rotary Positional Embeddings.
+
+        Notation used for tensor shapes:
+            - b: batch size
+            - m: sequence length
+            - h: num heads
+            - c: head dim
+
+        Args:
+            x: Input tensor of shape (batch_size, seq_len, num_heads,
+                head_dim).
+            input_pos: Optional tensor of shape (batch_size, seq_len)
+                containing the positions of the input tokens. If not provided,
+                the cache will be used for the entire sequence length.
+
+        Returns:
+            Output tensor of the same shape as input, with RoPE applied.
+        """
+        # NOTE: Input tensor has shape [b, s, n_h, h_d].
+        seq_len = x.size(1)
+
+        # Extract the values based on whether input_pos is set or not
+        rope_cache = self.cache[input_pos] if input_pos is not None else self.cache[:seq_len]
+
+        # Reshape input; the last dimension is used for computing the output.
+        # Cast to float to match the reference implementation.
+        # NOTE: Tensor has shape [b, s, n_h, h_d // 2, 2].
+        xshaped = x.float().reshape(*x.shape[:-1], -1, 2)
+
+        # Reshape the cache for broadcasting.
+        # NOTE: Tensor has shape [b, s, 1, h_d // 2, 2] if packed samples;
+        # otherwise has shape [1, s, 1, h_d // 2, 2].
+        rope_cache = rope_cache.view(-1, xshaped.size(1), 1, xshaped.size(3), 2)
+
+        # NOTE: Tensor has shape [b, s, n_h, h_d // 2, 2].
+        x_out = torch.stack(
+            [
+                xshaped[..., 0] * rope_cache[..., 0] - xshaped[..., 1] * rope_cache[..., 1],
+                xshaped[..., 1] * rope_cache[..., 0] + xshaped[..., 0] * rope_cache[..., 1],
+            ],
+            -1,
+        )
+
+        # NOTE: Tensor has shape [b, s, n_h, h_d].
+        x_out = x_out.flatten(3)
+        return x_out.type_as(x)
+
+    @typecheck
+    def out_dim(self) -> int:
+        """Embedding dimension produced by this encoder.
+
+        Returns:
+            Integer representing the output dimension.
+        """
+        return self.dim
 
 
 class TimeFourierEncoding(PositionalEncoding):

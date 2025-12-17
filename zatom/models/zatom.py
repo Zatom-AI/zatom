@@ -389,17 +389,17 @@ class Zatom(LightningModule):
             for dataset, cfg in self.hparams.datasets.items()
             if cfg.proportion > 0.0
         )
-        if self.model.jvp_attn:
+        if hasattr(self.model, "jvp_attn") and self.model.jvp_attn:
             # Find the smallest power of 2 >= max(max_num_nodes, 32)
             min_num_nodes = max(self.max_num_nodes, 32)
             closest_power_of_2 = 1 << (min_num_nodes - 1).bit_length()
             self.max_num_nodes = int(closest_power_of_2)
         if (
-            hasattr(self.model.model, "context_length")
-            and self.model.model.context_length < self.max_num_nodes
+            hasattr(self.model, "context_length")
+            and self.model.context_length < self.max_num_nodes
         ):
             raise ValueError(
-                f"Model context length ({self.model.model.context_length}) is smaller than max_num_nodes ({self.max_num_nodes})."
+                f"Model context length ({self.model.context_length}) is smaller than max_num_nodes ({self.max_num_nodes})."
             )
 
         # Densify batch
@@ -1251,10 +1251,7 @@ class Zatom(LightningModule):
             # NOTE: Strategies such as DeepSpeed require `params` to instead be specified as `model_params`
             optimizer = self.hparams.optimizer(model_params=trainable_parameters)
 
-        use_scheduler = (
-            self.trainer.world_size > self.trainer.datamodule.hparams.batch_size.base_world_size
-        )
-        if self.hparams.scheduler is not None and use_scheduler:
+        if self.hparams.scheduler is not None:
             scheduler = self.hparams.scheduler(optimizer=optimizer)
             return {
                 "optimizer": optimizer,

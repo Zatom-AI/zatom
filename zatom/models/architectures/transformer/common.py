@@ -10,9 +10,45 @@ from zatom.utils.typing_utils import typecheck
 class SwiGLU(nn.Module):
     """SwiGLU activation function."""
 
+    @typecheck
     def forward(self, x: Tensor) -> Tensor:
         x, gates = x.chunk(2, dim=-1)
         return F.silu(gates) * x
+
+
+class SwiGLUFeedForward(nn.Module):
+    """Feed-forward network with SwiGLU activation.
+
+    Args:
+        dim: Input and output dimension.
+        hidden_dim: Hidden layer dimension.
+        multiple_of: Ensure hidden_dim is a multiple of this value.
+    """
+
+    @typecheck
+    def __init__(self, dim: int, hidden_dim: int, multiple_of: int = 256):
+        super().__init__()
+        hidden_dim = int(2 * hidden_dim / 3)
+        hidden_dim = multiple_of * ((hidden_dim + multiple_of - 1) // multiple_of)
+
+        self.w1 = nn.Linear(dim, hidden_dim, bias=False)
+        self.w2 = nn.Linear(hidden_dim, dim, bias=False)
+        self.w3 = nn.Linear(dim, hidden_dim, bias=False)
+
+    @typecheck
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass through the SwiGLU feed-forward network.
+
+        Args:
+            x (Tensor): Input tensor of shape (..., dim).
+
+        Returns:
+            Tensor: Output tensor of shape (..., dim).
+        """
+        swish = F.silu(self.w1(x))
+        x_V = self.w3(x)
+        x = swish * x_V
+        return self.w2(x)
 
 
 class ChargeSpinEmbedding(nn.Module):

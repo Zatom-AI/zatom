@@ -58,9 +58,9 @@ datamodule:
   batch_size:
     base_world_size: 2
     base_accumulate_grad_batches: 2
-    train: ${resolve_batch_size:64,${model.architecture.batch_size_scale_factor}}
-    val: ${resolve_batch_size:64,${model.architecture.batch_size_scale_factor}}
-    test: ${resolve_batch_size:64,${model.architecture.batch_size_scale_factor}}
+    train: ${resolve_batch_size:128,${model.architecture.batch_size_scale_factor}}
+    val: ${resolve_batch_size:128,${model.architecture.batch_size_scale_factor}}
+    test: ${resolve_batch_size:128,${model.architecture.batch_size_scale_factor}}
 
   num_workers:
     train: 32
