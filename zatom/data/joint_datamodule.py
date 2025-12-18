@@ -168,6 +168,7 @@ class JointDataModule(LightningDataModule):
         https://lightning.ai/docs/pytorch/latest/data/datamodule.html
     """
 
+    @typecheck
     def __init__(
         self,
         datasets: DictConfig,
@@ -180,6 +181,7 @@ class JointDataModule(LightningDataModule):
         # Also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
+    @typecheck
     def setup(self, stage: str | None = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
@@ -679,6 +681,7 @@ class JointDataModule(LightningDataModule):
             log.info(f"MPtrj test dataset: {len(self.mptrj_test_dataset)} samples")
             log.info(f"Matbench test dataset: {len(self.matbench_test_dataset)} samples")
 
+    @typecheck
     def train_dataloader(self) -> DataLoader:
         """Create and return the train dataloader.
 
@@ -694,6 +697,7 @@ class JointDataModule(LightningDataModule):
             drop_last=True,
         )
 
+    @typecheck
     def val_dataloader(self) -> Sequence[DataLoader]:
         """Create and return the validation dataloader.
 
@@ -752,6 +756,7 @@ class JointDataModule(LightningDataModule):
             ),
         ]
 
+    @typecheck
     def test_dataloader(self) -> Sequence[DataLoader]:
         """Create and return the test dataloader.
 

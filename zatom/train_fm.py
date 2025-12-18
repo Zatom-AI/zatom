@@ -13,6 +13,8 @@ from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies.strategy import Strategy
 from omegaconf import DictConfig, open_dict
 
+from zatom.utils.typing_utils import typecheck
+
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -49,6 +51,7 @@ from zatom.utils import (
 log = RankedLogger(__name__, rank_zero_only=True)
 
 
+@typecheck
 @task_wrapper
 def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Trains a foundation model for 3D molecules and materials.
@@ -240,6 +243,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     return metric_dict, object_dict
 
 
+@typecheck
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train_fm.yaml")
 def main(cfg: DictConfig) -> float | None:
     """Main entry point for foundation model training.

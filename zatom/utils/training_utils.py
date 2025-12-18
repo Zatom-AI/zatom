@@ -47,7 +47,6 @@ SDPA_BACKENDS = [
 # Classes
 
 
-@typecheck
 class ConstantScheduleWithWarmup:
     """A learning rate scheduler that linearly increases the learning rate factor from 0 to 1 over
     a specified number of warmup steps. After the warmup period, the learning rate factor remains
@@ -58,6 +57,7 @@ class ConstantScheduleWithWarmup:
             the learning rate factor.
     """
 
+    @typecheck
     def __init__(self, warmup_steps: int | None):
         assert (
             warmup_steps is not None and warmup_steps > 0
@@ -82,7 +82,6 @@ class ConstantScheduleWithWarmup:
         return 1.0
 
 
-@typecheck
 class CosineScheduleWithWarmup:
     """A learning rate scheduler that linearly increases the learning rate factor from 0 to 1 over
     `warmup_steps`, then decays it following a cosine schedule of `num_cycles` to a minimum of
@@ -97,6 +96,7 @@ class CosineScheduleWithWarmup:
         min_lr_factor: The minimum learning rate factor after decay.
     """
 
+    @typecheck
     def __init__(
         self,
         warmup_steps: int | None,
@@ -151,6 +151,7 @@ class HistogramTimeDistribution:
         probs: A 1D tensor of non-negative probabilities representing the histogram bins.
     """
 
+    @typecheck
     def __init__(self, probs: torch.Tensor):
         assert probs.ndim == 1, "The argument `probs` must be 1D."
         assert torch.all(probs >= 0), "The argument `probs` must be non-negative."

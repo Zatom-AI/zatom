@@ -63,6 +63,7 @@ class TFT(nn.Module):
         test_so3_equivariance: Whether to test the model for SO(3) equivariance after each forward pass.
     """
 
+    @typecheck
     def __init__(
         self,
         multimodal_model: partial[Callable[..., nn.Module]],

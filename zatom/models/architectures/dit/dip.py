@@ -64,6 +64,7 @@ class MultimodalDiP(nn.Module):
         solid_name: The name of the Platonic solid (e.g., `tetrahedron`, `octahedron`, `icosahedron`) to define the symmetry group.
     """
 
+    @typecheck
     def __init__(
         self,
         time_embedder: nn.Module,

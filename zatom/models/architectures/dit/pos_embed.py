@@ -89,6 +89,7 @@ class AbsolutePositionEncoding(nn.Module):
         include_input: Whether to include the original input position in the output embedding.
     """
 
+    @typecheck
     def __init__(self, in_dim: int, embed_dim: int, include_input: bool = False):
         super().__init__()
         self.in_dim = in_dim
@@ -158,6 +159,7 @@ class FourierPositionEncoding(torch.nn.Module):
         log_sampling: Whether to use logarithmic sampling of frequency bands.
     """
 
+    @typecheck
     def __init__(
         self,
         in_dim: int,
@@ -237,6 +239,7 @@ class AxialRotaryPositionEncoding(nn.Module):
         base: The base frequency for the rotary embeddings.
     """
 
+    @typecheck
     def __init__(
         self,
         in_dim: int,

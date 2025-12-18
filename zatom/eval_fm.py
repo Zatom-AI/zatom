@@ -12,6 +12,8 @@ from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies.strategy import Strategy
 from omegaconf import DictConfig, open_dict
 
+from zatom.utils.typing_utils import typecheck
+
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -46,6 +48,7 @@ from zatom.utils import (
 log = RankedLogger(__name__, rank_zero_only=True)
 
 
+@typecheck
 @task_wrapper
 def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Evaluates given checkpoint on a datamodule testset.
@@ -171,6 +174,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     return metric_dict, object_dict
 
 
+@typecheck
 @hydra.main(version_base="1.3", config_path="../configs", config_name="eval_fm.yaml")
 def main(cfg: DictConfig) -> None:
     """Main entry point for foundation model evaluation.

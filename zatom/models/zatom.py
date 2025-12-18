@@ -71,6 +71,7 @@ class Zatom(LightningModule):
         https://lightning.ai/docs/pytorch/latest/common/lightning_module.html
     """
 
+    @typecheck
     def __init__(
         self,
         architecture: torch.nn.Module,
@@ -839,6 +840,7 @@ class Zatom(LightningModule):
         """Called at the start of the validation epoch."""
         self.on_evaluation_epoch_start(stage="val")
 
+    @typecheck
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx: int) -> None:
         """Perform a single validation step on a batch of data."""
         self.evaluation_step(batch, batch_idx, dataloader_idx, stage="val")
@@ -853,6 +855,7 @@ class Zatom(LightningModule):
         """Called at the start of the test epoch."""
         self.on_evaluation_epoch_start(stage="test")
 
+    @typecheck
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx: int) -> None:
         """Perform a single test step on a batch of data."""
         self.evaluation_step(batch, batch_idx, dataloader_idx, stage="test")
@@ -925,6 +928,7 @@ class Zatom(LightningModule):
                 add_dataloader_idx=False,
             )
 
+    @typecheck
     def on_evaluation_epoch_end(self, stage: Literal["val", "test"]) -> None:
         """Lightning hook that is called when a validation/test epoch ends."""
 
@@ -1270,6 +1274,7 @@ class Zatom(LightningModule):
         # Finalize model configuration in case this hook is called multiple times
         self.model_configured = True
 
+    @typecheck
     def configure_optimizers(self) -> Dict[str, Any]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
         Normally you'd need one. But in the case of GANs or similar you might have multiple.

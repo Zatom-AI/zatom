@@ -71,6 +71,7 @@ class Mlp(nn.Module):
         dtype: Data type for the layers.
     """
 
+    @typecheck
     def __init__(
         self,
         in_features: int,
@@ -140,6 +141,7 @@ class PlatonicMlp(nn.Module):
         dtype: Data type for the layers.
     """
 
+    @typecheck
     def __init__(
         self,
         in_features: int,
@@ -237,6 +239,7 @@ class DiTBlock(nn.Module):
         use_swiglu: Whether to use SwiGLU activation in the MLP. Default: True
     """
 
+    @typecheck
     def __init__(
         self,
         self_attention_layer: nn.Module,
@@ -320,6 +323,7 @@ class DiPBlock(nn.Module):
         use_swiglu: Whether to use SwiGLU activation in the MLP. Default: True
     """
 
+    @typecheck
     def __init__(
         self,
         self_attention_layer: nn.Module,
@@ -438,6 +442,7 @@ class HomogenTrunk(nn.Module):
         Output tensor of shape (B, N, D).
     """
 
+    @typecheck
     def __init__(self, block: nn.Module, depth: int, repr_layer: int | None = None):
         super().__init__()
         self.blocks = nn.ModuleList([block() for _ in range(depth)])

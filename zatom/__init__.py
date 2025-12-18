@@ -7,8 +7,10 @@ from typing import Any
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from zatom.utils.training_utils import get_lr_scheduler
+from zatom.utils.typing_utils import typecheck
 
 
+@typecheck
 def set_omegaconf_flag_recursive(cfg: Any, flag: str, value: bool) -> None:
     """Recursively set an OmegaConf flag on all nodes in the config tree.
 
@@ -23,6 +25,7 @@ def set_omegaconf_flag_recursive(cfg: Any, flag: str, value: bool) -> None:
             set_omegaconf_flag_recursive(v, flag, value)
 
 
+@typecheck
 def generate_index(length: int = 8) -> str:
     """Generate a random base-36 string of `length` digits.
 
@@ -36,6 +39,7 @@ def generate_index(length: int = 8) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+@typecheck
 def resolve_omegaconf_variable(variable_path: str) -> Any:
     """Resolve an OmegaConf variable path to its value.
 
@@ -65,6 +69,7 @@ def resolve_omegaconf_variable(variable_path: str) -> Any:
     return attribute
 
 
+@typecheck
 def resolve_lr(
     lr: float,
     base_world_size: int,
@@ -95,6 +100,7 @@ def resolve_lr(
     )
 
 
+@typecheck
 def resolve_batch_size(base_size: int, scale_factor: float) -> int:
     """Resolve batch size based on base size and scale factor.
 
@@ -108,6 +114,7 @@ def resolve_batch_size(base_size: int, scale_factor: float) -> int:
     return max(1, round(base_size * scale_factor))
 
 
+@typecheck
 def resolve_grad_accum_steps(base_steps: int, scale_factor: float) -> int:
     """Resolve gradient accumulation steps based on base steps and scale factor.
 
