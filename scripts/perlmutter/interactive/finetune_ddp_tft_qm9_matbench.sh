@@ -78,9 +78,9 @@ bash -c "
     ckpt_path=$CKPT_PATH \
     callbacks.model_checkpoint.monitor=val_qm9/aux_global_property_loss \
     data=$DATASET \
-    data.datamodule.batch_size.train=256 \
-    data.datamodule.batch_size.val=256 \
-    data.datamodule.batch_size.test=256 \
+    data.datamodule.batch_size.train=32 \
+    data.datamodule.batch_size.val=32 \
+    data.datamodule.batch_size.test=32 \
     data.datamodule.datasets.qm9.proportion=1.0 \
     data.datamodule.datasets.qm9.global_property=all \
     data.datamodule.datasets.matbench.proportion=1.0 \
