@@ -15,8 +15,8 @@ while [ $COUNT -le $MAX_RETRIES ]; do
            --gpus-per-node=2 \
            --ntasks-per-node=2 \
            --time=04:00:00 \
-           --job-name=finetune-tft-70M-qm9 \
-           bash -c "bash scripts/perlmutter/interactive/finetune_ddp_tft_qm9.sh"
+           --job-name=finetune-tft-70M-qm9-matbench \
+           bash -c "bash scripts/perlmutter/interactive/finetune_ddp_tft_qm9_matbench.sh"
 
     echo "Job finished or timed out. Restarting..."
     COUNT=$((COUNT + 1))
