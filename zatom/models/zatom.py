@@ -1336,8 +1336,8 @@ class Zatom(LightningModule):
                 "omol25" in self.hparams.datasets
                 and self.hparams.datasets["omol25"].global_energy is not None
             ) or (
-                "mp20" in self.hparams.datasets
-                and self.hparams.datasets["mp20"].global_energy is not None
+                "mptrj" in self.hparams.datasets
+                and self.hparams.datasets["mptrj"].global_energy is not None
             ):
                 aux_tasks.add("global_energy")
                 aux_tasks.add("atomic_forces")

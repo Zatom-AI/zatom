@@ -39,6 +39,9 @@ data:
       mptrj:
         proportion: 0.0
         global_energy: null
+      matbench:
+        proportion: 1.0
+        global_property: matbench_mp_gap
 
 model:
   architecture:
