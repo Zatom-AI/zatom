@@ -117,7 +117,7 @@ def joblib_map(
 
     if backend != "sequential":
         with parallel_config(backend=backend, inner_max_num_threads=inner_max_num_threads):
-            if backend == "loky":
+            if backend == "loky" and n_jobs != 1:
                 results = ParallelTqdm(n_jobs=n_jobs, total_tasks=total, desc=desc)(
                     delayed(func)(i) for i in iterable
                 )
