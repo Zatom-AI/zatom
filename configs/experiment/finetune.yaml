@@ -48,3 +48,10 @@ model:
     num_aux_layers: 4
   augmentations:
     frac_coords: false
+  sampling:
+    n_jobs: 1
+    num_samples: 1
+    batch_size: 1
+
+trainer:
+  max_time: "10:00:00:00"

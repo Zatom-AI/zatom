@@ -89,14 +89,10 @@ bash -c "
     experiment=$EXPERIMENT \
     model=$MODEL \
     model/architecture=$ARCHITECTURE \
-    model.sampling.n_jobs=1 \
-    model.sampling.num_samples=1 \
-    model.sampling.batch_size=1 \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.max_time='10:00:00:00' \
     trainer.check_val_every_n_epoch=20
 "
 

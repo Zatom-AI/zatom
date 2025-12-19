@@ -1,13 +1,13 @@
 #!/bin/bash -l
 
 # salloc -C "gpu&hbm80g" \
-#        --qos=shared_interactive \
+#        --qos=interactive \
 #        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
 #        --module=gpu,nccl-plugin \
 #        --account=m5008 \
-#        --nodes=1 \
-#        --gpus-per-node=2 \
-#        --ntasks-per-node=2 \
+#        --nodes=4 \
+#        --gpus-per-node=4 \
+#        --ntasks-per-node=4 \
 #        --time=04:00:00 \
 #        --job-name=finetune-tft-70M-omol25
 
@@ -28,8 +28,8 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="yrfz1iew"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-12-08_15-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="d8yj4uxj"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-12-19_10-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
 DEFAULT_ARCHITECTURE="tft_70M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,}_70M`, `{tft,}_160M`, `{tft,}_300M`, `{mft,mfp}_80M`, `{mft,mfp}_180M`, `{mft,mfp}_500M`)
@@ -44,7 +44,7 @@ ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architectu
 TASK_NAME="finetune_fm"                                                # Name of the task to perform
 RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_omol25"     # Name of the model type and dataset configuration
 
-PRETRAINED_CKPT_PATH="logs/finetune_fm/runs/finetune_model-zatom_arch-tft_70M_joint_all_props_2025-12-03_12-00-00/checkpoints/model-epoch@619-step@265980-val_qm9_property_loss@0.0175-val_omol25_energy_loss@0.0000.ckpt"  # Path at which to find (initial) pretrained model checkpoint
+PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_model-zatom_arch-tft_70M_joint_fast_2025-12-15_20-00-00/checkpoints/model-epoch@1399-step@43400-val_qm9_valid_rate@0.9471-val_mp20_valid_rate@0.9003.ckpt"  # Path at which to find (initial) pretrained model checkpoint
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
 mkdir -p "$CKPT_PATH"
 
@@ -89,14 +89,10 @@ bash -c "
     experiment=$EXPERIMENT \
     model=$MODEL \
     model/architecture=$ARCHITECTURE \
-    model.augmentations.scale=1.0 \
-    model.sampling.num_samples=1 \
-    model.sampling.batch_size=1 \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.max_time='10:00:00:00' \
     trainer.val_check_interval=10000 \
     trainer.check_val_every_n_epoch=null \
     +trainer.limit_val_batches=0.25
