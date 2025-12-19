@@ -1,15 +1,15 @@
 #!/bin/bash -l
 
 # salloc -C "gpu&hbm80g" \
-#        --qos=shared_interactive \
+#        --qos=interactive \
 #        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
 #        --module=gpu,nccl-plugin \
 #        --account=m5008 \
-#        --nodes=1 \
-#        --gpus-per-node=2 \
-#        --ntasks-per-node=2 \
+#        --nodes=4 \
+#        --gpus-per-node=4 \
+#        --ntasks-per-node=4 \
 #        --time=04:00:00 \
-#        --job-name=finetune-tft-70M-qm9
+#        --job-name=finetune-tft-70M-qm9-fast
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -28,7 +28,7 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="ftuxjrnx"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_ID="gtuxjrnx"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
 DEFAULT_RUN_DATE="2025-12-19_12-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
@@ -41,8 +41,8 @@ MODEL=${4:-$DEFAULT_MODEL}                # Fourth argument or default model if 
 EXPERIMENT=${5:-$DEFAULT_EXPERIMENT}      # Fifth argument or default experiment if not provided
 ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architecture if not provided
 
-TASK_NAME="finetune_fm"                                                         # Name of the task to perform
-RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_qm9_matbench"       # Name of the model type and dataset configuration
+TASK_NAME="finetune_fm"                                                              # Name of the task to perform
+RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_qm9_matbench_fast"       # Name of the model type and dataset configuration
 
 PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_model-zatom_arch-tft_70M_joint_fast_2025-12-15_20-00-00/checkpoints/model-epoch@1399-step@43400-val_qm9_valid_rate@0.9471-val_mp20_valid_rate@0.9003.ckpt"  # Path at which to find (initial) pretrained model checkpoint
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
@@ -93,7 +93,8 @@ bash -c "
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
-    trainer.check_val_every_n_epoch=20
+    trainer.check_val_every_n_epoch=20 \
+    strategy.gradient_as_bucket_view=False
 "
 
 # Inform user of run completion
