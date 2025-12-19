@@ -140,7 +140,7 @@ Train model with chosen experiment configuration from [configs/experiment/](conf
 python zatom/train_fm.py experiment=experiment_name.yaml
 ```
 
-For example, reproduce Zatom's default model training run
+For example, reproduce Zatom's default model (pre)training run
 
 ```bash
 python zatom/train_fm.py experiment=train
@@ -152,7 +152,7 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the `[DEBUG] train_fm.py` config within `.vscode/launch.json` for a full example of how to customize or debug model training.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within `.vscode/launch.json` for full examples of how to customize or debug model training.
 
 ## Evaluation
 
