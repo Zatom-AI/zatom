@@ -28,7 +28,7 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="is5425hl"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_ID="7l9r43fe"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
 DEFAULT_RUN_DATE="2025-12-18_15-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
@@ -81,6 +81,7 @@ bash -c "
     data.datamodule.batch_size.train=512 \
     data.datamodule.batch_size.val=512 \
     data.datamodule.batch_size.test=512 \
+    data.datamodule.num_workers.persistent_workers=true \
     data.datamodule.datasets.qm9.proportion=1.0 \
     data.datamodule.datasets.qm9.global_property=all \
     data.datamodule.datasets.matbench.proportion=0.0 \

@@ -75,3 +75,5 @@ datamodule:
     train: 32
     val: 32
     test: 32
+    pin_memory: false
+    persistent_workers: false
