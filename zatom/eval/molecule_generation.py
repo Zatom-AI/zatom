@@ -108,7 +108,21 @@ class MoleculeGenerationEvaluator:
             # Update list (used for wandb table)
             self.pred_rdkit_list.append((m, pred_smiles, pred_2d, valid, pb_valid))
 
-        # Compute validity metrics
+        # Define consistent set of keys for PoseBusters metrics
+        pb_keys = [
+            "mol_pred_loaded",
+            "sanitization",
+            "inchi_convertible",
+            "all_atoms_connected",
+            "bond_lengths",
+            "bond_angles",
+            "internal_steric_clash",
+            "aromatic_ring_flatness",
+            "double_bond_flatness",
+            "internal_energy",
+            "posebusters_rate",
+        ]
+
         if len(valid_smiles) > 0:
             unique_smiles = set(valid_smiles)
             novel_smiles = (
@@ -129,7 +143,10 @@ class MoleculeGenerationEvaluator:
             }
             pb_metrics = self.buster.bust(valid_molecules, None, None)
             pb_metrics["posebusters_rate"] = pb_metrics.all(axis=1)
-            pb_metrics_dict = pb_metrics.mean().to_dict()
+            pb_metrics_dict_raw = pb_metrics.mean().to_dict()
+
+            # Ensure all keys are present
+            pb_metrics_dict = {k: pb_metrics_dict_raw.get(k, 0.0) for k in pb_keys}
 
             # Update pred_rdkit_list with PoseBusters validity after bulk screening
             valid_idx = 0
@@ -150,19 +167,8 @@ class MoleculeGenerationEvaluator:
                 "unique_rate": torch.tensor(0.0, device=self.device),
                 "novel_rate": torch.tensor(0.0, device=self.device),
             }
-            pb_metrics_dict = {
-                "mol_pred_loaded": 0.0,
-                "sanitization": 0.0,
-                "inchi_convertible": 0.0,
-                "all_atoms_connected": 0.0,
-                "bond_lengths": 0.0,
-                "bond_angles": 0.0,
-                "internal_steric_clash": 0.0,
-                "aromatic_ring_flatness": 0.0,
-                "double_bond_flatness": 0.0,
-                "internal_energy": 0.0,
-                "posebusters_rate": 0.0,
-            }
+            # Ensure all keys are present with default 0.0 value
+            pb_metrics_dict = {k: 0.0 for k in pb_keys}
 
         metrics_dict = {**validity_metrics_dict, **pb_metrics_dict}
         return metrics_dict
@@ -239,7 +245,9 @@ def array_dict_to_molecule(
         Molecule: Molecule object, optionally saved as a pdb file.
     """
     mol = Molecule(
-        species=x["atom_types"], coords=x["pos"], properties={"sample_idx": x["sample_idx"]}
+        species=x["atom_types"],
+        coords=x["pos"],
+        properties={"sample_idx": x["sample_idx"]},
     )
     if save:
         os.makedirs(save_dir_name, exist_ok=True)
