@@ -12,7 +12,7 @@
 
 <!-- [![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/paper/2020) -->
 
-<img src="./overview.png" width="600">
+<img src="./overview.png">
 
 </div>
 
