@@ -6,7 +6,7 @@ COUNT=1
 while [ $COUNT -le $MAX_RETRIES ]; do
     echo "[$COUNT/$MAX_RETRIES] Requesting new interactive allocation..."
 
-    salloc -C "gpu&hbm80g" \
+    salloc -C "gpu&hbm40g" \
            --qos=shared_interactive \
            --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
            --module=gpu,nccl-plugin \

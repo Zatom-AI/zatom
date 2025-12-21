@@ -63,6 +63,7 @@ class TFT(nn.Module):
         test_so3_equivariance: Whether to test the model for SO(3) equivariance after each forward pass.
     """
 
+    @typecheck
     def __init__(
         self,
         multimodal_model: partial[Callable[..., nn.Module]],
@@ -78,13 +79,13 @@ class TFT(nn.Module):
         num_layers: int = 16,
         token_num_heads: int = 8,
         max_num_elements: int = 100,
-        batch_size_scale_factor: int = 1,
+        batch_size_scale_factor: int | float = 1,
         interdist_loss: InterDistancesLoss | None = None,
         time_distribution: Literal["uniform", "beta", "histogram"] = "beta",
         time_alpha_factor: float = 2.0,
         force_loss_weight: float = 5.0,
         test_so3_equivariance: bool = False,
-        **kwargs: Any,
+        **kwargs,
     ):
         super().__init__()
 

@@ -60,6 +60,7 @@ class RMSNorm(nn.Module):
               default because RMSNorm doesn't enforce re-centering invariance.
     """
 
+    @typecheck
     def __init__(self, d: int, p: float = -1.0, eps: float = 1e-8, bias: bool = False):
         super().__init__()
 
@@ -126,6 +127,7 @@ class SelfAttentionLayer(nn.Module):
         linear_target: The linear layer class to use (default: nn.Linear).
     """
 
+    @typecheck
     def __init__(
         self,
         hidden_size: int,
@@ -206,6 +208,7 @@ class EfficientSelfAttentionLayer(SelfAttentionLayer):
     https://github.com/facebookresearch/dinov2/blob/main/dinov2/layers/attention.py.
     """
 
+    @typecheck
     def __init__(
         self,
         *args,
@@ -282,6 +285,7 @@ class PlatonicEfficientSelfAttentionLayer(nn.Module):
         pos_embedder: Optional positional embedding module.
     """
 
+    @typecheck
     def __init__(
         self,
         hidden_size: int,
@@ -423,6 +427,7 @@ class SwiGLUFeedForward(nn.Module):
         multiple_of: Ensure the hidden dimension is a multiple of this value.
     """
 
+    @typecheck
     def __init__(self, dim: int, hidden_dim: int, multiple_of: int = 256):
         super().__init__()
         hidden_dim = int(2 * hidden_dim / 3)
@@ -469,6 +474,7 @@ class PlatonicSwiGLUFeedForward(nn.Module):
         multiple_of: Ensure the hidden dimension is a multiple of this value.
     """
 
+    @typecheck
     def __init__(self, dim: int, hidden_dim: int, solid: str, multiple_of: int = 192):
         super().__init__()
 
@@ -524,6 +530,7 @@ class TimestepEmbedder(nn.Module):
         frequency_embedding_size: The size of the sinusoidal frequency embeddings.
     """
 
+    @typecheck
     def __init__(self, hidden_size: int, frequency_embedding_size: int = 256):
         super().__init__()
         self.mlp = nn.Sequential(
@@ -592,6 +599,7 @@ class LabelEmbedder(nn.Module):
         dropout_prob: The dropout probability for context conditioning.
     """
 
+    @typecheck
     def __init__(self, num_classes: int, hidden_size: int, dropout_prob: float):
         super().__init__()
         self.num_classes = num_classes
@@ -652,6 +660,7 @@ class FinalLayer(nn.Module):
         condition_on_input: Whether to condition on the input as well as the provided context.
     """
 
+    @typecheck
     def __init__(
         self,
         hidden_size: int,
@@ -727,6 +736,7 @@ class PlatonicFinalLayer(nn.Module):
         condition_on_input: Whether to condition on the input as well as the provided context.
     """
 
+    @typecheck
     def __init__(
         self,
         hidden_size: int,

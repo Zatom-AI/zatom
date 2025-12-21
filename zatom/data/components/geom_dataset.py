@@ -14,6 +14,7 @@ from torch_geometric.data import Data, InMemoryDataset, download_url
 from tqdm import tqdm
 
 from zatom.utils import pylogger
+from zatom.utils.typing_utils import typecheck
 
 warnings.simplefilter("ignore", UserWarning)
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -52,6 +53,7 @@ class GEOM(InMemoryDataset):
             (default: `train`)
     """
 
+    @typecheck
     def __init__(
         self,
         root: str,

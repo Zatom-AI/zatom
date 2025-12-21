@@ -11,7 +11,9 @@ license = "MIT"
 keywords = [
     'artificial intelligence',
     'deep learning',
+    'foundation model',
     '3D molecules',
+    '3D materials',
 ]
 
 classifiers=[

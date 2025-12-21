@@ -79,6 +79,7 @@ class MFT(nn.Module):
         force_loss_weight: Weighting factor for force loss when performing auxiliary force prediction.
     """
 
+    @typecheck
     def __init__(
         self,
         multimodal_model: partial[Callable[..., nn.Module]],
@@ -106,7 +107,7 @@ class MFT(nn.Module):
         atom_n_keys_dec: int = 128,
         max_num_elements: int = 100,
         num_properties: int = 1,
-        batch_size_scale_factor: int = 1,
+        batch_size_scale_factor: int | float = 1,
         use_length_condition: bool = True,
         condition_on_input: bool = False,
         test_so3_equivariance: bool = False,

@@ -1,6 +1,7 @@
 import copy
 import os
 import time
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Literal, Tuple
 
@@ -18,6 +19,9 @@ from torch_geometric.utils import to_dense_batch
 from torchmetrics import MeanMetric
 from tqdm import tqdm
 
+from zatom.data.components.matbench_dataset import (
+    MATBENCH_QM9_TARGET_NAME_TO_LITERATURE_SCALE,
+)
 from zatom.data.components.preprocessing_utils import lattice_params_to_matrix_torch
 from zatom.data.joint_datamodule import (
     EV_TO_MEV,
@@ -68,6 +72,7 @@ class Zatom(LightningModule):
         https://lightning.ai/docs/pytorch/latest/common/lightning_module.html
     """
 
+    @typecheck
     def __init__(
         self,
         architecture: torch.nn.Module,
@@ -75,8 +80,8 @@ class Zatom(LightningModule):
         sampling: DictConfig,
         conditioning: DictConfig,
         datasets: DictConfig,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler.LRScheduler,
+        optimizer: torch.optim.Optimizer | partial,
+        scheduler: torch.optim.lr_scheduler.LRScheduler | partial | None,
         scheduler_frequency: int,
         compile: bool,
         log_grads_every_n_steps: int | None,
@@ -162,7 +167,7 @@ class Zatom(LightningModule):
                     ),
                     removeHs=self.hparams.sampling.removeHs,
                 )
-            elif dataset == "mptrj":
+            elif dataset in ("mptrj", "matbench"):
                 self.val_generation_evaluators[dataset] = CrystalGenerationEvaluator(
                     dataset_cif_list=None
                 )
@@ -285,6 +290,10 @@ class Zatom(LightningModule):
             for target in QM9_TARGETS:
                 if self.hparams.datasets["qm9"].global_property in ("all", target):
                     val_metrics["qm9"][f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
+                    if "matbench" in val_metrics:
+                        val_metrics["matbench"][
+                            f"aux_global_property_loss_{target}_scaled"
+                        ] = MeanMetric()
         for dataset in ("omol25", "mptrj"):
             if (
                 dataset in self.hparams.datasets
@@ -480,12 +489,14 @@ class Zatom(LightningModule):
 
         # Add auxiliary targets to dense batch if applicable
         is_qm9_dataset = batch.dataset_idx == self.dataset_to_index.get("qm9", -1)
+        is_matbench_dataset = batch.dataset_idx == self.dataset_to_index.get("matbench", -1)
         is_omol25_dataset = batch.dataset_idx == self.dataset_to_index.get("omol25", -1)
         is_mptrj_dataset = batch.dataset_idx == self.dataset_to_index.get("mptrj", -1)
 
         is_qm9_property_training = (
             is_qm9_dataset.any() and self.hparams.datasets["qm9"].global_property is not None
         )
+        is_matbench_property_training = is_matbench_dataset.any()
         is_omol25_energy_training = (
             is_omol25_dataset.any() and self.hparams.datasets["omol25"].global_energy is not None
         )
@@ -493,7 +504,7 @@ class Zatom(LightningModule):
             is_mptrj_dataset.any() and self.hparams.datasets["mptrj"].global_energy is not None
         )
 
-        if is_qm9_property_training:
+        if is_qm9_property_training or is_matbench_property_training:
             dense_batch["global_property"] = batch.y
 
         if is_omol25_energy_training or is_mptrj_energy_training:
@@ -531,21 +542,34 @@ class Zatom(LightningModule):
         ):
             for name, idx in QM9_TARGET_NAME_TO_IDX.items():
                 if self.hparams.datasets["qm9"].global_property in ("all", name):
-                    if is_qm9_dataset.any():
+                    if is_qm9_dataset.any() or is_matbench_dataset.any():
                         aux_prop_scale = torch.ones_like(pred_aux_global_property[:, idx])
                         aux_prop_shift = torch.zeros_like(pred_aux_global_property[:, idx])
+                        aux_to_lit_scale = torch.ones_like(pred_aux_global_property[:, idx])
                         aux_prop_scale[is_qm9_dataset] = (
                             self.trainer.datamodule.qm9_train_prop_std[0, idx]
                         )
                         aux_prop_shift[is_qm9_dataset] = (
                             self.trainer.datamodule.qm9_train_prop_mean[0, idx]
                         )
+                        aux_prop_scale[is_matbench_dataset] = (
+                            self.trainer.datamodule.matbench_train_dataset.scale[0, idx]
+                        ).nan_to_num(1.0)
+                        aux_prop_shift[is_matbench_dataset] = (
+                            self.trainer.datamodule.matbench_train_dataset.shift[0, idx]
+                        ).nan_to_num(0.0)
+                        aux_to_lit_scale[is_qm9_dataset] = QM9_TARGET_NAME_TO_LITERATURE_SCALE[
+                            name
+                        ]
+                        aux_to_lit_scale[is_matbench_dataset] = (
+                            MATBENCH_QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                        )
                         aux_prop_pred = (
                             pred_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
-                        ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                        ) * aux_to_lit_scale
                         aux_prop_target = (
                             target_aux_global_property[:, idx] * aux_prop_scale + aux_prop_shift
-                        ) * QM9_TARGET_NAME_TO_LITERATURE_SCALE[name]
+                        ) * aux_to_lit_scale
                         aux_prop_mask = mask_aux_global_property[:, idx]
                         aux_prop_err = (aux_prop_pred - aux_prop_target) * aux_prop_mask
                         aux_prop_loss_value = aux_prop_err.abs().sum() / (
@@ -817,6 +841,7 @@ class Zatom(LightningModule):
         """Called at the start of the validation epoch."""
         self.on_evaluation_epoch_start(stage="val")
 
+    @typecheck
     def validation_step(self, batch: Batch, batch_idx: int, dataloader_idx: int) -> None:
         """Perform a single validation step on a batch of data."""
         self.evaluation_step(batch, batch_idx, dataloader_idx, stage="val")
@@ -831,6 +856,7 @@ class Zatom(LightningModule):
         """Called at the start of the test epoch."""
         self.on_evaluation_epoch_start(stage="test")
 
+    @typecheck
     def test_step(self, batch: Batch, batch_idx: int, dataloader_idx: int) -> None:
         """Perform a single test step on a batch of data."""
         self.evaluation_step(batch, batch_idx, dataloader_idx, stage="test")
@@ -903,6 +929,7 @@ class Zatom(LightningModule):
                 add_dataloader_idx=False,
             )
 
+    @typecheck
     def on_evaluation_epoch_end(self, stage: Literal["val", "test"]) -> None:
         """Lightning hook that is called when a validation/test epoch ends."""
 
@@ -969,10 +996,13 @@ class Zatom(LightningModule):
             gen_metrics_dict = generation_evaluators[dataset].get_metrics(
                 save=self.hparams.sampling.visualize,
                 save_dir=save_dir,
-                n_jobs=16,
+                n_jobs=self.hparams.sampling.n_jobs,
             )
             gen_metrics_dict["sampling_time"] = t_end - t_start
-            for k, v in gen_metrics_dict.items():
+
+            # Sort keys to ensure consistent logging order across ranks (to prevent NCCL deadlocks)
+            for k in sorted(gen_metrics_dict.keys()):
+                v = gen_metrics_dict[k]
                 metrics[dataset][k](v)
                 self.log(
                     f"{stage}_{dataset}/{k}",
@@ -1248,6 +1278,7 @@ class Zatom(LightningModule):
         # Finalize model configuration in case this hook is called multiple times
         self.model_configured = True
 
+    @typecheck
     def configure_optimizers(self) -> Dict[str, Any]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
         Normally you'd need one. But in the case of GANs or similar you might have multiple.

@@ -7,13 +7,13 @@ while [ $COUNT -le $MAX_RETRIES ]; do
     echo "[$COUNT/$MAX_RETRIES] Requesting new interactive allocation..."
 
     salloc -C "gpu&hbm80g" \
-           --qos=shared_interactive \
+           --qos=interactive \
            --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
            --module=gpu,nccl-plugin \
            --account=m5008 \
-           --nodes=1 \
-           --gpus-per-node=2 \
-           --ntasks-per-node=2 \
+           --nodes=4 \
+           --gpus-per-node=4 \
+           --ntasks-per-node=4 \
            --time=04:00:00 \
            --job-name=tft-70M-mp20 \
            bash -c "bash scripts/perlmutter/interactive/train_ddp_tft_mp20.sh"

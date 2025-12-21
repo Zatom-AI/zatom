@@ -52,6 +52,7 @@ class MultimodalDiT(nn.Module):
         kwargs: Additional keyword arguments (unused).
     """
 
+    @typecheck
     def __init__(
         self,
         time_embedder: nn.Module,
