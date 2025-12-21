@@ -49,7 +49,10 @@ class AuxiliaryTaskFinetuning(BaseFinetuning):
             if (
                 aux_task in ("global_energy", "atomic_forces")
                 and pl_module.hparams.datasets["omol25"].global_energy is None
+                and pl_module.hparams.datasets["mptrj"].global_energy is None
             ):
+                # NOTE: This does not allow one to finetune on OMol25 for energy/force prediction while
+                # jointly training on MPtrj for other tasks such as generative modeling, and vice versa.
                 continue
             aux_task_modules = list(
                 filter(
@@ -143,7 +146,10 @@ class FlowMatchingAuxiliaryTaskFinetuning(AuxiliaryTaskFinetuning):
             if (
                 aux_task in ("global_energy", "atomic_forces")
                 and pl_module.hparams.datasets["omol25"].global_energy is None
+                and pl_module.hparams.datasets["mptrj"].global_energy is None
             ):
+                # NOTE: This does not allow one to finetune on OMol25 for energy/force prediction while
+                # jointly training on MPtrj for other tasks such as generative modeling, and vice versa.
                 continue
             aux_task_modules = list(
                 filter(

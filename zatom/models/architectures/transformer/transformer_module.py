@@ -229,14 +229,14 @@ class TransformerModule(nn.Module):
                 self.global_energy_cross_attention = decoder_layer()
                 self.atomic_forces_cross_attention = decoder_layer()
 
-            self.charge_proj = ChargeSpinEmbedding(
+            self.global_energy_charge_proj = ChargeSpinEmbedding(
                 embedding_type="pos_emb",
                 embedding_target="charge",
                 embedding_size=hidden_dim,
                 grad=True,
                 scale=1.0,
             )
-            self.spin_proj = ChargeSpinEmbedding(
+            self.global_energy_spin_proj = ChargeSpinEmbedding(
                 embedding_type="pos_emb",
                 embedding_target="spin",
                 embedding_size=hidden_dim,
@@ -553,8 +553,8 @@ class TransformerModule(nn.Module):
                     **attention_kwargs,
                 )
 
-            ce = self.charge_proj(feats["charge"])
-            se = self.spin_proj(feats["spin"])
+            ce = self.global_energy_charge_proj(feats["charge"])
+            se = self.global_energy_spin_proj(feats["spin"])
 
             cse = ce.unsqueeze(-2) + se.unsqueeze(-2)  # (B, 1, C)
 
