@@ -205,9 +205,12 @@ class ModernAttention(nn.Module):
                 pad_mask = torch.zeros((batch_size, 1, 1, seq_len), device=x.device, dtype=q.dtype)
                 pad_mask.masked_fill_(mask_broadcast, float("-inf"))
             else:
-                # Create a (more memory efficient) boolean mask: False where we mask
-                pad_mask = (~mask_broadcast).repeat(
-                    1, self.n_heads, seq_len, 1
+                # Expand mask to shape (B, H, Seq_Len, Seq_Len). Using .expand is more efficient
+                # than .repeat since it doesn't materialize the full mask tensor but broadcasts the
+                # existing tensor by using strides (Seq_Len, 0, 0, 1).
+                # pad_mask is a boolean mask that is False where we mask.
+                pad_mask = (~mask_broadcast).expand(
+                    -1, self.n_heads, seq_len, -1
                 )  # [B, H, Seq_Len, Seq_Len]
 
             # Combine with existing mask
