@@ -3,16 +3,15 @@
 # Options for finetuning:
 # - /model: [zatom]
 # - /model/architecture:
-#         [tft_70M, tft_160M, tft_300M,
-#          mft_80M, mft_180M, mft_500M,
-#          mfp_80M, mfp_180M, mfp_500M]
+#         [tft_80M, tft_160M, tft_300M,
+#          tfp_80M, tfp_160M, tfp_300M]
 # - /logger: [null, wandb]
 # - /trainer: [default, mps, ddp, fsdp]
 
 defaults:
   - override /data: joint
   - override /model: zatom
-  - override /model/architecture: tft_70M
+  - override /model/architecture: tft_80M
   - override /callbacks: default_finetuning
   - override /logger: wandb
   - override /strategy: optimized_ddp

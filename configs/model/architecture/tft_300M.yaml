@@ -17,13 +17,13 @@ multimodal_model:
   add_sinusoid_posenc: true
 
 dataset_embedder:
-  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
+  _target_: zatom.models.architectures.transformer.common.LabelEmbedding
   num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
-  _target_: zatom.models.architectures.dit.layers.LabelEmbedder
+  _target_: zatom.models.architectures.transformer.common.LabelEmbedding
   num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
@@ -128,8 +128,8 @@ angles_radians_interpolant:
     eps: 1e-6
 
 # General architecture parameters
-batch_size_scale_factor: 0.5 # 2, 1, 0.5 -> 70M, 160M, 300M model sizes
-hidden_size: 1024 # 512, 768, 1024 -> 70M, 160M, 300M model sizes
+batch_size_scale_factor: 0.5 # 2, 1, 0.5 -> 80M, 160M, 300M model sizes
+hidden_size: 1024 # 512, 768, 1024 -> 80M, 160M, 300M model sizes
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
 aux_hidden_size: 512 # (fixed) hidden size for auxiliary task layers

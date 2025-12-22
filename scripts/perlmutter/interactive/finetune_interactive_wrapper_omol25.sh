@@ -15,7 +15,7 @@ while [ $COUNT -le $MAX_RETRIES ]; do
            --gpus-per-node=4 \
            --ntasks-per-node=4 \
            --time=04:00:00 \
-           --job-name=finetune-tft-70M-omol25 \
+           --job-name=finetune-tft-80M-omol25 \
            bash -c "bash scripts/perlmutter/interactive/finetune_ddp_tft_omol25.sh"
 
     echo "Job finished or timed out. Restarting..."

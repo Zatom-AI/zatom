@@ -15,7 +15,7 @@ while [ $COUNT -le $MAX_RETRIES ]; do
            --gpus-per-node=2 \
            --ntasks-per-node=2 \
            --time=04:00:00 \
-           --job-name=finetune-tft-70M-qm9-no-noise \
+           --job-name=finetune-tft-80M-qm9-no-noise \
            bash -c "bash scripts/perlmutter/interactive/finetune_ddp_tft_qm9_no_noise.sh"
 
     echo "Job finished or timed out. Restarting..."

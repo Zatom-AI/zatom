@@ -193,7 +193,7 @@ export PROJECT_ROOT=$(pwd)/forks/flowmm
 export PMG_VASP_PSP_DIR=PATH_TO_YOUR_PSEUDOPOTENTIALS
 
 # Change as needed
-eval_dir="$(pwd)/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00"
+eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_80M_MP20_pbzagonf_2025-10-30_10-30-00"
 
 eval_for_dft_samples="$eval_dir/mp20_test_0"
 eval_for_dft_json="$eval_dir/mp20_test_0.json"

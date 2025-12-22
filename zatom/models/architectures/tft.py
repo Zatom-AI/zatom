@@ -55,7 +55,7 @@ class TFT(nn.Module):
         num_layers: Number of transformer layers in the token trunk.
         token_num_heads: Number of (token) attention heads in the token trunk.
         max_num_elements: Maximum number of elements in the dataset.
-        batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 70M) model variant.
+        batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 80M) model variant.
         interdist_loss: Type of interatomic distance loss to use. If None, no interatomic distance loss is used.
         time_distribution: Distribution to sample time points from. Must be one of (`uniform`, `beta`, `histogram`).
         time_alpha_factor: Alpha factor for beta time distribution.
@@ -692,7 +692,7 @@ class TFT(nn.Module):
         return_trajectories: bool = False,
         sdpa_backends: List[SDPBackend] = SDPA_BACKENDS,  # type: ignore
     ) -> Tuple[TensorDict, List[TensorDict]]:
-        """ODE-driven sampling with MFT using classifier-free guidance.
+        """ODE-driven sampling with TFT using classifier-free guidance.
 
         Args:
             batch: A TensorDict containing the input batch data, including:

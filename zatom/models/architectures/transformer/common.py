@@ -51,6 +51,68 @@ class SwiGLUFeedForward(nn.Module):
         return self.w2(x)
 
 
+class LabelEmbedding(nn.Module):
+    """Embedding of class labels into vector representations.
+
+    NOTE: Also handles label dropout for context conditioning.
+
+    Args:
+        num_classes: The number of classes.
+        hidden_size: The dimensionality of the hidden representations.
+        dropout_prob: The dropout probability for context conditioning.
+    """
+
+    @typecheck
+    def __init__(self, num_classes: int, hidden_size: int, dropout_prob: float):
+        super().__init__()
+        self.num_classes = num_classes
+        self.dropout_prob = dropout_prob
+
+        use_cfg_embedding = dropout_prob > 0
+        self.embedding_table = nn.Embedding(num_classes + use_cfg_embedding, hidden_size)
+
+    @typecheck
+    def token_drop(
+        self, labels: torch.Tensor, force_drop_ids: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """Drop labels to enable context conditioning.
+
+        Args:
+            labels: The input labels tensor.
+            force_drop_ids: Optional tensor indicating which labels to drop.
+
+        Returns:
+            The modified labels tensor.
+        """
+        if force_drop_ids is None:
+            drop_ids = torch.rand(labels.shape[0], device=labels.device) < self.dropout_prob
+        else:
+            drop_ids = force_drop_ids == 1
+        labels = torch.where(drop_ids, 0, labels)
+        # NOTE: 0 is the label for the null class
+        return labels
+
+    @typecheck
+    def forward(
+        self, labels: torch.Tensor, train: bool, force_drop_ids: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """Forward pass for label embedding.
+
+        Args:
+            labels: The input labels tensor.
+            train: Whether the model is in training mode.
+            force_drop_ids: Optional tensor indicating which labels to drop.
+
+        Returns:
+            The output embeddings tensor.
+        """
+        use_dropout = self.dropout_prob > 0
+        if (train and use_dropout) or (force_drop_ids is not None):
+            labels = self.token_drop(labels, force_drop_ids)
+        embeddings = self.embedding_table(labels)
+        return embeddings
+
+
 class ChargeSpinEmbedding(nn.Module):
     """Charge or spin embedding module.
 

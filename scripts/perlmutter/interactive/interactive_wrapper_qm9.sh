@@ -15,7 +15,7 @@ while [ $COUNT -le $MAX_RETRIES ]; do
            --gpus-per-node=4 \
            --ntasks-per-node=4 \
            --time=04:00:00 \
-           --job-name=tft-70M-qm9 \
+           --job-name=tft-80M-qm9 \
            bash -c "bash scripts/perlmutter/interactive/train_ddp_tft_qm9.sh"
 
     echo "Job finished or timed out. Restarting..."
