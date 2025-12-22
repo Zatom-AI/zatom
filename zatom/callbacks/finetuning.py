@@ -45,18 +45,20 @@ class AuxiliaryTaskFinetuning(BaseFinetuning):
                 pl_module.hparams.datasets["qm9"].global_property is None
                 and pl_module.hparams.datasets["matbench"].proportion == 0.0
             )
-            global_energy_pretraining = (
-                pl_module.hparams.datasets["omol25"].global_energy is None
-                and pl_module.hparams.datasets["mptrj"].global_energy is None
-            )
             if aux_task == "global_property" and global_property_pretraining:
                 # NOTE: This does not allow one to finetune on Matbench
                 # for any task other than property prediction.
                 continue
-            if aux_task in ("global_energy", "atomic_forces") and global_energy_pretraining:
-                # NOTE: This does not allow one to finetune on OMol25 for energy/force prediction while
-                # jointly training on MPtrj for other tasks such as generative modeling, and vice versa.
-                continue
+            # Check all datasets for global_energy, not just omol25
+            if aux_task in ("global_energy", "atomic_forces"):
+                # Check if any dataset has global_energy enabled
+                has_global_energy = any(
+                    hasattr(pl_module.hparams.datasets[dataset], "global_energy")
+                    and pl_module.hparams.datasets[dataset].global_energy is not None
+                    for dataset in pl_module.hparams.datasets
+                )
+                if not has_global_energy:
+                    continue
             aux_task_modules = list(
                 filter(
                     lambda param: aux_task in param[0].lower(),
@@ -145,18 +147,20 @@ class FlowMatchingAuxiliaryTaskFinetuning(AuxiliaryTaskFinetuning):
                 pl_module.hparams.datasets["qm9"].global_property is None
                 and pl_module.hparams.datasets["matbench"].proportion == 0.0
             )
-            global_energy_pretraining = (
-                pl_module.hparams.datasets["omol25"].global_energy is None
-                and pl_module.hparams.datasets["mptrj"].global_energy is None
-            )
             if aux_task == "global_property" and global_property_pretraining:
                 # NOTE: This does not allow one to finetune on Matbench
                 # for any task other than property prediction.
                 continue
-            if aux_task in ("global_energy", "atomic_forces") and global_energy_pretraining:
-                # NOTE: This does not allow one to finetune on OMol25 for energy/force prediction while
-                # jointly training on MPtrj for other tasks such as generative modeling, and vice versa.
-                continue
+            # Check all datasets for global_energy, not just omol25
+            if aux_task in ("global_energy", "atomic_forces"):
+                # Check if any dataset has global_energy enabled
+                has_global_energy = any(
+                    hasattr(pl_module.hparams.datasets[dataset], "global_energy")
+                    and pl_module.hparams.datasets[dataset].global_energy is not None
+                    for dataset in pl_module.hparams.datasets
+                )
+                if not has_global_energy:
+                    continue
             aux_task_modules = list(
                 filter(
                     lambda param: aux_task in param[0].lower(),

@@ -286,6 +286,7 @@ class Zatom(LightningModule):
         if (
             "qm9" in self.hparams.datasets
             and self.hparams.datasets["qm9"].global_property is not None
+            and "qm9" in val_metrics
         ):
             for target in QM9_TARGETS:
                 if self.hparams.datasets["qm9"].global_property in ("all", target):
@@ -298,6 +299,7 @@ class Zatom(LightningModule):
             if (
                 dataset in self.hparams.datasets
                 and self.hparams.datasets[dataset].global_energy is not None
+                and dataset in val_metrics
             ):
                 val_metrics[dataset]["aux_global_energy_loss_scaled"] = MeanMetric()
                 val_metrics[dataset]["aux_global_energy_per_atom_loss_scaled"] = MeanMetric()
