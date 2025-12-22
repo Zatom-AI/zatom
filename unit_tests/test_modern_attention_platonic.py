@@ -19,22 +19,22 @@ class TestModernAttentionPlatonic(unittest.TestCase):
 
     def test_equivariance_modern_attention_platonic_sdpa_backend(self):
         """Equivariance unit tests for ModernAttentionPlatonic - torch sdpa backend."""
-        self._test_equivariance_modern_attention_platonic(use_sdpa=True, jvp_attn=False)
+        self._test_equivariance_modern_attention_platonic(attn_backend="SDPA")
 
     def test_equivariance_modern_attention_platonic_jvp_backend(self):
         """Equivariance unit tests for ModernAttentionPlatonic - JVPAttn backend."""
-        self._test_equivariance_modern_attention_platonic(use_sdpa=False, jvp_attn=True)
+        self._test_equivariance_modern_attention_platonic(attn_backend="JVP_ATTN")
 
     def test_equivariance_modern_attention_platonic_manual_backend(self):
         """Equivariance unit tests for ModernAttentionPlatonic - manual backend."""
-        self._test_equivariance_modern_attention_platonic(use_sdpa=False, jvp_attn=False)
+        self._test_equivariance_modern_attention_platonic(attn_backend="MANUAL")
 
-    def _test_equivariance_modern_attention_platonic(self, use_sdpa, jvp_attn):
+    def _test_equivariance_modern_attention_platonic(self, attn_backend):
         """Equivariance unit tests for ModernAttentionPlatonic."""
 
         c_in, c_out = 12, 24
-        c_qk = c_val = 32  # JVPAttn backend requires equal c_qk = c_val, power of 2 and >=32
-        NQ = NKV = 32  # JVPAttn backend has high error if NQ,NKV are not powers of 2
+        c_qk = c_val = 32  # JVP_ATTN backend requires equal c_qk = c_val, power of 2 and >=32
+        NQ = NKV = 32  # JVP_ATTN backend has high error if NQ,NKV are not powers of 2
         B, H = 2, 4
         device = "cuda" if torch.cuda.is_available() else "cpu"
         dtype = torch.float32
@@ -69,7 +69,7 @@ class TestModernAttentionPlatonic(unittest.TestCase):
             # Loop over grid of all setting combinations that change the logic
             settings_loop = list(
                 itertools.product(
-                    (1, None),  # freq_sigma_platonic
+                    (1.234, None),  # freq_sigma_platonic
                     (False, True),  # linear_attention
                     (False, True),  # use_key
                     (False, True),  # use_qk_norm
@@ -103,8 +103,7 @@ class TestModernAttentionPlatonic(unittest.TestCase):
                     context_length=ctx_len,
                     sequence_rope_base=seq_rope_base,
                     use_qk_norm=use_qk_norm,
-                    use_sdpa=use_sdpa,
-                    jvp_attn=jvp_attn,
+                    attn_backend=attn_backend,
                 ).to(device, dtype)
 
                 # Loop over grid of all valid input tensor combinations
@@ -131,7 +130,7 @@ class TestModernAttentionPlatonic(unittest.TestCase):
 
                             setting_str = (
                                 f"  G:                 {solid_name}\n"
-                                + f"  use_sdpa,jvp_attn: {use_sdpa},{jvp_attn}\n"
+                                + f"  attn_backend:      {attn_backend}\n"
                                 + f"  freq_sigma:        {freq_sigma_platonic}\n"
                                 + f"  linear_attention:  {linear_attention}\n"
                                 + f"  use_key:           {use_key}\n"

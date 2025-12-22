@@ -3,7 +3,7 @@ Adapted from https://github.com/niazoys/PlatonicTransformers.
 """
 
 import math
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 import torch.nn as nn
@@ -18,6 +18,11 @@ from zatom.models.architectures.transformer.positional_encoder import (
     RotaryPositionalEmbeddings as SequenceRoPE,
 )
 from zatom.utils.typing_utils import typecheck
+
+
+def IS_POWER_OF_2(N: int) -> bool:
+    """Helper to check whether int N is a positive power of 2."""
+    return N > 0 and (N & (N - 1)) == 0
 
 
 class ModernAttentionPlatonic(nn.Module):
@@ -48,8 +53,7 @@ class ModernAttentionPlatonic(nn.Module):
         context_length:         Maximum context length for sequence axis RoPE.
         sequence_rope_base:     Base frequency for sequence axis RoPE.
         use_qk_norm:            Whether to apply RMS normalization to queries and keys.
-        use_sdpa:               Whether to use PyTorch's scaled dot-product attention backend.
-        jvp_attn:               Whether to use JVP-compatible attention backend.
+        attn_backend:           Softmax attention backend. One of "SDPA", "JVP_ATTN" or "MANUAL".
     """
 
     @typecheck
@@ -62,7 +66,7 @@ class ModernAttentionPlatonic(nn.Module):
         n_heads: int,
         ### Platonic attention specific args
         solid_name: str,
-        freq_sigma_platonic: float = 1.0,
+        freq_sigma_platonic: float,
         freq_init_platonic: str = "random",
         learned_freqs_platonic: bool = True,
         bias: bool = False,
@@ -73,8 +77,7 @@ class ModernAttentionPlatonic(nn.Module):
         context_length: Optional[int] = 2048,
         sequence_rope_base: Optional[int] = 10_000,
         use_qk_norm: bool = True,
-        use_sdpa: bool = True,
-        jvp_attn: bool = False,
+        attn_backend: Literal["SDPA", "JVP_ATTN", "MANUAL"] = "SDPA",
     ):
         super().__init__()
 
@@ -90,15 +93,18 @@ class ModernAttentionPlatonic(nn.Module):
         self.linear_attention = linear_attention
         self.use_key = use_key
         self.use_qk_norm = use_qk_norm
-        self.use_sdpa = use_sdpa
-        self.jvp_attn = jvp_attn
-        assert not (jvp_attn and use_sdpa), "Either jvp_attn or use_sdpa can be True, not both."
+        self.attn_backend = attn_backend
+        assert attn_backend in (
+            "SDPA",
+            "JVP_ATTN",
+            "MANUAL",
+        ), f"Unknown attn_backend '{attn_backend}', should be one of 'SDPA', 'JVP_ATTN', 'MANUAL'"
 
         # Platonic linear projectors
         self.q_proj = PlatonicLinear(G * c_in, G * H * c_qk, solid_name, bias=bias)
         self.v_proj = PlatonicLinear(G * c_in, G * H * c_val, solid_name, bias=bias)
         self.o_proj = PlatonicLinear(G * H * c_val, G * c_out, solid_name, bias=bias)
-        # key-projection is optional in Platonic transformers
+        # key-projection is optional in Platonic transformers (it might be replaced with torch.ones)
         if freq_sigma_platonic is None or use_key:
             self.k_proj = PlatonicLinear(G * c_in, G * H * c_qk, solid_name, bias=bias)
         else:
@@ -158,7 +164,7 @@ class ModernAttentionPlatonic(nn.Module):
                            For cross-attention. If None, set to coords_Q.
             sequence_idxs: Sequence index tensor for sequence RoPE,                 [B, NQ]
                            Valid only for self-attention and if SequenceRope!=None.
-            padding_mask:  Boolean mask for padding tokens (True means ignore)      [B, NKV]
+            padding_mask:  Boolean mask for padding tokens (True means ignore !!!)  [B, NKV]
             attn_mask:     Attention mask (False or -inf indicates masked entries)  [B, H, NQ, NKV]
             avg_num_nodes: Used to normalize the dynamic convolution kernel if
                            linear_attention is True and no padding mask is passed.
@@ -221,24 +227,30 @@ class ModernAttentionPlatonic(nn.Module):
             padding_mask = ~padding_mask[:, None, None, :]  # (B, 1, 1, NKV)
 
             if attn_mask is None:
-                # .expand leads to shape (B,H,NQ,NKV) but keeps the underlying data tensor with
-                # stride (NKV,0,0,1). This is required since attention kernels don't broadcast
-                # automatically. It is more memory efficient than using e.g. .repeat, which
-                # materializes the tensor explicitly, leading to infeasible O(N^2) memory IO in
-                # the attention kernel.
-                # Note: expansion needs to be done before logical negation ~.
-                final_mask = padding_mask.expand(B, H, NQ, NKV)
+                final_mask = padding_mask
 
             elif attn_mask.is_floating_point():
                 # Create a float mask: 0.0 where we keep, -inf where we mask
                 padding_mask_float = torch.zeros((B, 1, 1, NKV), device=device, dtype=dtype)
                 padding_mask_float.masked_fill_(~padding_mask, float("-inf"))
                 final_mask = attn_mask + padding_mask_float
-                final_mask = final_mask.expand(B, H, NQ, NKV)
 
             else:  # boolean attention mask
                 final_mask = attn_mask & padding_mask
-                final_mask = final_mask.expand(B, H, NQ, NKV)
+
+            # .expand leads to shape (B,H,NQ,NKV) but keeps the underlying data tensor with
+            # stride (NKV,0,0,1). This is required since attention kernels don't broadcast
+            # automatically. It is more memory efficient than using e.g. .repeat, which
+            # materializes the tensor explicitly, leading to infeasible O(N^2) memory IO in
+            # the attention kernel.
+            # Note: expansion needs to be done after logical negation ~ to avoid materialization!
+            final_mask = final_mask.expand(B, H, NQ, NKV)
+
+        elif attn_mask is not None:
+            final_mask = attn_mask  # (B, H, NQ, NKV)
+
+        else:
+            final_mask = None
 
         ### Softmax attention
         if not self.linear_attention:
@@ -246,27 +258,41 @@ class ModernAttentionPlatonic(nn.Module):
             k = k.transpose(1, 2)  # (B, G*H, NKV, c_qk)
             v = v.transpose(1, 2)  # (B, G*H, NKV, c_val)
 
-            # Expand mask over group axis.
-            # If the stride of the heads axis is zero, reshape is a view and the G*H has stride zero
-            # as well, which makes the implementation memory IO efficient.
-            if attn_mask is not None:
-                attn_mask = attn_mask.unsqueeze(1).expand(B, G, H, NQ, NKV)
-                attn_mask = attn_mask.reshape(B, G * H, NQ, NKV)
+            # Expand final_mask for broadcasting over group elements.
+            # If the stride of the H axis is zero (expanded padding_mask), reshape is a view and the
+            # G*H axis has stride zero as well, which makes the implementation memory IO efficient.
+            if final_mask is not None:
+                final_mask = final_mask.unsqueeze(1).expand(B, G, H, NQ, NKV)
+                final_mask = final_mask.reshape(B, G * H, NQ, NKV)
+                # Sanity check:  efficient strides for pure padding_mask
+                if attn_mask is None:
+                    assert final_mask.stride() == (NKV, 0, 0, 1)
 
-            if self.use_sdpa:
+            if self.attn_backend == "SDPA":
                 # Use PyTorch's optimized scaled dot-product attention (SDPA)
-                output = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
-            elif self.jvp_attn:
-                output = JVPAttn.fwd_dual(q, k, v, attn_mask=attn_mask)
-            else:
+                output = F.scaled_dot_product_attention(q, k, v, attn_mask=final_mask)
+
+            elif self.attn_backend == "JVP_ATTN":
+                assert IS_POWER_OF_2(NQ) and IS_POWER_OF_2(
+                    NKV
+                ), "'JVP_ATTN' backend currently requires NQ and NKV to be powers of 2"
+                assert (
+                    self.c_qk == self.c_val
+                ), "'JVP_ATTN' backend currently requires c_qk == c_val"
+                output = JVPAttn.fwd_dual(q, k, v, attn_mask=final_mask)
+
+            elif self.attn_backend == "MANUAL":
                 # Use manual implementation for comparison or environments where SDPA is not available
                 scores = torch.matmul(q, k.transpose(-1, -2)) / math.sqrt(self.c_qk)
-                if attn_mask is not None and attn_mask.is_floating_point():
-                    scores = scores + attn_mask
-                elif attn_mask is not None:
-                    scores = scores.masked_fill(~attn_mask, float("-inf"))
+                if final_mask is not None and final_mask.is_floating_point():
+                    scores = scores + final_mask
+                elif final_mask is not None:
+                    scores = scores.masked_fill(~final_mask, float("-inf"))
                 scores = F.softmax(scores.float(), dim=-1).type_as(q)
                 output = torch.matmul(scores, v)
+
+            else:
+                raise ValueError(f"Unknown attn_backend '{self.attn_backend}'")
 
             output = output.transpose(1, 2).flatten(-2, -1)  # (B, NQ, G*H*c_val)
 
@@ -276,21 +302,22 @@ class ModernAttentionPlatonic(nn.Module):
             k = k.view(B, NKV, G, H, self.c_qk)
             v = v.view(B, NKV, G, H, self.c_val)
 
-            if attn_mask is not None:
+            if final_mask is not None:
                 assert (
-                    not attn_mask.is_floating_point()
-                ), "attn_mask needs to be boolean if linear_attention is True"
-                assert (attn_mask.size(2) == 1) or (
-                    attn_mask.stride(2) == 0
+                    not final_mask.is_floating_point()
+                ), "final_mask needs to be boolean if linear_attention is True"
+                assert (final_mask.size(2) == 1) or (
+                    final_mask.stride(2) == 0
                 ), "Linear attention currently doesn't support query-dependent masking"
 
-                attn_mask = attn_mask[:, :, 0, :].transpose(1, 2)  # (B, NKV, H)
-                v = v * attn_mask[:, :, None, :, None]
-                k = k * attn_mask[:, :, None, :, None]
+                final_mask = final_mask[:, :, 0, :].transpose(1, 2)  # (B, NKV, H)
+                k = k * final_mask[:, :, None, :, None]  # (B, NKV, G, H, c_qk)
+                v = v * final_mask[:, :, None, :, None]  # (B, NKV, G, H, c_val)
 
             kv_conv_kernel = torch.einsum("bnghc,bnghd->bghcd", k, v)
 
             if self.mean_aggregation and padding_mask is not None:
+                # Note: inverted ~padding_mask above
                 num_nodes = padding_mask.sum(dim=(1, 2, 3)).float().view(B, 1, 1, 1, 1)
                 assert torch.all(num_nodes > 0)
             else:
