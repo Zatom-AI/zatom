@@ -13,8 +13,6 @@ from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies.strategy import Strategy
 from omegaconf import DictConfig, open_dict
 
-from zatom.models.architectures.transformer import common
-
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -38,6 +36,7 @@ from zatom import (
     resolve_omegaconf_variable,
     set_omegaconf_flag_recursive,
 )
+from zatom.models.architectures.transformer import common
 from zatom.utils import (
     RankedLogger,
     extras,
