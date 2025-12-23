@@ -51,8 +51,8 @@ class SwiGLUFeedForward(nn.Module):
         return self.w2(x)
 
 
-class LabelEmbedding(nn.Module):
-    """Embedding of class labels into vector representations.
+class LabelEmbedder(nn.Module):
+    """Embedder of class labels into vector representations.
 
     NOTE: Also handles label dropout for context conditioning.
 

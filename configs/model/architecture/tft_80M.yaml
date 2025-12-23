@@ -17,13 +17,13 @@ multimodal_model:
   add_sinusoid_posenc: true
 
 dataset_embedder:
-  _target_: zatom.models.architectures.transformer.common.LabelEmbedding
+  _target_: zatom.models.architectures.transformer.common.LabelEmbedder
   num_classes: ${globals.num_dataset_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
 
 spacegroup_embedder:
-  _target_: zatom.models.architectures.transformer.common.LabelEmbedding
+  _target_: zatom.models.architectures.transformer.common.LabelEmbedder
   num_classes: ${globals.num_spacegroup_classes}
   hidden_size: ${model.architecture.hidden_size}
   dropout_prob: 0.1
