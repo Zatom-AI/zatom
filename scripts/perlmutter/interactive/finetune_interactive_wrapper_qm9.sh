@@ -12,8 +12,8 @@ while [ $COUNT -le $MAX_RETRIES ]; do
            --module=gpu,nccl-plugin \
            --account=m5008 \
            --nodes=1 \
-           --gpus-per-node=2 \
-           --ntasks-per-node=2 \
+           --gpus-per-node=1 \
+           --ntasks-per-node=1 \
            --time=04:00:00 \
            --job-name=finetune-tft-80M-qm9 \
            bash -c "bash scripts/perlmutter/interactive/finetune_ddp_tft_qm9.sh"
