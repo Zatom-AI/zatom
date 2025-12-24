@@ -1,13 +1,13 @@
 #!/bin/bash -l
 
 # salloc -C "gpu&hbm80g" \
-#        --qos=interactive \
+#        --qos=shared_interactive \
 #        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
 #        --module=gpu,nccl-plugin \
 #        --account=m5008 \
-#        --nodes=4 \
-#        --gpus-per-node=4 \
-#        --ntasks-per-node=4 \
+#        --nodes=1 \
+#        --gpus-per-node=1 \
+#        --ntasks-per-node=1 \
 #        --time=04:00:00 \
 #        --job-name=tft-80M-joint-geom
 
@@ -73,7 +73,7 @@ bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
-    callbacks.model_checkpoint.filename="'model-epoch@{epoch}-step@{step}-val_geom_valid_rate@{val_geom/valid_rate:.4f}-val_mp20_valid_rate@{val_mp20/valid_rate:.4f}'" \
+    callbacks.model_checkpoint.filename=\"model-epoch@{epoch}-step@{step}-val_geom_valid_rate@{val_geom/valid_rate:.4f}-val_mp20_valid_rate@{val_mp20/valid_rate:.4f}\" \
     ckpt_path=$CKPT_PATH \
     data=$DATASET \
     data.datamodule.batch_size.train=64 \
