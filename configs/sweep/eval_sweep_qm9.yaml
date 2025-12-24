@@ -49,6 +49,9 @@ parameters:
   seed:
     value: 42
 
+  tags:
+    value: ["qm9", "fm", "eval", "sweep"]
+
 command:
   - ${env}
   - HYDRA_FULL_ERROR=1

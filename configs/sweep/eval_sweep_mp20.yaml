@@ -35,7 +35,13 @@ parameters:
     value: 10000
 
   model.architecture.frac_coords_interpolant.white_noise_sampling_scale:
-    values: [0.01, 0.1, 1.0]
+    values: [0.01, 0.1]
+
+  model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale:
+    values: [0.01, 0.1]
+
+  model.architecture.angles_radians_interpolant.white_noise_sampling_scale:
+    values: [0.01, 0.1]
 
   model.sampling.steps:
     values: [50, 100, 200]
@@ -44,10 +50,13 @@ parameters:
     values: [0.0, 1.0, 2.0]
 
   name:
-    value: "eval_${hydra:runtime.choices.model/architecture}_noise-${model.architecture.frac_coords_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_cfg-${model.sampling.cfg_scale}_mp20"
+    value: "eval_${hydra:runtime.choices.model/architecture}_fc-noise-${model.architecture.frac_coords_interpolant.white_noise_sampling_scale}_ls-noise-${model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale}_ar-noise-${model.architecture.angles_radians_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_cfg-${model.sampling.cfg_scale}_mp20"
 
   seed:
     value: 42
+
+  tags:
+    value: ["mp20", "fm", "eval", "sweep"]
 
 command:
   - ${env}

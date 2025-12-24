@@ -9,7 +9,7 @@
 #SBATCH --nodes=1                                             # NOTE: this needs to match Lightning's `Trainer(num_nodes=...)`
 #SBATCH --gpus-per-node=1                                     # request A100 GPU resource(s)
 #SBATCH --ntasks-per-node=1                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
-#SBATCH --time=00-03:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
+#SBATCH --time=00-02:30:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
 #SBATCH --job-name=eval-sweep-qm9                             # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/eval_sweep_qm9%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/eval_sweep_qm9%j.err   # error log file

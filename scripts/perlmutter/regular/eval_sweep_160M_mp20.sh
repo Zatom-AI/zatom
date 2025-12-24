@@ -13,7 +13,7 @@
 #SBATCH --job-name=eval-sweep-160M-mp20                       # job name
 #SBATCH --output=scripts/perlmutter/regular/logs/eval_sweep_160M_mp20%j.out  # output log file
 #SBATCH --error=scripts/perlmutter/regular/logs/eval_sweep_160M_mp20%j.err   # error log file
-#SBATCH --array=0-8                                           # create an array of jobs for the sweep (0-11 or 12 total for finetuning and 0-8 or 9 total for generative evaluation)
+#SBATCH --array=0-71                                          # create an array of jobs for the sweep (0-11 or 12 total for finetuning and 0-71 or 72 total for generative evaluation)
 
 # Wait for 5-10 seconds randomly to avoid race condition
 sleep $((RANDOM % 6 + 5))
