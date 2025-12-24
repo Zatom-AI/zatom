@@ -76,9 +76,9 @@ bash -c "
     callbacks.model_checkpoint.filename='\"model-epoch@{epoch}-step@{step}-val_geom_valid_rate@{val_geom/valid_rate:.4f}-val_mp20_valid_rate@{val_mp20/valid_rate:.4f}\"' \
     ckpt_path=$CKPT_PATH \
     data=$DATASET \
-    data.datamodule.batch_size.train=48 \
-    data.datamodule.batch_size.val=48 \
-    data.datamodule.batch_size.test=48 \
+    data.datamodule.batch_size.train=32 \
+    data.datamodule.batch_size.val=32 \
+    data.datamodule.batch_size.test=32 \
     data.datamodule.datasets.geom.proportion=1.0 \
     data.datamodule.datasets.qm9.proportion=0.0 \
     date=$RUN_DATE \
