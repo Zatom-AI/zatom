@@ -42,8 +42,8 @@ class TestPlatonicAPE(unittest.TestCase):
         """
 
         group = get_platonic_group(solid_name)
-        num_G = group.G
-        embed_dim = 16 * num_G  # divisible by num_G
+        G = group.G
+        c_embed = 16
         B, N = 2, 4
         class_name = PlatonicAPEClass.__name__
         # print(f"testing {class_name}, G={solid_name}               ", end="\r")
@@ -55,7 +55,7 @@ class TestPlatonicAPE(unittest.TestCase):
             PlatonicAPEClass = partial(PlatonicAPEClass, freq_sigma=4.2)
 
         pos_embedder = PlatonicAPEClass(
-            embed_dim=embed_dim,
+            c_embed=c_embed,
             solid_name=solid_name,
             spatial_dims=group.dim,
         )
@@ -63,7 +63,7 @@ class TestPlatonicAPE(unittest.TestCase):
         all_tests_passed = True
         embedding_orig = pos_embedder(pos)
 
-        for g in range(num_G):
+        for g in range(G):
             g_indices = group.cayley_table[g, :]
             g_element = group.elements[g].to(pos.dtype)
 
@@ -74,9 +74,9 @@ class TestPlatonicAPE(unittest.TestCase):
             embedding_ape_g = pos_embedder(pos_transformed)
 
             # Compute g.APE(pos)
-            embedding_g_ape = embedding_orig.view(B, N, num_G, embed_dim // num_G)
+            embedding_g_ape = embedding_orig.view(B, N, G, c_embed)
             embedding_g_ape = embedding_g_ape[:, :, g_indices, :]
-            embedding_g_ape = embedding_g_ape.reshape(B, N, embed_dim)
+            embedding_g_ape = embedding_g_ape.reshape(B, N, G * c_embed)
 
             self.assertTrue(
                 torch.allclose(embedding_ape_g, embedding_g_ape, atol=1e-5),

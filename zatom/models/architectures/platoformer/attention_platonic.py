@@ -68,7 +68,7 @@ class ModernAttentionPlatonic(nn.Module):
         c_val: int,  # per group element and head
         n_heads: int,
         ### Platonic attention specific args
-        solid_name: str,
+        solid_name: str,  # in PLATONIC_GROUPS_3D
         freq_sigma_platonic: float,
         freq_init_platonic: str = "random",
         learned_freqs_platonic: bool = True,
