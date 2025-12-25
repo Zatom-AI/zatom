@@ -955,7 +955,8 @@ class Zatom(LightningModule):
                     spacegroups_bincount=self.spacegroups_bincount[dataset],
                     batch_size=self.hparams.sampling.batch_size,
                     cfg_scale=self.hparams.sampling.cfg_scale,
-                    dataset_idx=self.dataset_to_index.get(dataset, -1),
+                    dataset_index=self.dataset_to_index.get(dataset, -1),
+                    dataset_idx=self.dataset_to_idx.get(dataset, -1),
                     steps=self.hparams.sampling.get("steps", 100),
                 )
                 # Save predictions for metrics and visualisation
@@ -1073,6 +1074,7 @@ class Zatom(LightningModule):
         spacegroups_bincount: torch.Tensor | None,
         batch_size: int,
         cfg_scale: float = 0.0,
+        dataset_index: int = 0,
         dataset_idx: int = 0,
         steps: int = 100,
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
@@ -1082,13 +1084,15 @@ class Zatom(LightningModule):
             num_nodes_bincount: A tensor containing the number of nodes for each crystal structure.
             spacegroups_bincount: A tensor containing the space group information for each crystal structure.
             batch_size: The number of crystal structures to sample.
-            dataset_idx: The index of the dataset to sample from.
+            cfg_scale: The classifier-free guidance (CFG) scale to use for sampling.
+            dataset_index: The ID index of the dataset to sample from.
+            dataset_idx: The type index (0=Periodic, 1=Non-Periodic) of the dataset to sample from.
             steps: The number of ODE steps to use for sampling. Only applicable if using flow matching-based sampling.
 
         Returns:
             A tuple containing the sampled modalities and the original batch.
         """
-        sample_is_periodic = torch.isin(dataset_idx, self.periodic_datasets)
+        sample_is_periodic = torch.isin(dataset_index, self.periodic_datasets)
 
         # Sample random lengths from distribution: (B, 1)
         sample_lengths = torch.multinomial(
