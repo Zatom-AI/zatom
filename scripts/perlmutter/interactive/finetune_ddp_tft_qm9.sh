@@ -28,8 +28,8 @@ mkdir -p "$HF_HOME"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="oevlmybs"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-12-22_18-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="xhmf0kdl"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-12-24_18-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
 DEFAULT_ARCHITECTURE="tft_80M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,tfp}_80M`, `{tft,tfp}_160M`, `{tft,tfp}_300M`)
@@ -42,7 +42,7 @@ EXPERIMENT=${5:-$DEFAULT_EXPERIMENT}      # Fifth argument or default experiment
 ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architecture if not provided
 
 TASK_NAME="finetune_fm"                                                            # Name of the task to perform
-RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_qm9_matbench_U0"       # Name of the model type and dataset configuration
+RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_qm9_matbench_mu"       # Name of the model type and dataset configuration
 
 PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_model-zatom_arch-tft_80M_joint_2025-12-15_20-00-00/checkpoints/model-epoch@1399-step@43400-val_qm9_valid_rate@0.9471-val_mp20_valid_rate@0.9003.ckpt"  # Path at which to find (initial) pretrained model checkpoint
 CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
@@ -82,7 +82,7 @@ bash -c "
     data.datamodule.batch_size.val=256 \
     data.datamodule.batch_size.test=256 \
     data.datamodule.datasets.qm9.proportion=1.0 \
-    data.datamodule.datasets.qm9.global_property=U0 \
+    data.datamodule.datasets.qm9.global_property=mu \
     data.datamodule.datasets.matbench.proportion=0.0 \
     data.datamodule.datasets.matbench.global_property=matbench_mp_gap \
     date=$RUN_DATE \
