@@ -198,7 +198,7 @@ class Zatom(LightningModule):
             and self.hparams.datasets["qm9"].global_property is not None
         ):
             for target in QM9_TARGETS:
-                if self.hparams.datasets["qm9"].global_property in ("all", target):
+                if target in self.hparams.datasets["qm9"].global_property:
                     self.train_metrics[f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
         for dataset in ("omol25", "mptrj"):
             if (
@@ -289,7 +289,7 @@ class Zatom(LightningModule):
             ):
                 # NOTE: QM9's `global_property` flag indicates how to modify the model architecture
                 for target in QM9_TARGETS:
-                    if self.hparams.datasets["qm9"].global_property in ("all", target):
+                    if target in self.hparams.datasets["qm9"].global_property:
                         val_metrics[dataset][
                             f"aux_global_property_loss_{target}_scaled"
                         ] = MeanMetric()
@@ -541,7 +541,7 @@ class Zatom(LightningModule):
             and self.hparams.datasets["qm9"].global_property is not None
         ):
             for name, idx in QM9_TARGET_NAME_TO_IDX.items():
-                if self.hparams.datasets["qm9"].global_property in ("all", name):
+                if name in self.hparams.datasets["qm9"].global_property:
                     if is_qm9_dataset.any() or is_matbench_dataset.any():
                         aux_prop_scale = torch.ones_like(pred_aux_global_property[:, idx])
                         aux_prop_shift = torch.zeros_like(pred_aux_global_property[:, idx])
