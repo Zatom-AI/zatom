@@ -6,7 +6,7 @@ program: zatom/train_fm.py
 method: grid
 
 metric: # Does not matter, as we are using sweep to run the experiment.
-  goal: maximize
+  goal: minimize
   name: val_qm9/aux_global_property_loss
 
 parameters:
