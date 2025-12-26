@@ -212,6 +212,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         ### Modern attention specific args
         context_length: Optional[int] = 2048,
         sequence_rope_base: Optional[int] = 10_000,
+        use_sequence_rope_cross: bool = False,
         qk_layernorm: bool = True,
         qk_norm_per_g: bool = True,  # TODO: test what works best here
         attn_backend: Literal["SDPA", "JVP_ATTN", "MANUAL"] = "SDPA",
@@ -221,6 +222,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
     ):
         super().__init__()
 
+        self.use_sequence_rope_cross = use_sequence_rope_cross
         attn_kwargs = SimpleNamespace(
             c_in=c_model,
             c_out=c_model,
@@ -246,8 +248,8 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         )
         self.attn_cross = ModernAttentionPlatonic(
             **vars(attn_kwargs),
-            context_length=None,  # sequence RoPE deactivated for cross-attention
-            sequence_rope_base=None,  # sequence RoPE deactivated for cross-attention
+            context_length=context_length if use_sequence_rope_cross else None,
+            sequence_rope_base=sequence_rope_base if use_sequence_rope_cross else None,
         )
 
         self.feed_forward = SwiGLUFeedForwardPlatonic(
@@ -276,7 +278,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         memory: torch.Tensor,
         coords_feat: torch.Tensor,
         coords_mem: torch.Tensor,
-        sequence_idxs_feat: Optional[torch.Tensor] = None,
+        sequence_idxs: Optional[torch.Tensor] = None,
         padding_mask_feat: Optional[torch.Tensor] = None,
         padding_mask_mem: Optional[torch.Tensor] = None,
         attn_mask_self: Optional[torch.Tensor] = None,
@@ -291,7 +293,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
             memory:              Input feature tensor                                [B, M, c_model]
             coords_feat:         Euclidean coordinates tensor                        [B, N, 3]
             coords_mem:          Euclidean coordinates tensor                        [B, M, 3]
-            sequence_idxs_feat:  Position ids for rotary embeddings                  [B, N]
+            sequence_idxs:       Sequence indices for sequence index RoPe            [B, N]
             padding_mask_feat:   Boolean mask for padding tokens (True => masked)    [B, N]
             padding_mask_mem:    Boolean mask for padding tokens (True => masked)    [B, M]
             attn_mask_self:      Attention mask (False/-inf => masked)               [B, H, N, N]
@@ -309,7 +311,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         h = self.attn_self(
             feat_Q=h,  # used at feat_KV as well
             coords_Q=coords_feat,  # used as coords_KV as well
-            sequence_idxs=sequence_idxs_feat,
+            sequence_idxs=sequence_idxs,
             padding_mask=padding_mask_feat,
             attn_mask=attn_mask_self,
             avg_num_nodes=avg_num_nodes_self,
@@ -323,6 +325,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
             feat_KV=memory,
             coords_Q=coords_feat,
             coords_KV=coords_mem,
+            sequence_idxs=sequence_idxs if self.use_sequence_rope_cross else None,
             padding_mask=padding_mask_mem,
             attn_mask=attn_mask_cross,
             avg_num_nodes=avg_num_nodes_cross,

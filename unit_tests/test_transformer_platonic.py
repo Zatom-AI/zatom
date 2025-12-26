@@ -117,7 +117,7 @@ class TestModernTransformerDecoderBlockPlatonic(unittest.TestCase):
             )
             attn_mask_self = torch.randn((B, H, N, N), device=device, dtype=dtype) < 1.25
             attn_mask_cross = torch.randn((B, H, N, M), device=device, dtype=dtype) < 1.25
-            sequence_idxs_feat = torch.arange(N, device=device).repeat(B, 1)  # (B, N)
+            sequence_idxs = torch.arange(N, device=device).repeat(B, 1)  # (B, N)
 
             block = ModernTransformerDecoderBlockPlatonic(
                 c_model=c_model,
@@ -134,7 +134,7 @@ class TestModernTransformerDecoderBlockPlatonic(unittest.TestCase):
                 memory=memory,
                 coords_feat=coords_feat,
                 coords_mem=coords_mem,
-                sequence_idxs_feat=sequence_idxs_feat,
+                sequence_idxs=sequence_idxs,
                 padding_mask_feat=padding_mask_feat,
                 padding_mask_mem=padding_mask_mem,
                 attn_mask_self=attn_mask_self,
@@ -156,7 +156,7 @@ class TestModernTransformerDecoderBlockPlatonic(unittest.TestCase):
                     memory=g_memory,
                     coords_feat=g_coords_feat,
                     coords_mem=g_coords_mem,
-                    sequence_idxs_feat=sequence_idxs_feat,
+                    sequence_idxs=sequence_idxs,
                     padding_mask_feat=padding_mask_feat,
                     padding_mask_mem=padding_mask_mem,
                     attn_mask_self=attn_mask_self,

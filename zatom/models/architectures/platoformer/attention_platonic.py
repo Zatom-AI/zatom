@@ -217,6 +217,9 @@ class ModernAttentionPlatonic(nn.Module):
 
         # Apply sequence RoPE
         if self.sequence_rope is not None:
+            assert NQ == NKV and torch.allclose(
+                coords_Q, coords_KV
+            ), "sequence_rope is only valid for query/key sequences with corresponding indices."
             q = self.sequence_rope(q, input_pos=sequence_idxs)
             k = self.sequence_rope(k, input_pos=sequence_idxs)
 
