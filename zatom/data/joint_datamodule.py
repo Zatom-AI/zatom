@@ -242,8 +242,8 @@ class JointDataModule(LightningDataModule):
                 float("nan"),
             )
             log.info(
-                f"QM9 target properties set to '{qm9_target_names}' (indices {qm9_target_idx})"
-                f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean(dim=0)} and std {qm9_dataset.data.y[:, qm9_target_idx].std(dim=0)}."
+                f"QM9 target properties set to '{qm9_target_names}' (indices {qm9_target_idx.tolist()})"
+                f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean(dim=0).tolist()} and std {qm9_dataset.data.y[:, qm9_target_idx].std(dim=0).tolist()}."
             )
             # Create property prediction train/val/test splits (n.b., same as Platonic Transformer)
             qm9_random_state = np.random.RandomState(seed=42)
