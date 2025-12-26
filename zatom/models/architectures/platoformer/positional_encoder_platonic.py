@@ -59,9 +59,13 @@ class PlatonicSinusoidAPE(PositionalEncoding):
         assert coords.size(-1) == self.spatial_dims
         return self.platonic_sinusoid_ape(coords)
 
-    @typecheck
     def out_dim(self) -> int:
-        return self.embed_dim
+        """Embedding dimension produced by this encoder.
+
+        Returns:
+            Integer representing the output dimension.
+        """
+        return self.group.G * self.c_embed
 
 
 class PlatonicLinearAPE(PositionalEncoding):

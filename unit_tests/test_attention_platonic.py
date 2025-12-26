@@ -111,18 +111,28 @@ class TestModernAttentionPlatonic(unittest.TestCase):
                     for use_padding_mask in (False, True):
                         for cross_attn in (False, True):
 
-                            if cross_attn:
-                                if use_sequence_rope:
-                                    continue  # SequenceRope is for self-attn
-                                feat_KV_ = feat_KV
-                                coords_KV_ = coords_KV
-                                padding_mask_KV_ = padding_mask_KV if use_padding_mask else None
-                                attn_mask = attn_mask_cross if use_attn_mask else None
-                            else:  # self-attention
+                            # Self attention
+                            if not cross_attn:
                                 feat_KV_ = None
                                 coords_KV_ = None
                                 padding_mask_KV_ = padding_mask_Q if use_padding_mask else None
                                 attn_mask = attn_mask_self if use_attn_mask else None
+                            # Cross-attention
+                            else:
+                                # No sequence RoPE, can use arbitrary KV features
+                                if not use_sequence_rope:
+                                    feat_KV_ = feat_KV
+                                    coords_KV_ = coords_KV
+                                    padding_mask_KV_ = (
+                                        padding_mask_KV if use_padding_mask else None
+                                    )
+                                    attn_mask = attn_mask_cross if use_attn_mask else None
+                                # For sequence RoPE, KV features need to come from the same sequence
+                                else:
+                                    feat_KV_ = torch.randn_like(feat_Q)
+                                    coords_KV_ = torch.randn_like(coords_Q)
+                                    padding_mask_KV_ = padding_mask_Q if use_padding_mask else None
+                                    attn_mask = attn_mask_self if use_attn_mask else None
 
                             # Linear Platonic attn implementation requires query-independent mask
                             if linear_attention and use_attn_mask:

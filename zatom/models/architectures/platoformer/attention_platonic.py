@@ -170,7 +170,9 @@ class ModernAttentionPlatonic(nn.Module):
             coords_KV:     Key/value Euclidean coords for Platonic RoPE (optional), [B, NKV, 3]
                            For cross-attention. If None, set to coords_Q.
             sequence_idxs: Sequence index tensor for sequence RoPE,                 [B, NQ]
-                           Valid only for self-attention and if SequenceRope!=None.
+                           Valid only if SequenceRope!=None. For cross-attention
+                           this only makes sense if queries/keys/values are
+                           are features coming from the same sequence.
             padding_mask:  Boolean mask for padding tokens (True means ignore !!!)  [B, NKV]
             attn_mask:     Attention mask (False or -inf indicates masked entries)  [B, H, NQ, NKV]
             avg_num_nodes: Used to normalize the dynamic convolution kernel if
@@ -182,9 +184,6 @@ class ModernAttentionPlatonic(nn.Module):
         if self.sequence_rope is None:
             assert sequence_idxs is None, "SequenceRope is disabled, don't pass sequence_idxs."
         else:
-            assert (
-                feat_KV is None and coords_KV is None
-            ), "SequenceRope is only valid for self-attention."
             assert sequence_idxs is not None, "SequenceRope requires sequence_idxs to be passed."
 
         # Self-attention:  set KV-tensors = Q-tensors
