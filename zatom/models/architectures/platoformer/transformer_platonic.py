@@ -46,7 +46,7 @@ class ModernTransformerBlockPlatonic(nn.Module):
         attn_backend:           Softmax attention backend. One of "SDPA", "JVP_ATTN" or "MANUAL".
         normalize_per_g:        If False, RMS normalizing over the last axis of size c_model only.
                                 If True, acting on the group axis as well.
-        elementwise_affine:     Enables learnable weights for Platonic RMSNorm.
+        norm_elementwise_affine: Enables learnable weights for Platonic RMSNorm.
     """
 
     @typecheck
@@ -105,16 +105,18 @@ class ModernTransformerBlockPlatonic(nn.Module):
             solid_name=solid_name,
         )
 
-        norm_kwargs = SimpleNamespace(
-            mode="RMSNorm",
-            solid_name=solid_name,
-            c=c_model,
-            normalize_per_g=normalize_per_g,
-            elementwise_affine=norm_elementwise_affine,
-            bias=False,
+        norm_kwargs = vars(
+            SimpleNamespace(
+                mode="RMSNorm",
+                solid_name=solid_name,
+                c=c_model,
+                normalize_per_g=normalize_per_g,
+                elementwise_affine=norm_elementwise_affine,
+                bias=False,
+            )
         )
-        self.norm_attn = NormPlatonic(**vars(norm_kwargs))
-        self.norm_ffwd = NormPlatonic(**vars(norm_kwargs))
+        self.norm_attn = NormPlatonic(**norm_kwargs)
+        self.norm_ffwd = NormPlatonic(**norm_kwargs)
 
     @typecheck
     def forward(
@@ -190,7 +192,7 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         attn_backend:           Softmax attention backend. One of "SDPA", "JVP_ATTN" or "MANUAL".
         normalize_per_g:        If False, RMS normalizing over the last axis of size c_model only.
                                 If True, acting on the group axis as well.
-        elementwise_affine:     Enables learnable weights for Platonic RMSNorm.
+        norm_elementwise_affine: Enables learnable weights for Platonic RMSNorm.
     """
 
     @typecheck
@@ -223,31 +225,33 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         super().__init__()
 
         self.use_sequence_rope_cross = use_sequence_rope_cross
-        attn_kwargs = SimpleNamespace(
-            c_in=c_model,
-            c_out=c_model,
-            c_qk=c_qk,
-            c_val=c_val,
-            n_heads=n_heads,
-            solid_name=solid_name,
-            freq_sigma_platonic=freq_sigma_platonic,
-            freq_init_platonic=freq_init_platonic,
-            learned_freqs_platonic=learned_freqs_platonic,
-            bias=bias,
-            mean_aggregation=mean_aggregation,
-            linear_attention=linear_attention,
-            use_key=use_key,
-            use_qk_norm=qk_layernorm,
-            qk_norm_per_g=qk_norm_per_g,
-            attn_backend=attn_backend,
+        attn_kwargs = vars(
+            SimpleNamespace(
+                c_in=c_model,
+                c_out=c_model,
+                c_qk=c_qk,
+                c_val=c_val,
+                n_heads=n_heads,
+                solid_name=solid_name,
+                freq_sigma_platonic=freq_sigma_platonic,
+                freq_init_platonic=freq_init_platonic,
+                learned_freqs_platonic=learned_freqs_platonic,
+                bias=bias,
+                mean_aggregation=mean_aggregation,
+                linear_attention=linear_attention,
+                use_key=use_key,
+                use_qk_norm=qk_layernorm,
+                qk_norm_per_g=qk_norm_per_g,
+                attn_backend=attn_backend,
+            )
         )
         self.attn_self = ModernAttentionPlatonic(
-            **vars(attn_kwargs),
+            **attn_kwargs,
             context_length=context_length,
             sequence_rope_base=sequence_rope_base,
         )
         self.attn_cross = ModernAttentionPlatonic(
-            **vars(attn_kwargs),
+            **attn_kwargs,
             context_length=context_length if use_sequence_rope_cross else None,
             sequence_rope_base=sequence_rope_base if use_sequence_rope_cross else None,
         )
@@ -259,17 +263,19 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
             solid_name=solid_name,
         )
 
-        norm_kwargs = SimpleNamespace(
-            mode="RMSNorm",
-            solid_name=solid_name,
-            c=c_model,
-            normalize_per_g=normalize_per_g,
-            elementwise_affine=norm_elementwise_affine,
-            bias=False,
+        norm_kwargs = vars(
+            SimpleNamespace(
+                mode="RMSNorm",
+                solid_name=solid_name,
+                c=c_model,
+                normalize_per_g=normalize_per_g,
+                elementwise_affine=norm_elementwise_affine,
+                bias=False,
+            )
         )
-        self.norm_self = NormPlatonic(**vars(norm_kwargs))
-        self.norm_cross = NormPlatonic(**vars(norm_kwargs))
-        self.norm_ffwd = NormPlatonic(**vars(norm_kwargs))
+        self.norm_self = NormPlatonic(**norm_kwargs)
+        self.norm_cross = NormPlatonic(**norm_kwargs)
+        self.norm_ffwd = NormPlatonic(**norm_kwargs)
 
     @typecheck
     def forward(
@@ -290,9 +296,9 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
 
         Args:
             feat:                Input feature tensor for self-attention             [B, N, c_model]
-            memory:              Input feature tensor                                [B, M, c_model]
-            coords_feat:         Euclidean coordinates tensor                        [B, N, 3]
-            coords_mem:          Euclidean coordinates tensor                        [B, M, 3]
+            memory:              Memory tensor in cross-attention layer              [B, M, c_model]
+            coords_feat:         Euclidean coordinates for feat                      [B, N, 3]
+            coords_mem:          Euclidean coordinates for memory                    [B, M, 3]
             sequence_idxs:       Sequence indices for sequence index RoPe            [B, N]
             padding_mask_feat:   Boolean mask for padding tokens (True => masked)    [B, N]
             padding_mask_mem:    Boolean mask for padding tokens (True => masked)    [B, M]
@@ -374,6 +380,7 @@ class ModernTransformerPlatonic(nn.Module):
         elementwise_affine:     Enables learnable weights for Platonic RMSNorm.
         repr_layer:             Layer at which to additionally extract intermediate representations.
                                 If None, no intermediate representation is extracted.
+        is_decoder:             Whether the transformer is used as a (cross-attention) decoder.
     """
 
     @typecheck
@@ -404,6 +411,7 @@ class ModernTransformerPlatonic(nn.Module):
         norm_elementwise_affine: bool = True,
         ###
         repr_layer: Optional[int] = None,
+        is_decoder: bool = False,
     ):
         super().__init__()
         self.c_model = c_model
@@ -411,12 +419,15 @@ class ModernTransformerPlatonic(nn.Module):
         self.n_heads = n_heads
         self.max_seq_len = context_length
         self.repr_layer = repr_layer
+        self.is_decoder = is_decoder
 
+        layer_class = (
+            ModernTransformerDecoderBlockPlatonic if is_decoder else ModernTransformerBlockPlatonic
+        )
         self.layers = nn.ModuleList(
             [
-                ModernAttentionPlatonic(
-                    c_in=c_model,
-                    c_out=c_model,
+                layer_class(
+                    c_model=c_model,
                     c_qk=c_qk,
                     c_val=c_val,
                     n_heads=n_heads,
@@ -430,50 +441,63 @@ class ModernTransformerPlatonic(nn.Module):
                     use_key=use_key,
                     context_length=context_length,
                     sequence_rope_base=sequence_rope_base,
-                    use_qk_norm=qk_layernorm,
+                    qk_layernorm=qk_layernorm,
                     qk_norm_per_g=qk_norm_per_g,
                     attn_backend=attn_backend,
+                    normalize_per_g=normalize_per_g,
+                    norm_elementwise_affine=norm_elementwise_affine,
                 )
                 for _ in range(depth)
             ]
         )
 
-        norm_kwargs = SimpleNamespace(
-            mode="RMSNorm",
-            solid_name=solid_name,
-            c=c_model,
-            normalize_per_g=normalize_per_g,
-            elementwise_affine=norm_elementwise_affine,
-            bias=False,
+        norm_kwargs = vars(
+            SimpleNamespace(
+                mode="RMSNorm",
+                solid_name=solid_name,
+                c=c_model,
+                normalize_per_g=normalize_per_g,
+                elementwise_affine=norm_elementwise_affine,
+                bias=False,
+            )
         )
         if repr_layer is not None:
-            self.norm_repr = NormPlatonic(**vars(norm_kwargs))
-        self.norm_final = NormPlatonic(**vars(norm_kwargs))
+            self.norm_repr = NormPlatonic(**norm_kwargs)
+        self.norm_final = NormPlatonic(**norm_kwargs)
 
     @typecheck
     def forward(
         self,
         feat: torch.Tensor,
-        coords: torch.Tensor,
+        coords_feat: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
+        coords_mem: Optional[torch.Tensor] = None,
         sequence_idxs: Optional[torch.Tensor] = None,
-        padding_mask: Optional[torch.Tensor] = None,
-        attn_mask: Optional[torch.Tensor] = None,
-        avg_num_nodes: Optional[float] = 1.0,
+        padding_mask_feat: Optional[torch.Tensor] = None,
+        padding_mask_mem: Optional[torch.Tensor] = None,
+        attn_mask_self: Optional[torch.Tensor] = None,
+        attn_mask_cross: Optional[torch.Tensor] = None,
+        avg_num_nodes_self: Optional[float] = 1.0,
+        avg_num_nodes_cross: Optional[float] = 1.0,
     ) -> torch.Tensor | Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass through the Platonic modern transformer.
 
         Args:
-            feat:           Input feature tensor                                    [B, N, c_model]
-            coords:         Euclidean coordinates tensor                            [B, N, 3]
-            sequence_idxs:  Sequence indices for sequence index RoPe                [B, N]
-            padding_mask:   Boolean mask for padding tokens (True means masked)     [B, N]
-            attn_mask:      Attention mask (False / -inf means masked)              [B, H, N, N]
-                            To make the model causal (decoder-style), pass a causal mask.
-            avg_num_nodes:  Used to normalize the dynamic convolution kernel if
-                            linear_attention is True and no padding mask is passed.
+            feat:               Input feature tensor for self-attention              [B, N, c_model]
+            coords_feat:        Euclidean coordinates for feat                       [B, N, 3]
+            memory:             Memory tensor for cross-attention if is_decoder      [B, M, c_model]
+            coords_mem:         Coordinates for memory if is_decoder                 [B, M, 3]
+            sequence_idxs:      Sequence indices for sequence index RoPe             [B, N]
+            padding_mask_feat:  Mask for padding features (True => masked)           [B, N]
+            padding_mask_mem:   Mask for padding memory tokens (True => masked)      [B, M]
+            attn_mask_self:     Mask for self-attention layers                       [B, H, N, N]
+            attn_mask_cross:    Mask for cross-attention layers                      [B, H, N, M]
+            avg_num_nodes_self: Used to normalize the dynamic convolution kernel if
+                                linear_attention is True and no padding mask is passed.
+            avg_num_nodes_cross: Like avg_num_nodes_self, but for cross-attn if is_decoder is True.
 
         Returns:
-            Output feature tensor                                                   [B, N, c_model]
+            Output feature tensor                                                    [B, N, c_model]
             or Tuple[output tensor, intermediate repr] if `repr_layer` is set.
         """
         _, N, _ = feat.shape
@@ -481,16 +505,42 @@ class ModernTransformerPlatonic(nn.Module):
             self.max_seq_len is None or N <= self.max_seq_len
         ), "Sequence length exceeds model's maximum sequence length"
 
+        if not self.is_decoder:
+            assert (
+                (memory is None)
+                and (coords_mem is None)
+                and (padding_mask_mem is None)
+                and (attn_mask_cross is None)
+                and (avg_num_nodes_cross == 1.0)
+            ), "The inputs are invalid if is_decoder is False."
+
         repr = None
         for i, layer in enumerate(self.layers):
-            feat = layer(
-                feat_Q=feat,
-                coords_Q=coords,
-                sequence_idxs=sequence_idxs,
-                padding_mask=padding_mask,
-                attn_mask=attn_mask,
-                avg_num_nodes=avg_num_nodes,
-            )
+
+            if self.is_decoder:
+                feat = layer(
+                    feat=feat,
+                    memory=memory,
+                    coords_feat=coords_feat,
+                    coords_mem=coords_mem,
+                    sequence_idxs=sequence_idxs,
+                    padding_mask_feat=padding_mask_feat,
+                    padding_mask_mem=padding_mask_mem,
+                    attn_mask_self=attn_mask_self,
+                    attn_mask_cross=attn_mask_cross,
+                    avg_num_nodes_self=avg_num_nodes_self,
+                    avg_num_nodes_cross=avg_num_nodes_cross,
+                )
+            else:
+                feat = layer(
+                    feat=feat,
+                    coords=coords_feat,
+                    sequence_idxs=sequence_idxs,
+                    padding_mask=padding_mask_feat,
+                    attn_mask=attn_mask_self,
+                    avg_num_nodes=avg_num_nodes_self,
+                )
+
             if self.repr_layer is not None and i == self.repr_layer:
                 repr = feat.clone()
 

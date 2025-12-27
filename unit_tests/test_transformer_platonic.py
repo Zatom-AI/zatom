@@ -179,10 +179,10 @@ class TestModernTransformerPlatonic(unittest.TestCase):
 
     def test_equivariance_transformer_platonic(self):
         """Equivariance unit tests for ModernTransformerPlatonic."""
-        c_model = 64  # per group element
-        c_qk = 16  # per group element
+        c_model = 16  # per group element
+        c_qk = 12  # per group element
         c_val = 8  # per group element
-        B, H, N = 16, 6, 33
+        B, H, N = 2, 6, 17
         device = "cuda" if torch.cuda.is_available() else "cpu"
         dtype = torch.float32
 
@@ -213,10 +213,10 @@ class TestModernTransformerPlatonic(unittest.TestCase):
             # Original output, for non-transformed inputs
             net_feat, net_repr = net(
                 feat=feat,
-                coords=coords,
+                coords_feat=coords,
                 sequence_idxs=sequence_idxs,
-                padding_mask=padding_mask,
-                attn_mask=attn_mask,
+                padding_mask_feat=padding_mask,
+                attn_mask_self=attn_mask,
             )
 
             for g in range(G):
@@ -229,10 +229,10 @@ class TestModernTransformerPlatonic(unittest.TestCase):
                 # Output for transformed inputs
                 net_g_feat, net_g_repr = net(
                     feat=g_feat,
-                    coords=g_coords,
+                    coords_feat=g_coords,
                     sequence_idxs=sequence_idxs,
-                    padding_mask=padding_mask,
-                    attn_mask=attn_mask,
+                    padding_mask_feat=padding_mask,
+                    attn_mask_self=attn_mask,
                 )
 
                 # Transformed output from non-transformed inputs
