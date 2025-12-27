@@ -39,9 +39,9 @@ colors = {
 ax.plot(x_steps, zatom_y, marker="s", color=colors["zatom"], label="Zatom (80M)")
 ax.plot(x_steps, zatom_l_y, marker="s", color=colors["zatom_l"], label="Zatom-L (160M)")
 ax.plot(x_steps, zatom_xl_y, marker="s", color=colors["zatom_xl"], label="Zatom-XL (300M)")
-ax.plot(x_steps, adit_s_y, marker="o", color=colors["adit_s"], label="ADiT-S (32M)")
-ax.plot(x_steps, adit_b_y, marker="o", color=colors["adit_b"], label="ADiT-B (130M)")
-ax.plot(x_steps, adit_l_y, marker="o", color=colors["adit_l"], label="ADiT-L (450M)")
+ax.plot(x_steps, adit_s_y, marker="o", color=colors["adit_s"], label="ADiT-S (80M)")
+ax.plot(x_steps, adit_b_y, marker="o", color=colors["adit_b"], label="ADiT-B (180M)")
+ax.plot(x_steps, adit_l_y, marker="o", color=colors["adit_l"], label="ADiT-L (500M)")
 ax.plot(x_steps, flowmm_y, marker="x", color=colors["flowmm"], label="FlowMM (12M)")
 
 # --- 4. Customize Main Plot Appearance ---
