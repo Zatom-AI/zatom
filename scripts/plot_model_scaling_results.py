@@ -76,6 +76,7 @@ plot_configs = [
         "df": df_loss,
         "y_label_left": "Train loss",
         "y_label_right": "Ep. 2000: Train loss",
+        "y_max": 10.0,
     },
     {
         "title": "Crystal validity",
@@ -120,6 +121,10 @@ for i, config in enumerate(plot_configs):
             markersize=6,
             linestyle="-",
         )
+        # Apply y-axis upper limit if provided in config (plotting functions don't accept y_max)
+        if config.get("y_max", None) is not None:
+            ymin, _ = ax_left.get_ylim()
+            ax_left.set_ylim(ymin, config["y_max"])
 
     ax_left.axvline(x=2000, color="grey", linestyle="--", alpha=0.7)
     ax_left.set_xlabel("Epoch")
@@ -156,7 +161,7 @@ for i, config in enumerate(plot_configs):
         bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.5),
     )
 
-    ax_right.set_xlabel("Log(Number of parameters in M)")
+    ax_right.set_xlabel("log(Number of parameters in M)")
     ax_right.set_ylabel(config["y_label_right"])
     ax_right.yaxis.set_label_position("right")
     ax_right.yaxis.tick_right()
