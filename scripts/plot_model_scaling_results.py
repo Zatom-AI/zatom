@@ -5,65 +5,153 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 
-# --- 1. Generate Dummy Data & CSV Files ---
-# This section creates placeholder CSV files with data similar to the plots.
-# If you already have these files, you can skip this part.
+# --- 1. Defining Data ---
+df_loss = pd.DataFrame(
+    {
+        "epoch": {
+            0: 0,
+            1: 250,
+            2: 500,
+            3: 750,
+            4: 1000,
+            5: 1250,
+            6: 1500,
+            7: 1750,
+            8: 2000,
+        },
+        "Zatom": {
+            0: 19.64182,
+            1: 1.75808,
+            2: 1.1903,
+            3: 1.124,
+            4: 1.04569,
+            5: 0.99231,
+            6: 0.94617,
+            7: 0.93031,
+            8: 0.90646,
+        },
+        "Zatom-L": {
+            0: 10.66805,
+            1: 1.56799,
+            2: 1.24015,
+            3: 1.10702,
+            4: 1.00602,
+            5: 0.95718,
+            6: 0.92139,
+            7: 0.91278,
+            8: 0.88432,
+        },
+        "Zatom-XL": {
+            0: 2.10083,
+            1: 1.90358,
+            2: 1.34222,
+            3: 1.15693,
+            4: 1.0264,
+            5: 0.94898,
+            6: 0.90873,
+            7: 0.89944,
+            8: 0.86318,
+        },
+    }
+)
+df_crystal = pd.DataFrame(
+    {
+        "epoch": {
+            0: 0,
+            1: 250,
+            2: 500,
+            3: 750,
+            4: 1000,
+            5: 1250,
+            6: 1500,
+            7: 1750,
+            8: 2000,
+        },
+        "Zatom": {
+            0: 0.0,
+            1: 0.81709,
+            2: 0.85793,
+            3: 0.86321,
+            4: 0.87091,
+            5: 0.87986,
+            6: 0.88825,
+            7: 0.89036,
+            8: 0.89395,
+        },
+        "Zatom-L": {
+            0: 0.0,
+            1: 0.82945,
+            2: 0.85425,
+            3: 0.87011,
+            4: 0.88129,
+            5: 0.88723,
+            6: 0.89203,
+            7: 0.89399,
+            8: 0.89774,
+        },
+        "Zatom-XL": {
+            0: 0.0,
+            1: 0.78988,
+            2: 0.84974,
+            3: 0.86944,
+            4: 0.88591,
+            5: 0.89744,
+            6: 0.90045,
+            7: 0.90265,
+            8: 0.90272,
+        },
+    }
+)
+df_molecule = pd.DataFrame(
+    {
+        "epoch": {
+            0: 0,
+            1: 250,
+            2: 500,
+            3: 750,
+            4: 1000,
+            5: 1250,
+            6: 1500,
+            7: 1750,
+            8: 2000,
+        },
+        "Zatom": {
+            0: 0.0,
+            1: 0.61825,
+            2: 0.87266,
+            3: 0.90917,
+            4: 0.92757,
+            5: 0.93686,
+            6: 0.94389,
+            7: 0.94408,
+            8: 0.94678,
+        },
+        "Zatom-L": {
+            0: 0.0,
+            1: 0.76158,
+            2: 0.87094,
+            3: 0.91805,
+            4: 0.93684,
+            5: 0.94547,
+            6: 0.94673,
+            7: 0.94759,
+            8: 0.9476,
+        },
+        "Zatom-XL": {
+            0: 0.0,
+            1: 0.55776,
+            2: 0.82099,
+            3: 0.89122,
+            4: 0.92563,
+            5: 0.94033,
+            6: 0.94668,
+            7: 0.94999,
+            8: 0.94935,
+        },
+    }
+)
 
-# Common epoch range
-epochs = np.arange(0, 2001, 250)
-df = pd.DataFrame({"epoch": epochs})
-
-# a) Training Loss Data
-# Starts high and decays, with larger models having slightly lower loss.
-train_losses_csv_path = os.path.join(os.path.dirname(__file__), "training_losses.csv")
-if not os.path.exists(train_losses_csv_path):
-    loss_s = 1.08 + 1.8 * np.exp(-epochs / 250) + np.random.normal(0, 0.01, len(epochs))
-    loss_b = 1.04 + 1.8 * np.exp(-epochs / 250) + np.random.normal(0, 0.01, len(epochs))
-    loss_l = 1.01 + 1.8 * np.exp(-epochs / 250) + np.random.normal(0, 0.01, len(epochs))
-    loss_df = df.copy()
-    loss_df["Zatom"] = loss_s
-    loss_df["Zatom-L"] = loss_b
-    loss_df["Zatom-XL"] = loss_l
-    loss_df.to_csv("training_losses.csv", index=False)
-
-    print("Created placeholder training_losses.csv")
-
-# b) Crystal Validity Data
-# Starts low and saturates near 1.0, with larger models performing better.
-crystal_validity_csv_path = os.path.join(os.path.dirname(__file__), "crystal_validity.csv")
-if not os.path.exists(crystal_validity_csv_path):
-    crystal_s = 0.92 - 0.9 * np.exp(-epochs / 400) + np.random.normal(0, 0.005, len(epochs))
-    crystal_b = 0.93 - 0.9 * np.exp(-epochs / 350) + np.random.normal(0, 0.005, len(epochs))
-    crystal_l = 0.94 - 0.9 * np.exp(-epochs / 300) + np.random.normal(0, 0.005, len(epochs))
-    crystal_df = df.copy()
-    crystal_df["Zatom"] = np.clip(crystal_s, 0, 1)
-    crystal_df["Zatom-L"] = np.clip(crystal_b, 0, 1)
-    crystal_df["Zatom-XL"] = np.clip(crystal_l, 0, 1)
-    crystal_df.to_csv("crystal_validity.csv", index=False)
-
-    print("Created placeholder crystal_validity.csv")
-
-# c) Molecule Validity Data
-# Similar to crystal, but with a more pronounced performance gap between models.
-molecule_validity_csv_path = os.path.join(os.path.dirname(__file__), "molecule_validity.csv")
-if not os.path.exists(molecule_validity_csv_path):
-    mol_s = 0.90 - 1.5 * np.exp(-epochs / 600) + np.random.normal(0, 0.01, len(epochs))
-    mol_b = 0.95 - 1.2 * np.exp(-epochs / 450) + np.random.normal(0, 0.01, len(epochs))
-    mol_l = 0.96 - 1.1 * np.exp(-epochs / 400) + np.random.normal(0, 0.01, len(epochs))
-    mol_df = df.copy()
-    mol_df["Zatom"] = np.clip(mol_s, 0, 1)
-    mol_df["Zatom-L"] = np.clip(mol_b, 0, 1)
-    mol_df["Zatom-XL"] = np.clip(mol_l, 0, 1)
-    mol_df.to_csv("molecule_validity.csv", index=False)
-
-    print("Created placeholder molecule_validity.csv")
-
-# --- 2. Load Data from CSV Files ---
-df_loss = pd.read_csv(train_losses_csv_path)
-df_crystal = pd.read_csv(crystal_validity_csv_path)
-df_molecule = pd.read_csv(molecule_validity_csv_path)
-
-# --- 3. Plotting ---
+# --- 2. Plotting ---
 
 # Define model properties for consistency
 models = {
