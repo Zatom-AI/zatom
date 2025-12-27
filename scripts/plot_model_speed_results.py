@@ -98,7 +98,7 @@ fig.subplots_adjust(right=0.75)
 
 # Final adjustments and saving the figure
 plt.savefig(
-    os.path.join(os.path.dirname(__file__), "model_speed_comparison.pdf"),
+    os.path.join(os.path.dirname(__file__), "model_speed_results.pdf"),
     bbox_inches="tight",
     dpi=300,
 )
