@@ -10,7 +10,7 @@ from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 # NOTE: ADiT and competitor data points are estimated from Figure 2 and Table 3 of the ADiT paper.
 x_steps = np.array([10, 25, 50, 100, 250, 500, 750, 1000])
 
-eps = 0.5  # TODO: Remove after adding real data.
+eps = 2.0  # TODO: Remove after adding real data.
 dataset_config = {
     "MP20": {
         "y_label_object": "crystals",
@@ -18,13 +18,13 @@ dataset_config = {
         "inset_y_lim": (-1, 21),
         "competitor_name": "FlowMM (12M)",
         "data": {
-            "zatom": np.array([1.5, 2.5, 3.5, 5.5, 10, 18, 24, 30]) + eps,
-            "zatom_l": np.array([2.5, 4.5, 7, 12, 25, 50, 75, 100]) + eps,
+            "zatom": np.array([0.5, 0.75, 1.25, 2.25, 7, 14, 21, 28]) + eps,
+            "zatom_l": np.array([1.5, 2.75, 5, 9.5, 25, 50, 75, 100]) + eps,
             "zatom_xl": np.array([4, 9, 17, 33, 85, 170, 260, 345]) + eps,
-            "adit_s": np.array([1.5, 2.5, 3.5, 5.5, 10, 18, 24, 30]),
-            "adit_b": np.array([2.5, 4.5, 7, 12, 25, 50, 75, 100]),
+            "adit_s": np.array([0.5, 0.75, 1.25, 2.25, 7, 14, 21, 28]),
+            "adit_b": np.array([1.5, 2.75, 5, 9.5, 25, 50, 75, 100]),
             "adit_l": np.array([4, 9, 17, 33, 85, 170, 260, 345]),
-            "competitor": np.array([2.5, 5, 9, 18, 42, 80, 115, 155]),
+            "competitor": np.array([2, 4, 8, 18, 42, 75, 110, 145]),
         },
     },
     "QM9": {
@@ -33,13 +33,13 @@ dataset_config = {
         "inset_y_lim": (-2, 22),
         "competitor_name": "GeoLDM (5M)",
         "data": {
-            "zatom": np.array([4, 6, 8, 12, 20, 28, 35, 40]) + eps,
-            "zatom_l": np.array([6, 10, 15, 25, 55, 90, 120, 140]) + eps,
-            "zatom_xl": np.array([10, 18, 30, 55, 115, 225, 340, 450]) + eps,
-            "adit_s": np.array([4, 6, 8, 12, 20, 28, 35, 40]),
-            "adit_b": np.array([6, 10, 15, 25, 55, 90, 120, 140]),
-            "adit_l": np.array([10, 18, 30, 55, 115, 225, 340, 450]),
-            "competitor": np.array([5, 12, 20, 35, 75, 110, 140, 160]),
+            "zatom": np.array([1, 2, 3, 5, 11, 22, 32, 42]) + eps,
+            "zatom_l": np.array([2, 4, 7, 14, 32, 60, 90, 120]) + eps,
+            "zatom_xl": np.array([5, 12, 25, 45, 115, 225, 340, 450]) + eps,
+            "adit_s": np.array([1, 2, 3, 5, 11, 22, 32, 42]),
+            "adit_b": np.array([2, 4, 7, 14, 32, 60, 90, 120]),
+            "adit_l": np.array([5, 12, 25, 45, 115, 225, 340, 450]),
+            "competitor": np.array([2.5, 4.67, 7.75, 15, 34, 64, 98, 132]),
         },
     },
     "GEOM": {
@@ -48,13 +48,13 @@ dataset_config = {
         "inset_y_lim": (-5, 45),
         "competitor_name": "SemlaFlow (46M)",
         "data": {
-            "zatom": np.array([6, 9, 13, 20, 35, 55, 70, 80]) + eps,
-            "zatom_l": np.array([8, 15, 25, 40, 75, 120, 150, 170]) + eps,
-            "zatom_xl": np.array([15, 28, 45, 80, 150, 300, 450, 600]) + eps,
-            "adit_s": np.array([6, 9, 13, 20, 35, 55, 70, 80]),
-            "adit_b": np.array([8, 15, 25, 40, 75, 120, 150, 170]),
-            "adit_l": np.array([15, 28, 45, 80, 150, 300, 450, 600]),
-            "competitor": np.array([10, 18, 28, 48, 95, 145, 180, 200]),
+            "zatom": np.array([0.5, 1.75, 3.5, 7, 20, 40, 60, 80]) + eps,
+            "zatom_l": np.array([1.75, 4.75, 9.5, 18, 45, 87.5, 130, 170]) + eps,
+            "zatom_xl": np.array([7, 15, 30, 60, 150, 300, 450, 600]) + eps,
+            "adit_s": np.array([0.5, 1.75, 3.5, 7, 20, 40, 60, 80]),
+            "adit_b": np.array([1.75, 4.75, 9.5, 18, 45, 87.5, 130, 170]),
+            "adit_l": np.array([7, 15, 30, 60, 150, 300, 450, 600]),
+            "competitor": np.array([2, 5.5, 10.75, 20.75, 51, 100, 150, 200]),
         },
     },
 }
