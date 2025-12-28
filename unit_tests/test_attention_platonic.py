@@ -130,7 +130,7 @@ class TestModernAttentionPlatonic(unittest.TestCase):
                                 # For sequence RoPE, KV features need to come from the same sequence
                                 else:
                                     feat_KV_ = torch.randn_like(feat_Q)
-                                    coords_KV_ = torch.randn_like(coords_Q)
+                                    coords_KV_ = coords_Q
                                     padding_mask_KV_ = padding_mask_Q if use_padding_mask else None
                                     attn_mask = attn_mask_self if use_attn_mask else None
 
