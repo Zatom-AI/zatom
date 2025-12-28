@@ -40,7 +40,7 @@ mkdir -p "$WANDB_CACHE_DIR"
 mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
-DEFAULT_SWEEP_ID="jjjrwm68"                   # NOTE: Generate a unique ID for each run by running `wandb sweep configs/sweep/{train,eval}_sweep_{joint,}.yaml`
+DEFAULT_SWEEP_ID="nfeyf8lm"                   # NOTE: Generate a unique ID for each run by running `wandb sweep configs/sweep/{train,eval}_sweep_{joint,}.yaml`
 SWEEP_ID=${1:-$DEFAULT_SWEEP_ID}              # First argument or default ID if not provided
 
 # Inform user of job details
