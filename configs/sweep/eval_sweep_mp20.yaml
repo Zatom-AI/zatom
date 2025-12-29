@@ -1,4 +1,4 @@
-name: eval_sweep_mp20_2025-12-24_09-00-00
+name: eval_sweep_mp20_2025-12-26_09-00-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -20,7 +20,7 @@ parameters:
     value: 0.0
 
   date:
-    value: "2025-12-24_09-00-00"
+    value: "2025-12-26_09-00-00"
 
   experiment:
     value: eval
@@ -34,6 +34,9 @@ parameters:
   model.sampling.num_samples:
     value: 10000
 
+  model.sampling.visualize:
+    value: false
+
   model.architecture.frac_coords_interpolant.white_noise_sampling_scale:
     values: [0.01, 0.1]
 
@@ -44,13 +47,10 @@ parameters:
     values: [0.01, 0.1]
 
   model.sampling.steps:
-    values: [50, 100, 200]
-
-  model.sampling.cfg_scale:
-    values: [0.0, 1.0, 2.0]
+    values: [5, 10, 25, 50, 100, 200]
 
   name:
-    value: "eval_${hydra:runtime.choices.model/architecture}_fc-noise-${model.architecture.frac_coords_interpolant.white_noise_sampling_scale}_ls-noise-${model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale}_ar-noise-${model.architecture.angles_radians_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_cfg-${model.sampling.cfg_scale}_mp20"
+    value: "eval_${hydra:runtime.choices.model/architecture}_fc-noise-${model.architecture.frac_coords_interpolant.white_noise_sampling_scale}_ls-noise-${model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale}_ar-noise-${model.architecture.angles_radians_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_mp20"
 
   seed:
     value: 42

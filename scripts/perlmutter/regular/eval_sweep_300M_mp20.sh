@@ -10,10 +10,10 @@
 #SBATCH --gpus-per-node=1                                     # request A100 GPU resource(s)
 #SBATCH --ntasks-per-node=1                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
 #SBATCH --time=00-02:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=eval-sweep-160M-qm9                        # job name
-#SBATCH --output=scripts/perlmutter/regular/logs/eval_sweep_160M_qm9%j.out  # output log file
-#SBATCH --error=scripts/perlmutter/regular/logs/eval_sweep_160M_qm9%j.err   # error log file
-#SBATCH --array=0-23                                          # create an array of jobs for the sweep (0-11 or 12 total for finetuning and 0-23 or 24 total for generative evaluation)
+#SBATCH --job-name=eval-sweep-300M-mp20                       # job name
+#SBATCH --output=scripts/perlmutter/regular/logs/eval_sweep_300M_mp20%j.out  # output log file
+#SBATCH --error=scripts/perlmutter/regular/logs/eval_sweep_300M_mp20%j.err   # error log file
+#SBATCH --array=0-47                                          # create an array of jobs for the sweep (0-11 or 12 total for finetuning and 0-47 or 48 total for generative evaluation)
 
 # Wait for 5-10 seconds randomly to avoid race condition
 sleep $((RANDOM % 6 + 5))
@@ -40,7 +40,7 @@ mkdir -p "$WANDB_CACHE_DIR"
 mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
-DEFAULT_SWEEP_ID="0wt7olay"                   # NOTE: Generate a unique ID for each run by running `wandb sweep configs/sweep/{train,eval}_sweep_{joint,}.yaml`
+DEFAULT_SWEEP_ID="gbhrbgv5"                   # NOTE: Generate a unique ID for each run by running `wandb sweep configs/sweep/{train,eval}_sweep_{joint,}.yaml`
 SWEEP_ID=${1:-$DEFAULT_SWEEP_ID}              # First argument or default ID if not provided
 
 # Inform user of job details

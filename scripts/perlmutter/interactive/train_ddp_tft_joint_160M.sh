@@ -13,18 +13,24 @@
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
-# PROJECT_DIR="/global/cfs/cdirs/$PROJECT_ID/$USER/Repositories/zatom" # long term storage community drive
-PROJECT_DIR="/pscratch/sd/${USER:0:1}/$USER/Repositories/zatom" # high-performance storage scratch drive with an 8-week purge policy
+# PROJECT_DIR="/global/cfs/cdirs/$PROJECT_ID/$USER/Repositories/zatom"            # long term storage community drive
+PROJECT_DIR="/pscratch/sd/${USER:0:1}/$USER/Repositories/zatom"                   # high-performance storage scratch drive with an 8-week purge policy
 cd "$PROJECT_DIR" || exit
 
 # Establish environment variables
-# export TORCH_HOME="/global/cfs/cdirs/$PROJECT_ID/$USER/torch_cache" # long term storage community drive
-# export HF_HOME="/global/cfs/cdirs/$PROJECT_ID/$USER/hf_cache" # long term storage community drive
-export TORCH_HOME="/pscratch/sd/${USER:0:1}/$USER/torch_cache" # high-performance storage scratch drive with an 8-week purge policy
-export HF_HOME="/pscratch/sd/${USER:0:1}/$USER/hf_cache"       # high-performance storage scratch drive with an 8-week purge policy
+# export TORCH_HOME="/global/cfs/cdirs/$PROJECT_ID/$USER/torch_cache"             # long term storage community drive
+# export HF_HOME="/global/cfs/cdirs/$PROJECT_ID/$USER/hf_cache"                   # long term storage community drive
+# export WANDB_CACHE_DIR="/global/cfs/cdirs/$PROJECT_ID/$USER/wandb_cache"        # long term storage community drive
+# export WANDB_ARTIFACT_DIR="/global/cfs/cdirs/$PROJECT_ID/$USER/wandb_artifacts" # long term storage community drive
+export TORCH_HOME="/pscratch/sd/${USER:0:1}/$USER/torch_cache"                    # high-performance storage scratch drive with an 8-week purge policy
+export HF_HOME="/pscratch/sd/${USER:0:1}/$USER/hf_cache"                          # high-performance storage scratch drive with an 8-week purge policy
+export WANDB_CACHE_DIR="/pscratch/sd/${USER:0:1}/$USER/wandb_cache"               # high-performance storage scratch drive with an 8-week purge policy
+export WANDB_ARTIFACT_DIR="/pscratch/sd/${USER:0:1}/$USER/wandb_artifacts"        # high-performance storage scratch drive with an 8-week purge policy
 
 mkdir -p "$TORCH_HOME"
 mkdir -p "$HF_HOME"
+mkdir -p "$WANDB_CACHE_DIR"
+mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
@@ -71,7 +77,7 @@ echo -e "\nExecuting script $TASK_NAME.py:\n====================================
 # Run script
 bash -c "
     unset NCCL_CROSS_NIC \
-    && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME \
+    && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME WANDB_CACHE_DIR=$WANDB_CACHE_DIR WANDB_ARTIFACT_DIR=$WANDB_ARTIFACT_DIR \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
     ckpt_path=$CKPT_PATH \
     data=$DATASET \

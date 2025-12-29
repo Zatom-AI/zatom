@@ -1,0 +1,71 @@
+name: finetune_sweep_qm9-all-prop-pred_2025-12-26_12-00-00
+project: zatom
+entity: zatom
+program: zatom/train_fm.py
+
+method: grid
+
+metric: # Does not matter, as we are using sweep to run the experiment.
+  goal: minimize
+  name: val_qm9/aux_global_property_loss
+
+parameters:
+  pretrained_ckpt_path:
+    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_80M_joint_2025-12-15_20-00-00/checkpoints/model-epoch@1399-step@43400-val_qm9_valid_rate@0.9471-val_mp20_valid_rate@0.9003.ckpt"
+
+  ckpt_path:
+    value: "${paths.log_dir}/${task_name}/runs/${name}_${date}/checkpoints/"
+
+  callbacks.model_checkpoint.monitor:
+    value: val_qm9/aux_global_property_loss
+
+  data.datamodule.batch_size.train:
+    values: [64, 128, 256]
+  data.datamodule.batch_size.val:
+    value: ${data.datamodule.batch_size.train}
+  data.datamodule.batch_size.test:
+    value: ${data.datamodule.batch_size.train}
+
+  date:
+    value: "2025-12-26_12-00-00"
+
+  experiment:
+    value: finetune
+
+  model/architecture:
+    values: [tft_80M]
+
+  model.optimizer.lr:
+    values: [4e-5, 1e-4, 3e-4, 1e-3]
+
+  model.optimizer.weight_decay:
+    values: [0.0, 1e-2]
+
+  name:
+    value: "finetune_${hydra:runtime.choices.model/architecture}_batch-size-${data.datamodule.batch_size.train}_lr-${model.optimizer.lr}_wd-${model.optimizer.weight_decay}_qm9-all-prop-pred"
+
+  seed:
+    value: 42
+
+  strategy:
+    value: optimized_ddp
+
+  tags:
+    value: ["qm9", "fm", "finetune", "sweep"]
+
+  trainer:
+    value: ddp
+
+  trainer.devices:
+    value: 1
+
+  trainer.check_val_every_n_epoch:
+    value: 20
+
+command:
+  - ${env}
+  - HYDRA_FULL_ERROR=1
+  - WANDB_START_METHOD=thread
+  - python
+  - ${program}
+  - ${args_no_hyphens}
