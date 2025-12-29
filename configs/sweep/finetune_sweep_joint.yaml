@@ -35,18 +35,25 @@ parameters:
           global_property:
             values:
               [
-                "mu",
-                "alpha",
-                "homo",
-                "lumo",
-                "gap",
-                "r2",
-                "zpve",
-                "U0",
-                "U",
-                "H",
-                "G",
-                "Cv",
+                mu,
+                alpha,
+                homo,
+                lumo,
+                gap,
+                r2,
+                zpve,
+                U0,
+                U,
+                H,
+                G,
+                Cv,
+                U0_atom,
+                U_atom,
+                H_atom,
+                G_atom,
+                A,
+                B,
+                C,
               ]
         matbench:
           proportion:

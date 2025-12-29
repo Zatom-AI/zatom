@@ -1,4 +1,4 @@
-name: eval_sweep_qm9_2025-12-24_09-00-00
+name: eval_sweep_qm9-only_2025-12-24_09-00-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -11,7 +11,7 @@ metric: # Does not matter, as we are using sweep to run the experiment.
 
 parameters:
   ckpt_path:
-    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_80M_joint_2025-12-15_20-00-00/checkpoints/model-epoch@1399-step@43400-val_qm9_valid_rate@0.9471-val_mp20_valid_rate@0.9003.ckpt"
+    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_80M_QM9_2025-12-21_09-00-00/checkpoints/model-epoch@399-step@9600-val_qm9_valid_rate@0.9677-val_mp20_valid_rate@0.0000.ckpt"
 
   data:
     values: [joint]
@@ -44,13 +44,13 @@ parameters:
     values: [0.0, 1.0, 2.0]
 
   name:
-    value: "eval_${hydra:runtime.choices.model/architecture}_noise-${model.architecture.pos_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_cfg-${model.sampling.cfg_scale}_qm9"
+    value: "eval_${hydra:runtime.choices.model/architecture}_noise-${model.architecture.pos_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_cfg-${model.sampling.cfg_scale}_qm9-only"
 
   seed:
     value: 42
 
   tags:
-    value: ["qm9", "fm", "eval", "sweep"]
+    value: ["qm9-only", "fm", "eval", "sweep"]
 
 command:
   - ${env}

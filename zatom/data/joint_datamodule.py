@@ -216,36 +216,35 @@ class JointDataModule(LightningDataModule):
         #     os.path.join(self.hparams.datasets.qm9.root, "num_nodes_bincount.pt"),
         # )
         # torch.save(smiles, os.path.join(self.hparams.datasets.qm9.root, "smiles.pt"))
-        # Select target property if specified
-        qm9_target_name = self.hparams.datasets.qm9.global_property
-        if qm9_target_name is not None:
-            assert (
-                qm9_target_name == "all" or qm9_target_name in QM9_TARGET_NAME_TO_IDX
-            ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {QM9_TARGETS}."
+        # Select target properties if specified
+        qm9_target_names = self.hparams.datasets.qm9.global_property
+        if qm9_target_names is not None:
+            assert all(
+                name in QM9_TARGET_NAME_TO_IDX for name in qm9_target_names
+            ), f"QM9 target properties '{qm9_target_names}' not recognized. Must be a list of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html."
             qm9_dataset = QM9(
                 root=self.hparams.datasets.qm9.root,
                 transform=partial(
                     qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs
                 ),
             )
-            if qm9_target_name == "all":
-                log.info(
-                    f"QM9 target property set to 'all' ({qm9_dataset.data.y.shape[1]} properties)."
-                )
-            else:
-                qm9_target_idx = QM9_TARGET_NAME_TO_IDX[qm9_target_name]
-                qm9_dataset.data.y = torch.where(
+            qm9_target_idx = torch.tensor(
+                [QM9_TARGET_NAME_TO_IDX[name] for name in qm9_target_names]
+            )
+            qm9_dataset.data.y = torch.where(
+                torch.isin(
                     torch.arange(
                         qm9_dataset.data.y.size(1), device=qm9_dataset.data.y.device
-                    ).unsqueeze(0)
-                    == qm9_target_idx,
-                    qm9_dataset.data.y,
-                    float("nan"),
-                )
-                log.info(
-                    f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
-                    f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean().item():.4f} and std {qm9_dataset.data.y[:, qm9_target_idx].std().item():.4f}."
-                )
+                    ).unsqueeze(0),
+                    qm9_target_idx,
+                ),
+                qm9_dataset.data.y,
+                float("nan"),
+            )
+            log.info(
+                f"QM9 target properties set to '{qm9_target_names}' (indices {qm9_target_idx.tolist()})"
+                f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean(dim=0).tolist()} and std {qm9_dataset.data.y[:, qm9_target_idx].std(dim=0).tolist()}."
+            )
             # Create property prediction train/val/test splits (n.b., same as Platonic Transformer)
             qm9_random_state = np.random.RandomState(seed=42)
             qm9_perm = torch.from_numpy(qm9_random_state.permutation(np.arange(130831)))

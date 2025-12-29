@@ -177,7 +177,7 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt tra
 To evaluate Zatom's molecule property predictions
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=all model.architecture.num_aux_layers=4 model.sampling.num_samples=1 model.sampling.batch_size=1 seed=42 trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C] model.architecture.num_aux_layers=4 model.sampling.num_samples=1 model.sampling.batch_size=1 seed=42 trainer=gpu
 ```
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.

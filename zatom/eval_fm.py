@@ -61,12 +61,6 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     Returns:
         A tuple containing two dictionaries - the first with evaluation metrics and the second with all instantiated objects.
     """
-    if cfg.ckpt_path is None:
-        log.warning(
-            "No checkpoint path provided. "
-            "Will use untrained weights to perform model inference."
-        )
-
     # Set seed for random number generators in pytorch, numpy and python.random
     if cfg.get("seed"):
         L.seed_everything(cfg.seed, workers=True)
@@ -145,14 +139,21 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log_hyperparameters(object_dict)
 
     # Load checkpoint and update model state dict using only matching keys
-    log.info(f"Loading checkpoint from {cfg.ckpt_path}")
-    checkpoint = torch.load(cfg.ckpt_path, map_location="cpu", weights_only=False)  # nosec
+    ckpt_path = cfg.ckpt_path
+    if ckpt_path is None or not os.path.isfile(ckpt_path):
+        log.warning(
+            "No valid checkpoint path provided. "
+            "Will use untrained weights to perform model inference."
+        )
+    else:
+        log.info(f"Loading checkpoint from {ckpt_path}")
+        checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)  # nosec
 
-    old_state_dict = checkpoint["state_dict"]
-    new_state_dict = model.state_dict()
+        old_state_dict = checkpoint["state_dict"]
+        new_state_dict = model.state_dict()
 
-    updated_state_dict = {k: v for k, v in old_state_dict.items() if k in new_state_dict}
-    model.load_state_dict(updated_state_dict, strict=False)
+        updated_state_dict = {k: v for k, v in old_state_dict.items() if k in new_state_dict}
+        model.load_state_dict(updated_state_dict, strict=False)
 
     if cfg.eval_split == "val":
         log.info("Starting validation!")

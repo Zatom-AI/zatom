@@ -15,7 +15,7 @@ datamodule:
       root: ${paths.data_dir}/qm9
       removeHs: false # only retain heavy atoms
       proportion: 1.0
-      global_property: null # NOTE: if provided, must be either `all` or one of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
+      global_property: null # NOTE: if provided, must be a list of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
       # registry metadata
       id: 1
       type_label: 1 # non-periodic

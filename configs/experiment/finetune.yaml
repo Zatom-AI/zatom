@@ -27,7 +27,28 @@ data:
         proportion: 0.0
       qm9:
         proportion: 1.0
-        global_property: all
+        global_property:
+          [
+            mu,
+            alpha,
+            homo,
+            lumo,
+            gap,
+            r2,
+            zpve,
+            U0,
+            U,
+            H,
+            G,
+            Cv,
+            U0_atom,
+            U_atom,
+            H_atom,
+            G_atom,
+            A,
+            B,
+            C,
+          ]
       qmof150:
         proportion: 0.0
       omol25:

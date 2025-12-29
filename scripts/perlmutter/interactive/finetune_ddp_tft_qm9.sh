@@ -82,7 +82,7 @@ bash -c "
     data.datamodule.batch_size.val=256 \
     data.datamodule.batch_size.test=256 \
     data.datamodule.datasets.qm9.proportion=1.0 \
-    data.datamodule.datasets.qm9.global_property=U0 \
+    data.datamodule.datasets.qm9.global_property=[U0] \
     data.datamodule.datasets.matbench.proportion=0.0 \
     data.datamodule.datasets.matbench.global_property=matbench_mp_gap \
     date=$RUN_DATE \

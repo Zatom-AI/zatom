@@ -18,6 +18,7 @@ sampling:
   steps: 100 # number of ODE steps
   n_jobs: 16 # number of parallel processes for sample evaluation
   data_dir: ${paths.data_dir}
+  save: true
   visualize: true
   save_dir: ${paths.viz_dir}
   removeHs: false # only retain heavy atoms (for molecules)
