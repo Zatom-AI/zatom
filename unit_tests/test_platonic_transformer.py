@@ -7,7 +7,7 @@ from zatom.models.architectures.platoformer import (
     PLATONIC_GROUPS_3D,
     get_platonic_group,
 )
-from zatom.models.architectures.platoformer.transformer_platonic import (
+from zatom.models.architectures.platoformer.transformer import (
     ModernTransformerBlockPlatonic,
     ModernTransformerDecoderBlockPlatonic,
     ModernTransformerPlatonic,

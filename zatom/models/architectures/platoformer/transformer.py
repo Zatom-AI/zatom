@@ -6,13 +6,13 @@ from typing import Literal, Optional, Tuple
 import torch
 import torch.nn as nn
 
-from zatom.models.architectures.platoformer.attention_platonic import (
+from zatom.models.architectures.platoformer.attention import (
     ModernAttentionPlatonic,
 )
-from zatom.models.architectures.platoformer.feedfwd_platonic import (
+from zatom.models.architectures.platoformer.feedfwd import (
     SwiGLUFeedForwardPlatonic,
 )
-from zatom.models.architectures.platoformer.norm_platonic import NormPlatonic
+from zatom.models.architectures.platoformer.norm import NormPlatonic
 from zatom.utils.typing_utils import typecheck
 
 

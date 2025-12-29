@@ -8,7 +8,7 @@ from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn
 
 from zatom.models.architectures.platoformer import get_platonic_group
-from zatom.models.architectures.platoformer.norm_platonic import NormPlatonic
+from zatom.models.architectures.platoformer.norm import NormPlatonic
 from zatom.utils.typing_utils import typecheck
 
 

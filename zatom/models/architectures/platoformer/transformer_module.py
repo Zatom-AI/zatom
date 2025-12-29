@@ -11,16 +11,16 @@ from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor
 
 from zatom.models.architectures.platoformer import get_platonic_group
-from zatom.models.architectures.platoformer.io_platonic import (
+from zatom.models.architectures.platoformer.io import (
     ProjRegularToScalar,
     ProjRegularToVector,
 )
-from zatom.models.architectures.platoformer.norm_platonic import NormPlatonic
-from zatom.models.architectures.platoformer.positional_encoder_platonic import (
+from zatom.models.architectures.platoformer.norm import NormPlatonic
+from zatom.models.architectures.platoformer.positional_encoder import (
     PlatonicLinearAPE,
     PlatonicSinusoidAPE,
 )
-from zatom.models.architectures.platoformer.transformer_platonic import (
+from zatom.models.architectures.platoformer.transformer import (
     ModernTransformerDecoderBlockPlatonic,
     ModernTransformerPlatonic,
 )

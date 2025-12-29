@@ -7,7 +7,7 @@ from zatom.models.architectures.platoformer import (
     PLATONIC_GROUPS_3D,
     get_platonic_group,
 )
-from zatom.models.architectures.platoformer.norm_platonic import NormPlatonic
+from zatom.models.architectures.platoformer.norm import NormPlatonic
 
 
 class TestNormPlatonic(unittest.TestCase):

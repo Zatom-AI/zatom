@@ -8,7 +8,7 @@ from zatom.models.architectures.platoformer import (
     PLATONIC_GROUPS_3D,
     get_platonic_group,
 )
-from zatom.models.architectures.platoformer.positional_encoder_platonic import (
+from zatom.models.architectures.platoformer.positional_encoder import (
     PlatonicLinearAPE,
     PlatonicSinusoidAPE,
 )

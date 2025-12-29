@@ -13,7 +13,7 @@ from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from platonic_transformers.models.platoformer.rope import PlatonicRoPE
 
 from zatom.models.architectures.platoformer import get_platonic_group
-from zatom.models.architectures.platoformer.norm_platonic import NormPlatonic
+from zatom.models.architectures.platoformer.norm import NormPlatonic
 from zatom.models.architectures.transformer.positional_encoder import (
     RotaryPositionalEmbeddings as SequenceRoPE,
 )

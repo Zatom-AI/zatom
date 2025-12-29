@@ -7,7 +7,7 @@ from zatom.models.architectures.platoformer import (
     PLATONIC_GROUPS_3D,
     get_platonic_group,
 )
-from zatom.models.architectures.platoformer.io_platonic import (
+from zatom.models.architectures.platoformer.io import (
     ProjRegularToScalar,
     ProjRegularToVector,
 )

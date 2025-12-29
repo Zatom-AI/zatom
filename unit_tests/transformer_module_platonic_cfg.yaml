@@ -6,13 +6,13 @@ coords_embed_options:
   coords_embed_none: null
 
   coords_embed_linear:
-    _target_: zatom.models.architectures.platoformer.positional_encoder_platonic.PlatonicLinearAPE
+    _target_: zatom.models.architectures.platoformer.positional_encoder.PlatonicLinearAPE
     c_embed: ${multimodal_model.c_model}
     solid_name: ${multimodal_model.solid_name}
     spatial_dims: ${multimodal_model.spatial_dim}
 
   coords_embed_sinusoid:
-    _target_: zatom.models.architectures.platoformer.positional_encoder_platonic.PlatonicSinusoidAPE
+    _target_: zatom.models.architectures.platoformer.positional_encoder.PlatonicSinusoidAPE
     c_embed: ${multimodal_model.c_model} # must be even.
     solid_name: ${multimodal_model.solid_name}
     spatial_dims: ${multimodal_model.spatial_dim}
@@ -23,7 +23,7 @@ coords_embed_options:
 # Actual model config to be instantiated
 #___________________________________________________________________________________________________
 multimodal_model:
-  _target_: zatom.models.architectures.platoformer.transformer_module_platonic.TransformerModulePlatonic
+  _target_: zatom.models.architectures.platoformer.transformer_module.TransformerModulePlatonic
   solid_name: octahedron
   spatial_dim: 3
   c_model: 16 # per group element
@@ -55,7 +55,7 @@ multimodal_model:
   transformer_factory:
     # This is a functools.partial factory method to construct ModernTransformerPlatonic instances.
     # Missing args to be filled in at runtime:  c_model, depth, repr_layer
-    _target_: zatom.models.architectures.platoformer.transformer_platonic.ModernTransformerPlatonic
+    _target_: zatom.models.architectures.platoformer.transformer.ModernTransformerPlatonic
     _partial_: true
     c_qk: 8 # per group element and head
     c_val: 4 # per group element and head
@@ -83,7 +83,7 @@ multimodal_model:
   cross_attn_factory:
     # This is a functools.partial factory method to construct ModernTransformerDecoderBlockPlatonic instances.
     # No missing args to be filled in at runtime;  instantiated via cross_attn_factory().
-    _target_: zatom.models.architectures.platoformer.transformer_platonic.ModernTransformerDecoderBlockPlatonic
+    _target_: zatom.models.architectures.platoformer.transformer.ModernTransformerDecoderBlockPlatonic
     _partial_: true
     c_model: ${..c_model}
     c_qk: ${..transformer_factory.c_qk} # per group element and head
