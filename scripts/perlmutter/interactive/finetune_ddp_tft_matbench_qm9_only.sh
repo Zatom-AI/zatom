@@ -98,7 +98,8 @@ bash -c "
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
     trainer.accumulate_grad_batches=4 \
-    trainer.check_val_every_n_epoch=5
+    trainer.check_val_every_n_epoch=5 \
+    trainer.max_epochs=1200
 "
 
 # Inform user of run completion
