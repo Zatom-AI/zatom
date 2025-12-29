@@ -1,4 +1,4 @@
-name: eval_sweep_300M_geom-speed_2025-12-27_15-00-00
+name: eval_sweep_tft_300M_qm9_2025-12-26_09-00-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -7,11 +7,11 @@ method: grid
 
 metric: # Does not matter, as we are using sweep to run the experiment.
   goal: maximize
-  name: test_geom/valid_rate
+  name: test_qm9/valid_rate
 
 parameters:
   ckpt_path:
-    value: null
+    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_300M_joint_2025-12-21_20-00-00/checkpoints/model-epoch@1049-step@32550-val_qm9_valid_rate@0.9509-val_mp20_valid_rate@0.9084.ckpt"
 
   data:
     values: [joint]
@@ -19,14 +19,8 @@ parameters:
   data.datamodule.datasets.mp20.proportion:
     value: 0.0
 
-  data.datamodule.datasets.qm9.proportion:
-    value: 0.0
-
-  data.datamodule.datasets.geom.proportion:
-    value: 1.0
-
   date:
-    value: "2025-12-27_15-00-00"
+    value: "2025-12-26_09-00-00"
 
   experiment:
     value: eval
@@ -43,17 +37,20 @@ parameters:
   model.sampling.visualize:
     value: false
 
+  model.architecture.pos_interpolant.white_noise_sampling_scale:
+    values: [1.0, 10.0, 50.0, 100.0]
+
   model.sampling.steps:
-    values: [10, 25, 50, 100, 250, 500, 750, 1000]
+    values: [5, 10, 25, 50, 100, 200]
 
   name:
-    value: "eval_${hydra:runtime.choices.model/architecture}_steps-${model.sampling.steps}_geom-speed"
+    value: "eval_${hydra:runtime.choices.model/architecture}_noise-${model.architecture.pos_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_qm9"
 
   seed:
     value: 42
 
   tags:
-    value: ["geom", "fm", "eval", "sweep", "speed"]
+    value: ["qm9", "fm", "eval", "sweep"]
 
 command:
   - ${env}

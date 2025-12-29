@@ -1,4 +1,4 @@
-name: eval_sweep_300M_mp20_2025-12-26_09-00-00
+name: eval_sweep_tft_160M_mp20_2025-12-26_09-00-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -11,7 +11,7 @@ metric: # Does not matter, as we are using sweep to run the experiment.
 
 parameters:
   ckpt_path:
-    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_300M_joint_2025-12-21_20-00-00/checkpoints/model-epoch@1049-step@32550-val_qm9_valid_rate@0.9509-val_mp20_valid_rate@0.9084.ckpt"
+    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_160M_joint_2025-12-22_10-00-00/checkpoints/model-epoch@1899-step@58900-val_qm9_valid_rate@0.9549-val_mp20_valid_rate@0.9036.ckpt"
 
   data:
     values: [joint]
@@ -26,7 +26,7 @@ parameters:
     value: eval
 
   model/architecture:
-    values: [tft_300M]
+    values: [tft_160M]
 
   model.sampling.batch_size:
     value: 1000

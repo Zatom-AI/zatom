@@ -1,0 +1,67 @@
+name: eval_sweep_tft_mp20-only_2025-12-26_09-00-00
+project: zatom
+entity: zatom
+program: zatom/eval_fm.py
+
+method: grid
+
+metric: # Does not matter, as we are using sweep to run the experiment.
+  goal: maximize
+  name: test_mp20/valid_rate
+
+parameters:
+  ckpt_path:
+    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt"
+
+  data:
+    values: [joint]
+
+  data.datamodule.datasets.qm9.proportion:
+    value: 0.0
+
+  date:
+    value: "2025-12-26_09-00-00"
+
+  experiment:
+    value: eval
+
+  model/architecture:
+    values: [tft_80M]
+
+  model.sampling.batch_size:
+    value: 1000
+
+  model.sampling.num_samples:
+    value: 10000
+
+  model.sampling.visualize:
+    value: false
+
+  model.architecture.frac_coords_interpolant.white_noise_sampling_scale:
+    values: [0.01, 0.1]
+
+  model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale:
+    values: [0.01, 0.1]
+
+  model.architecture.angles_radians_interpolant.white_noise_sampling_scale:
+    values: [0.01, 0.1]
+
+  model.sampling.steps:
+    values: [5, 10, 25, 50, 100, 200]
+
+  name:
+    value: "eval_${hydra:runtime.choices.model/architecture}_fc-noise-${model.architecture.frac_coords_interpolant.white_noise_sampling_scale}_ls-noise-${model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale}_ar-noise-${model.architecture.angles_radians_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_mp20-only"
+
+  seed:
+    value: 42
+
+  tags:
+    value: ["mp20-only", "fm", "eval", "sweep"]
+
+command:
+  - ${env}
+  - HYDRA_FULL_ERROR=1
+  - WANDB_START_METHOD=thread
+  - python
+  - ${program}
+  - ${args_no_hyphens}

@@ -10,9 +10,9 @@
 #SBATCH --gpus-per-node=1                                     # request A100 GPU resource(s)
 #SBATCH --ntasks-per-node=1                                   # NOTE: this needs to be `1` on SLURM clusters when using Lightning's `ddp_spawn` strategy`; otherwise, set to match Lightning's quantity of `Trainer(devices=...)`
 #SBATCH --time=00-11:00:00                                    # time limit for the job (up to 2 days: `02-00:00:00`)
-#SBATCH --job-name=eval-sweep-geom                            # job name
-#SBATCH --output=scripts/perlmutter/regular/logs/eval_sweep_geom%j.out  # output log file
-#SBATCH --error=scripts/perlmutter/regular/logs/eval_sweep_geom%j.err   # error log file
+#SBATCH --job-name=eval-sweep-tft-geom                        # job name
+#SBATCH --output=scripts/perlmutter/regular/logs/eval_sweep_tft_geom%j.out  # output log file
+#SBATCH --error=scripts/perlmutter/regular/logs/eval_sweep_tft_geom%j.err   # error log file
 #SBATCH --array=0-7                                           # create an array of jobs for the sweep (0-11 or 12 total for finetuning and 0-7 or 8 total for generative evaluation)
 
 # Wait for 5-10 seconds randomly to avoid race condition
