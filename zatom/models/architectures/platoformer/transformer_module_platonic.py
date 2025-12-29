@@ -38,7 +38,23 @@ log = RankedLogger(__name__, rank_zero_only=True)
 class TransformerModulePlatonic(nn.Module):
     """Platonic Transformer model for molecule and material generation.
 
+    Equivariant under actions of a Platonic solid group G, approximating full O(3)-equivariance.
+    Internal features are regular G-representations: there are channels associated to each group
+    element, permuting according to the group action. These features are of shape (B, N, G*C), but
+    should be thought of as shape (B, N, G, C).
+    The model input are Euclidean coordinates (vectors) and a bunch of invariant tensors (scalars).
+    Equivariant vector outputs are coordinates and auxiliary force predictions and, again, a lot of
+    scalar quantities.
+
+    The model sees Euclidean coordinates in two ways:
+     1) An initial Platonic absolute position embedding (APE) prior to the transformer trunk. These
+        position embeddings break translational symmetry, but are designed to respect Platonic group
+        equivariance. One can choose different Platonic APE implementations or entirely disable APE.
+     2) Platonic transformer style rotary position embeddings (RoPE) in self- and cross-attention
+        layers. Platonic RoPE respects both translations and Platonic symmetries.
+
     Args:
+        solid_name:           String identifying the Platonic solid group.
         spatial_dim:          Dimension of spatial coordinates (e.g., 3 for 3D).
         c_model:              Number of channels per group element.
         c_aux:                Number of channels per group element in the auxiliary task heads.
@@ -49,7 +65,6 @@ class TransformerModulePlatonic(nn.Module):
         num_properties:       Number of global properties to predict.
         dataset_embedder:     The dataset embedder module.
         spacegroup_embedder:  The spacegroup embedder module.
-        solid_name:           String identifying the Platonic solid group.
         transformer_factory:  Partial __init__ for ModernTransformerPlatonic with (c_model, depth,
                               repr_layer) filled in at runtime. Used to instantiate both the trunk
                               and auxiliary transformers.
@@ -64,11 +79,11 @@ class TransformerModulePlatonic(nn.Module):
                                 the full model will be translation and Platonic group equivariant.
                                 This might not work well together with cross-attention since there
                                 are no absolute position embeddings to attend to!
-        normalize_per_g:        If False, Platonic normalization layers operate over the last
-                                (channel) axis only. If True, acting on the group axis as well.
         use_sequence_sin_ape: Whether to add sinusoidal positional encoding along *sequence*
                               dimension (in SMILES ordering).
         concat_combine_input: Whether to concatenate and combine inputs.
+        normalize_per_g:      If False, Platonic normalization layers operate over the last
+                              (channel) axis only. If True, acting on the group axis as well.
         custom_weight_init:   Custom weight initialization method.
                               NOTE: not yet implemented.
     """
@@ -76,6 +91,7 @@ class TransformerModulePlatonic(nn.Module):
     @typecheck
     def __init__(
         self,
+        solid_name: str,  # in PLATONIC_GROUPS_3D
         spatial_dim: int,
         c_model: int,
         c_aux: int,
@@ -86,13 +102,12 @@ class TransformerModulePlatonic(nn.Module):
         num_properties: int,
         dataset_embedder: nn.Module,
         spacegroup_embedder: nn.Module,
-        solid_name: str,  # in PLATONIC_GROUPS_3D
         transformer_factory: Callable[..., ModernTransformerPlatonic],
         cross_attn_factory: Optional[Callable[[], ModernTransformerDecoderBlockPlatonic]],
         coords_embed: Optional[Literal[PlatonicSinusoidAPE, PlatonicLinearAPE]] = None,
-        normalize_per_g: bool = True,
         use_sequence_sin_ape: bool = True,
         concat_combine_input: bool = False,
+        normalize_per_g: bool = True,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
         ] = None,
@@ -125,24 +140,26 @@ class TransformerModulePlatonic(nn.Module):
         # __________________________________________________________________________________________
         # __EMBEDDINGS______________________________________________________________________________
 
-        # Global invariant embeddings
+        # Global E(3)-invariant embeddings
         self.dataset_embedder = dataset_embedder
         self.spacegroup_embedder = spacegroup_embedder
         self.time_encoding = TimeFourierEncoding(posenc_dim=c_model, max_len=200)
 
-        # Node-wise invariant embeddings
+        # Node-wise E(3)-invariant embeddings
         self.atom_type_embed = nn.Embedding(num_atom_types, c_model)
         self.frac_coords_embed = nn.Linear(
             spatial_dim, c_model, bias=False
-        )  # *scalar* coeffs relative to equivariant lattice basis
+        )  # fractional coordinates are *scalar* coefficients relative to equivariant lattice basis
         self.lengths_scaled_embed = nn.Linear(spatial_dim, c_model, bias=False)
         self.angles_radians_embed = nn.Linear(spatial_dim, c_model, bias=False)
-        if self.use_sequence_sin_ape:
+        if use_sequence_sin_ape:
             self.sequence_sin_ape = SinusoidEncoding(
                 posenc_dim=c_model, max_len=350
             )  # NOTE: along sequence axis in SMILES ordering, not Euclidean positions
 
-        # Node-wise Platonic group equivariant Euclidean coordinate embedding or None
+        # Euclidean coordinates embedding. Two options:
+        # - Platonic group equivariant APE  (breaking translation equivariance)
+        # - None                            (fully E(3)-invariant, coords invisible to the network)
         self.coords_embed = coords_embed
         assert (
             isinstance(coords_embed, (PlatonicSinusoidAPE, PlatonicLinearAPE))
@@ -152,33 +169,34 @@ class TransformerModulePlatonic(nn.Module):
         # Linear layers for combining embeddings when using concatenation
         if concat_combine_input:
             if coords_embed is None:
-                # Conventional linear layer, applied *before* lifting to G
+                # Conventional linear layer, applied to scalars *before* lifting to G
                 self.combine_input = nn.Linear(
-                    c_model * self.cond_dim,
-                    c_model,
+                    in_features=c_model * self.cond_dim,
+                    out_features=c_model,
                 )
             else:
                 # Platonic linear layer, applied *after* lifting to G
                 self.combine_input = PlatonicLinear(
-                    G * c_model * self.cond_dim,
-                    G * c_model,
+                    in_features=G * c_model * self.cond_dim,
+                    out_features=G * c_model,
                     solid=solid_name,
                 )
 
         # __________________________________________________________________________________________
         # __TRANSFORMER_____________________________________________________________________________
 
-        # Transformer trunk
         self.transformer_norm = NormPlatonic(
             "RMSNorm", solid_name, c_model, normalize_per_g, bias=False
         )
+
+        # Transformer trunk  (ModernTransformerPlatonic)
         self.transformer = transformer_factory(
             c_model=c_model,
             depth=num_layers,
             repr_layer=aux_layer,
         )
 
-        # Optional cross attention layers
+        # Optional cross attention layers  (ModernTransformerDecoderBlockPlatonic)
         if self.use_cross_attn:
             self.atom_types_cross_attn = cross_attn_factory()
             self.coords_cross_attn = cross_attn_factory()
@@ -426,20 +444,16 @@ class TransformerModulePlatonic(nn.Module):
         # First combine invariant embeddings via concatenation or sum, then lift to G.
         if self.coords_embed is None:
 
-            # Concatenate invariant embeddings along channels, shape (B, N, 6*c_model)
             if self.concat_combine_input:
-                embed_lengths_scaled = embed_lengths_scaled.unsqueeze(1).expand(-1, N, -1)
-                embed_angles_radians = embed_angles_radians.unsqueeze(1).expand(-1, N, -1)
-                embed_conditions = embed_conditions.unsqueeze(1).expand(-1, N, -1)
-
+                # Concatenate invariant embeddings along channels, shape (B, N, 6*c_model)
                 h_in = torch.cat(
                     [
                         embed_atom_types,
                         embed_frac_coords,
-                        embed_lengths_scaled,
-                        embed_angles_radians,
                         embed_sequence,
-                        embed_conditions,
+                        embed_lengths_scaled.expand(-1, N, -1),
+                        embed_angles_radians.expand(-1, N, -1),
+                        embed_conditions.expand(-1, N, -1),
                     ],
                     dim=-1,
                 )
@@ -452,8 +466,8 @@ class TransformerModulePlatonic(nn.Module):
                 h_in = self.combine_input(h_in)  # (B, N, c_model)
                 assert h_in.shape == (B, N, self.c_model), f"h_in.shape: {h_in.shape}"
 
-            # Sum invariant embeddings, shape (B, N, c_model)
             else:
+                # Sum invariant embeddings, shape (B, N, c_model)
                 h_in = (
                     embed_atom_types
                     + embed_frac_coords
@@ -483,31 +497,27 @@ class TransformerModulePlatonic(nn.Module):
             embed_angles_radians = self.G_lift_scalars(embed_angles_radians).expand(-1, N, -1)
             embed_conditions = self.G_lift_scalars(embed_conditions).expand(-1, N, -1)
 
-            # Concatenate all 6+1 lifted embeddings along channels, shape (B, N, 7*c_model)
             if self.concat_combine_input:
+                # Concatenate all 6+1 lifted embeddings along channels, shape (B, N, 7*G*c_model)
                 h_in = torch.cat(
                     [
-                        embed_atom_types,
-                        embed_coords,
-                        embed_frac_coords,
-                        embed_lengths_scaled,
-                        embed_angles_radians,
-                        embed_sequence,
-                        embed_conditions,
+                        embed_atom_types.view(B, N, self.G, self.c_model),
+                        embed_coords.view(B, N, self.G, self.c_model),
+                        embed_frac_coords.view(B, N, self.G, self.c_model),
+                        embed_lengths_scaled.view(B, N, self.G, self.c_model),
+                        embed_angles_radians.view(B, N, self.G, self.c_model),
+                        embed_sequence.view(B, N, self.G, self.c_model),
+                        embed_conditions.view(B, N, self.G, self.c_model),
                     ],
                     dim=-1,
-                )
-                assert h_in.shape == (
-                    B,
-                    N,
-                    self.hidden_dim * self.cond_dim,
-                ), f"h_in.shape: {h_in.shape}"
-                # Combine them via PlatonicLinear(7*C, C)
-                h_in = self.combine_input(h_in)  # (B, N, C)
-                assert h_in.shape == (B, N, self.hidden_dim), f"h_in.shape: {h_in.shape}"
+                ).view(B, N, self.G * self.c_model * self.cond_dim)
 
-            # Sum all 6+1 lifted embeddings, shape (B, N, C)
+                # Combine them via PlatonicLinear(7*G*c_model, G*c_model)
+                h_in = self.combine_input(h_in)  # (B, N, G*c_model)
+                assert h_in.shape == (B, N, self.G * self.c_model), f"h_in.shape: {h_in.shape}"
+
             else:
+                # Sum all 6+1 lifted embeddings, shape (B, N, G*c_model)
                 h_in = (
                     embed_atom_types
                     + embed_coords

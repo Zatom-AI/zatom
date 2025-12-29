@@ -1,0 +1,110 @@
+#___________________________________________________________________________________________________
+# Coordinate embedding implementation options.
+# Dynamically injected into multimodal_model.coords_embed at runtime.
+#___________________________________________________________________________________________________
+coords_embed_options:
+  coords_embed_none: null
+
+  coords_embed_linear:
+    _target_: zatom.models.architectures.platoformer.positional_encoder_platonic.PlatonicLinearAPE
+    c_embed: ${multimodal_model.c_model}
+    solid_name: ${multimodal_model.solid_name}
+    spatial_dims: ${multimodal_model.spatial_dim}
+
+  coords_embed_sinusoid:
+    _target_: zatom.models.architectures.platoformer.positional_encoder_platonic.PlatonicSinusoidAPE
+    c_embed: ${multimodal_model.c_model} # must be even.
+    solid_name: ${multimodal_model.solid_name}
+    spatial_dims: ${multimodal_model.spatial_dim}
+    freq_sigma: 0.5 # Standard deviation for sampling the initial random frequencies.
+    learned_freqs: false
+
+#___________________________________________________________________________________________________
+# Actual model config to be instantiated
+#___________________________________________________________________________________________________
+multimodal_model:
+  _target_: zatom.models.architectures.platoformer.transformer_module_platonic.TransformerModulePlatonic
+  solid_name: octahedron
+  spatial_dim: 3
+  c_model: 16 # per group element
+  c_aux: 12 # per group element
+  num_atom_types: 42
+  num_layers: 4
+  num_aux_layers: 2
+  aux_layer: 3
+  num_properties: 3
+  use_sequence_sin_ape: true
+  concat_combine_input: true
+  normalize_per_g: true
+  custom_weight_init: null
+
+  dataset_embedder:
+    _target_: zatom.models.architectures.transformer.common.LabelEmbedder
+    num_classes: 43
+    hidden_size: ${..c_model}
+    dropout_prob: 0.0
+
+  spacegroup_embedder:
+    _target_: zatom.models.architectures.transformer.common.LabelEmbedder
+    num_classes: 44
+    hidden_size: ${..c_model}
+    dropout_prob: 0.0
+
+  coords_embed: ${coords_embed_options.coords_embed_sinusoid}
+
+  transformer_factory:
+    # This is a functools.partial factory method to construct ModernTransformerPlatonic instances.
+    # Missing args to be filled in at runtime:  c_model, depth, repr_layer
+    _target_: zatom.models.architectures.platoformer.transformer_platonic.ModernTransformerPlatonic
+    _partial_: true
+    c_qk: 8 # per group element and head
+    c_val: 4 # per group element and head
+    n_heads: 4
+    ### Platonic attention specific args
+    solid_name: ${..solid_name}
+    freq_sigma_platonic: 1.0 # ???
+    freq_init_platonic: "random"
+    learned_freqs_platonic: true
+    bias: false
+    mean_aggregation: false
+    linear_attention: false
+    use_key: false
+    ### Modern attention specific args
+    context_length: 2048
+    sequence_rope_base: 10000
+    qk_layernorm: true
+    qk_norm_per_g: ${..normalize_per_g}
+    attn_backend: SDPA # SDPA, JVP_ATTN, MANUAL
+    ### Normalization args
+    normalize_per_g: ${..normalize_per_g}
+    norm_elementwise_affine: true
+
+  # cross_attn_factory: null
+  cross_attn_factory:
+    # This is a functools.partial factory method to construct ModernTransformerDecoderBlockPlatonic instances.
+    # No missing args to be filled in at runtime;  instantiated via cross_attn_factory().
+    _target_: zatom.models.architectures.platoformer.transformer_platonic.ModernTransformerDecoderBlockPlatonic
+    _partial_: true
+    c_model: ${..c_model}
+    c_qk: ${..transformer_factory.c_qk} # per group element and head
+    c_val: ${..transformer_factory.c_val} # per group element and head
+    n_heads: ${..transformer_factory.n_heads}
+    ### Platonic attention specific args
+    solid_name: ${..solid_name}
+    freq_sigma_platonic: ${..transformer_factory.freq_sigma_platonic}
+    freq_init_platonic: ${..transformer_factory.freq_init_platonic}
+    learned_freqs_platonic: ${..transformer_factory.learned_freqs_platonic}
+    bias: ${..transformer_factory.bias}
+    mean_aggregation: ${..transformer_factory.mean_aggregation}
+    linear_attention: ${..transformer_factory.linear_attention}
+    use_key: ${..transformer_factory.use_key}
+    ### Modern attention specific args
+    context_length: ${..transformer_factory.context_length}
+    sequence_rope_base: ${..transformer_factory.sequence_rope_base}
+    use_sequence_rope_cross: true
+    qk_layernorm: ${..transformer_factory.qk_layernorm}
+    qk_norm_per_g: ${..transformer_factory.qk_norm_per_g}
+    attn_backend: ${..transformer_factory.attn_backend}
+    ### Normalization args
+    normalize_per_g: ${..transformer_factory.normalize_per_g}
+    norm_elementwise_affine: ${..transformer_factory.norm_elementwise_affine}
