@@ -136,6 +136,6 @@ aux_hidden_size: 512 # (fixed) hidden size for auxiliary task layers
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 8
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
-time_distribution: beta # note: must be one of (`uniform`, `beta`, `histogram`)
+time_distribution: beta # NOTE: must be one of (`uniform`, `beta`, `histogram`)
 time_alpha_factor: 1.8
 test_so3_equivariance: false

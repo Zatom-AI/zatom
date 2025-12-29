@@ -79,6 +79,7 @@ class TransformerModule(nn.Module):
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
         ] = None,
+        **kwargs,
     ):
         super().__init__()
 

@@ -157,3 +157,6 @@ configs/local/default.yaml
 
 # Aim logging
 .aim
+
+# NFS files
+.nfs*
