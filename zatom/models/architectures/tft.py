@@ -8,7 +8,7 @@ Adapted from:
 
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Dict, List, Literal, Tuple
+from typing import Callable, Dict, List, Literal, Tuple
 
 import torch
 import torch.nn as nn
@@ -120,6 +120,13 @@ class TFT(nn.Module):
             )
 
         # Build multimodal model
+        kwargs.update(
+            {
+                # Support TFP-style config args
+                "c_model": hidden_size,
+                "c_aux": aux_hidden_size,
+            }
+        )
         self.model = multimodal_model(
             num_heads=token_num_heads,
             num_layers=num_layers,

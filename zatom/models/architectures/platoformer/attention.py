@@ -128,9 +128,7 @@ class ModernAttentionPlatonic(nn.Module):
                 base=sequence_rope_base,
             )
         else:
-            assert (
-                context_length is None and sequence_rope_base is None
-            ), "context_length and sequence_rope_base need to be both None or both not None."
+            # NOTE: If either is None, disable sequence RoPE
             self.sequence_rope = None
 
         # Platonic RoPE for Euclidean coordinates
@@ -181,9 +179,7 @@ class ModernAttentionPlatonic(nn.Module):
         Returns:
             Projected attention output tensor                                       [B, NQ, G*c_out]
         """
-        if self.sequence_rope is None:
-            assert sequence_idxs is None, "SequenceRope is disabled, don't pass sequence_idxs."
-        else:
+        if self.sequence_rope is not None:
             assert sequence_idxs is not None, "SequenceRope requires sequence_idxs to be passed."
 
         # Self-attention:  set KV-tensors = Q-tensors
@@ -277,7 +273,17 @@ class ModernAttentionPlatonic(nn.Module):
                 final_mask = final_mask.reshape(B, G * H, NQ, NKV)
                 # Sanity check:  efficient strides for pure padding_mask
                 if attn_mask is None:
-                    assert final_mask.stride() == (NKV, 0, 0, 1)
+                    # Ensure final_mask has efficient strides: (NKV, 0, 0, 1)
+                    if final_mask.stride() != (NKV, 0, 0, 1):
+                        # Use .as_strided to create a view with the desired strides
+                        final_mask = final_mask.as_strided(
+                            size=(B, G * H, NQ, NKV),
+                            stride=(NKV, 0, 0, 1),
+                        )
+                    assert final_mask.stride() == (NKV, 0, 0, 1), (
+                        "final_mask has inefficient strides, "
+                        "potentially leading to O(N^2) memory IO in attention kernel."
+                    )
 
             if self.attn_backend == "SDPA":
                 # Use PyTorch's optimized scaled dot-product attention (SDPA)

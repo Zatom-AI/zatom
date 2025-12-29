@@ -2,7 +2,7 @@
 
 from functools import partial
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -105,7 +105,7 @@ class TransformerModulePlatonic(nn.Module):
         spacegroup_embedder: nn.Module,
         transformer_factory: Callable[..., ModernTransformerPlatonic],
         cross_attn_factory: Optional[Callable[[], ModernTransformerDecoderBlockPlatonic]],
-        coords_embed: Optional[Literal[PlatonicSinusoidAPE, PlatonicLinearAPE]] = None,  # type: ignore
+        coords_embed: Optional[Union[PlatonicSinusoidAPE, PlatonicLinearAPE]] = None,  # type: ignore
         context_length: int = 2048,
         use_sequence_sin_ape: bool = True,
         concat_combine_input: bool = False,
@@ -136,6 +136,7 @@ class TransformerModulePlatonic(nn.Module):
         self.num_properties = num_properties
         self.context_length = context_length
 
+        self.jvp_attn = kwargs.get("attn_backend", "MANUAL") == "JVP_ATTN"
         self.use_cross_attn = cross_attn_factory is not None
         self.use_sequence_sin_ape = use_sequence_sin_ape
         self.concat_combine_input = concat_combine_input
@@ -569,7 +570,7 @@ class TransformerModulePlatonic(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],
@@ -801,7 +802,7 @@ class TransformerModulePlatonic(nn.Module):
             Float["b 1 3"],  # type: ignore - angles_radians
         ],
         Tuple[
-            Float["b 1 1"],  # type: ignore - global_property
+            Float["b 1 p"],  # type: ignore - global_property
             Float["b 1 1"],  # type: ignore - global_energy
             Float["b m 3"],  # type: ignore - atomic_forces
         ],
