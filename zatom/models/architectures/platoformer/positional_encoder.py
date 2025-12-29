@@ -1,5 +1,3 @@
-import torch
-import torch.nn as nn
 from platonic_transformers.models.platoformer.ape import PlatonicAPE
 from platonic_transformers.models.platoformer.io import lift_vectors
 from platonic_transformers.models.platoformer.linear import PlatonicLinear

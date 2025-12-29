@@ -3,8 +3,7 @@ from types import SimpleNamespace
 
 import hydra
 import torch
-import torch.nn as nn
-from omegaconf import DictConfig, OmegaConf, open_dict
+from omegaconf import OmegaConf
 from tqdm import tqdm
 
 from zatom.models.architectures.platoformer import (

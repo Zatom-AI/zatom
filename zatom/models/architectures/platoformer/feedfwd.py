@@ -2,7 +2,6 @@
 
 from typing import Optional
 
-import torch
 import torch.nn.functional as F
 from platonic_transformers.models.platoformer.linear import PlatonicLinear
 from torch import Tensor, nn

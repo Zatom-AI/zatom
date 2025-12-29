@@ -1,7 +1,6 @@
 import unittest
 
 import torch
-import torch.nn as nn
 
 from zatom.models.architectures.platoformer import (
     PLATONIC_GROUPS_3D,
