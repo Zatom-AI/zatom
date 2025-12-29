@@ -1,15 +1,15 @@
 #!/bin/bash -l
 
 # salloc -C "gpu&hbm80g" \
-#        --qos=interactive \
+#        --qos=shared_interactive \
 #        --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
 #        --module=gpu,nccl-plugin \
 #        --account=m5008 \
-#        --nodes=4 \
-#        --gpus-per-node=4 \
-#        --ntasks-per-node=4 \
+#        --nodes=1 \
+#        --gpus-per-node=2 \
+#        --ntasks-per-node=2 \
 #        --time=04:00:00 \
-#        --job-name=tft-300M-joint
+#        --job-name=finetune-tft-80M-matbench-qm9-only
 
 # Determine location of the project's directory
 # PROJECT_ID="dasrepo"
@@ -34,11 +34,11 @@ mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="i1upnjuo"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2025-12-21_20-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="60o406xb"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2025-12-27_09-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
-DEFAULT_EXPERIMENT="train"                # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
-DEFAULT_ARCHITECTURE="tft_300M"           # NOTE: Set the model architecture to be used, must be one of (`{tft,tfp}_80M`, `{tft,tfp}_160M`, `{tft,tfp}_300M`)
+DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
+DEFAULT_ARCHITECTURE="tft_80M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,tfp}_80M`, `{tft,tfp}_160M`, `{tft,tfp}_300M`)
 
 DATASET=${1:-$DEFAULT_DATASET}            # First argument or default dataset if not provided
 RUN_ID=${2:-$DEFAULT_RUN_ID}              # Second argument or default ID if not provided
@@ -47,10 +47,11 @@ MODEL=${4:-$DEFAULT_MODEL}                # Fourth argument or default model if 
 EXPERIMENT=${5:-$DEFAULT_EXPERIMENT}      # Fifth argument or default experiment if not provided
 ARCHITECTURE=${6:-$DEFAULT_ARCHITECTURE}  # Sixth argument or default architecture if not provided
 
-TASK_NAME="train_fm"                                                   # Name of the task to perform
-RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_joint"     # Name of the model type and dataset configuration
+TASK_NAME="finetune_fm"                                                              # Name of the task to perform
+RUN_NAME="${EXPERIMENT}_model-${MODEL}_arch-${ARCHITECTURE}_qm9_only_matbench"       # Name of the model type and dataset configuration
 
-CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/" # Path at which to find model checkpoints
+PRETRAINED_CKPT_PATH="logs/train_fm/runs/train_model-zatom_arch-tft_80M_QM9_2025-12-21_09-00-00/checkpoints/model-epoch@399-step@9600-val_qm9_valid_rate@0.9677-val_mp20_valid_rate@0.0000.ckpt"  # Path at which to find (initial) pretrained model checkpoint
+CKPT_PATH="logs/$TASK_NAME/runs/${RUN_NAME}_${RUN_DATE}/checkpoints/"  # Path at which to find model checkpoints from which to resume
 mkdir -p "$CKPT_PATH"
 
 # Inform user of job details
@@ -72,15 +73,22 @@ echo -e "\nCurrent time: $(date)"
 echo "Current directory: $(pwd)"
 echo "Current node: $(hostname)"
 
-echo -e "\nExecuting script $TASK_NAME.py:\n========================================================================\n"
+echo -e "\nExecuting script train_fm.py:\n========================================================================\n"
 
 # Run script
 bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME WANDB_CACHE_DIR=$WANDB_CACHE_DIR WANDB_ARTIFACT_DIR=$WANDB_ARTIFACT_DIR \
-    srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
+    srun --kill-on-bad-exit=1 shifter python zatom/train_fm.py \
+    pretrained_ckpt_path=$PRETRAINED_CKPT_PATH \
     ckpt_path=$CKPT_PATH \
+    callbacks.model_checkpoint.monitor=val_matbench/aux_global_property_loss \
     data=$DATASET \
+    data.datamodule.batch_size.train=32 \
+    data.datamodule.batch_size.val=32 \
+    data.datamodule.batch_size.test=32 \
+    data.datamodule.datasets.qm9.proportion=1.0 \
+    data.datamodule.datasets.matbench.proportion=1.0 \
     date=$RUN_DATE \
     experiment=$EXPERIMENT \
     model=$MODEL \
@@ -88,7 +96,10 @@ bash -c "
     name=$RUN_NAME \
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
-    trainer.devices=$SLURM_NTASKS_PER_NODE
+    trainer.devices=$SLURM_NTASKS_PER_NODE \
+    trainer.accumulate_grad_batches=4 \
+    trainer.check_val_every_n_epoch=5 \
+    trainer.max_epochs=1200
 "
 
 # Inform user of run completion

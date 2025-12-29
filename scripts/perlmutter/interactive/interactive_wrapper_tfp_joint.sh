@@ -6,17 +6,17 @@ COUNT=1
 while [ $COUNT -le $MAX_RETRIES ]; do
     echo "[$COUNT/$MAX_RETRIES] Requesting new interactive allocation..."
 
-    salloc -C "gpu&hbm40g" \
-           --qos=shared_interactive \
+    salloc -C "gpu&hbm80g" \
+           --qos=interactive \
            --image=registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1 \
            --module=gpu,nccl-plugin \
            --account=m5008 \
-           --nodes=1 \
-           --gpus-per-node=1 \
-           --ntasks-per-node=1 \
+           --nodes=4 \
+           --gpus-per-node=4 \
+           --ntasks-per-node=4 \
            --time=04:00:00 \
-           --job-name=finetune-tft-80M-qm9 \
-           bash -c "bash scripts/perlmutter/interactive/finetune_ddp_tft_qm9.sh"
+           --job-name=tfp-80M-joint \
+           bash -c "bash scripts/perlmutter/interactive/train_ddp_tfp_joint.sh"
 
     echo "Job finished or timed out. Restarting..."
     COUNT=$((COUNT + 1))
