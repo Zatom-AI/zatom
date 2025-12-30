@@ -69,10 +69,10 @@ class ModernTransformerBlockPlatonic(nn.Module):
         context_length: Optional[int] = 2048,
         sequence_rope_base: Optional[int] = 10_000,
         qk_layernorm: bool = True,
-        qk_norm_per_g: bool = True,  # TODO: test what works best here
+        qk_norm_per_g: bool = True,  # TODO: Test what works best here
         attn_backend: Literal["SDPA", "JVP_ATTN", "MANUAL"] = "SDPA",
         ### Normalization args
-        normalize_per_g: bool = True,  # TODO: test what works best here
+        normalize_per_g: bool = True,  # TODO: Test what works best here
         norm_elementwise_affine: bool = True,
     ):
         super().__init__()
@@ -216,10 +216,10 @@ class ModernTransformerDecoderBlockPlatonic(nn.Module):
         sequence_rope_base: Optional[int] = 10_000,
         use_sequence_rope_cross: bool = False,
         qk_layernorm: bool = True,
-        qk_norm_per_g: bool = True,  # TODO: test what works best here
+        qk_norm_per_g: bool = True,  # TODO: Test what works best here
         attn_backend: Literal["SDPA", "JVP_ATTN", "MANUAL"] = "SDPA",
         ### Normalization args
-        normalize_per_g: bool = True,  # TODO: test what works best here
+        normalize_per_g: bool = True,  # TODO: Test what works best here
         norm_elementwise_affine: bool = True,
     ):
         super().__init__()
@@ -406,10 +406,10 @@ class ModernTransformerPlatonic(nn.Module):
         context_length: Optional[int] = 2048,
         sequence_rope_base: Optional[int] = 10_000,
         qk_layernorm: bool = True,
-        qk_norm_per_g: bool = True,  # TODO: test what works best here
+        qk_norm_per_g: bool = True,  # TODO: Test what works best here
         attn_backend: Literal["SDPA", "JVP_ATTN", "MANUAL"] = "SDPA",
         ### Normalization args
-        normalize_per_g: bool = True,  # TODO: test what works best here
+        normalize_per_g: bool = True,  # TODO: Test what works best here
         norm_elementwise_affine: bool = True,
         ###
         repr_layer: Optional[int] = None,

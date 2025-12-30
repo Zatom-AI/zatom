@@ -726,7 +726,6 @@ class Zatom(LightningModule):
                 is_mptrj_dataset = batch.dataset_idx == self.dataset_to_index.get("mptrj", -1)
                 if is_omol25_dataset.any():
                     # Rotate non-periodic atomic forces accordingly
-                    # TODO: Decide if non-periodic forces need to be zero-centered just like `batch.pos[~batch.node_is_periodic]`
                     is_omol25_node = is_omol25_dataset[batch.batch]
                     forces_aug = torch.einsum(
                         "bi,bij->bj", batch.y[:, 1:4], rot_for_nodes.transpose(-2, -1)

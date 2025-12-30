@@ -163,6 +163,7 @@ class TransformerModule(nn.Module):
             nn.Linear(hidden_dim, atom_dim),
         )
         self.out_pos = nn.Sequential(
+            # TODO: Maybe replace LayerNorm with RMSNorm
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, spatial_dim, bias=False),
         )
