@@ -184,7 +184,7 @@ angles_radians_interpolant:
     eps: 1e-6
 
 # General architecture parameters
-batch_size_scale_factor: 1 # 2, 1, 0.5 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
+batch_size_scale_factor: 0.5 # 1, 0.5, 0.25 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
 hidden_size: 100 # 80, 100, 140 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
