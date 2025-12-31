@@ -184,16 +184,16 @@ angles_radians_interpolant:
     eps: 1e-6
 
 # General architecture parameters
-batch_size_scale_factor: 1 # 1, 0.5, 0.25 -> 80M/G, 160M/G, 300M/G model sizes (where G=24 is the octahedral group size)
-hidden_size: 20 # 20, 28, 36 -> 80M/G, 160M/G, 300M/G model sizes (where G=24 is the octahedral group size)
+batch_size_scale_factor: 2 # 2, 1, 0.5 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
+hidden_size: 80 # 80, 100, 140 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
-aux_hidden_size: 20 # (fixed) hidden size for auxiliary task layers
+aux_hidden_size: 80 # (fixed) hidden size for auxiliary task layers
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 4
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # NOTE: must be one of (`uniform`, `beta`, `histogram`)
-solid_name: octahedron # NOTE: must be one of `zatom.models.architectures.platoformer.PLATONIC_GROUPS_3D`
+solid_name: tetrahedron # NOTE: must be one of `zatom.models.architectures.platoformer.PLATONIC_GROUPS_3D`
 attn_backend: SDPA # NOTE: must be one of (`SDPA`, `JVP_ATTN`, `MANUAL`)
 time_alpha_factor: 1.8
 normalize_per_g: true
