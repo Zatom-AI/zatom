@@ -79,6 +79,7 @@ bash -c "
     unset NCCL_CROSS_NIC \
     && HYDRA_FULL_ERROR=1 WANDB_RESUME=allow WANDB_RUN_ID=$RUN_ID TORCH_HOME=$TORCH_HOME HF_HOME=$HF_HOME WANDB_CACHE_DIR=$WANDB_CACHE_DIR WANDB_ARTIFACT_DIR=$WANDB_ARTIFACT_DIR \
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
+    callbacks.last_model_checkpoint.every_n_train_steps=4000 \
     ckpt_path=$CKPT_PATH \
     data=$DATASET \
     date=$RUN_DATE \
