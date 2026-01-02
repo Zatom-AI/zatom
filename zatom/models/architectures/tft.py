@@ -579,7 +579,7 @@ class TFT(nn.Module):
                     aux_loss_value = err.abs().sum(0).squeeze(0) / (aux_mask.sum(0) + eps)
                 elif aux_task == "global_energy":
                     # Mean squared error per example
-                    # TODO: clarify `aux_target` shape with @alexmorehead –– the masking seems extraneous
+                    # TODO: Clarify `aux_target` shape with @alexmorehead –– the masking seems extraneous
                     err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = torch.sum(err.pow(2)) / (aux_mask.sum() + eps)
 
@@ -593,7 +593,7 @@ class TFT(nn.Module):
                     aux_mask = aux_mask * real_mask.unsqueeze(-1)
                     n_tokens = aux_mask.all(-1).sum(dim=-1)
                     
-                    # TODO: clarify `aux_target` shape with @alexmorehead –– the masking seems extraneous
+                    # TODO: Clarify `aux_target` shape with @alexmorehead –– the masking seems extraneous
                     err = torch.sqrt(((aux_pred - aux_target) * aux_mask).pow(2).sum(-1) + eps)
                     aux_loss_value = err.sum() / ((real_mask.any(-1) * n_tokens).sum() + eps)
                     aux_loss_value = aux_loss_value * self.force_loss_weight

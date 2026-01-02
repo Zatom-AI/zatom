@@ -595,8 +595,8 @@ class TransformerModule(nn.Module):
         atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
         
         if self.is_conservative:
-            # compute conservative atomic forces as negative gradient of global energy w.r.t. positions
-            # NOTE: no need to explicitly include grad_outputs in the autograd call since we're summing the energies up anyway
+            # Compute conservative atomic forces as negative gradient of global energy w.r.t. positions
+            # NOTE: No need to explicitly include grad_outputs in the autograd call since we're summing the energies up anyway
             conservative_atomic_forces = -torch.autograd.grad(global_energy.sum(), pos, create_graph=True, retain_graph=True)[0] * real_mask.unsqueeze(-1)
             assert conservative_atomic_forces.shape == atomic_forces.shape, f"conservative_atomic_forces.shape: {conservative_atomic_forces.shape}, atomic_forces.shape: {atomic_forces.shape}"
             atomic_forces = conservative_atomic_forces
@@ -711,3 +711,5 @@ class TransformerModule(nn.Module):
             eps_aux.append(torch.cat([half_aux, half_aux], dim=0))
 
         return tuple(eps), tuple(eps_aux)
+
+if __name__ == "__main__":
