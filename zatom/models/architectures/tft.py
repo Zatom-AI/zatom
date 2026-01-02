@@ -579,15 +579,32 @@ class TFT(nn.Module):
                     aux_loss_value = err.abs().sum(0).squeeze(0) / (aux_mask.sum(0) + eps)
                 elif aux_task == "global_energy":
                     # Mean squared error per example
+                    # TODO: clarify `aux_target` shape with @alexmorehead –– the masking seems extraneous
                     err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = torch.sum(err.pow(2)) / (aux_mask.sum() + eps)
+
+                    """
+                    # Alternate logic:
+                    err = (aux_pred - aux_target) * aux_mask
+                    aux_loss_value = err.pow(2).sum() / (aux_mask.sum() + eps)
+                    """
                 elif aux_task == "atomic_forces":
                     # Mean absolute error (in eV/Å) per atom
                     aux_mask = aux_mask * real_mask.unsqueeze(-1)
                     n_tokens = aux_mask.all(-1).sum(dim=-1)
+                    
+                    # TODO: clarify `aux_target` shape with @alexmorehead –– the masking seems extraneous
                     err = torch.sqrt(((aux_pred - aux_target) * aux_mask).pow(2).sum(-1) + eps)
                     aux_loss_value = err.sum() / ((real_mask.any(-1) * n_tokens).sum() + eps)
                     aux_loss_value = aux_loss_value * self.force_loss_weight
+
+                    """
+                    # Alternate logic:
+                    valid_atom_mask = aux_mask.all(-1)  # (B, N_max)
+                    per_atom_err = torch.sqrt(((aux_pred - aux_target) ** 2).sum(-1) + eps)  # (B, N_max)
+                    force_loss = (per_atom_err * valid_atom_mask).sum() / (valid_atom_mask.sum() + eps)
+                    force_loss = force_loss * self.force_loss_weight
+                    """
                 else:
                     raise ValueError(f"Unknown auxiliary task: {aux_task}")
                 loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value

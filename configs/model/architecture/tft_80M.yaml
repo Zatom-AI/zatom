@@ -15,6 +15,7 @@ multimodal_model:
   jvp_attn: false
   cross_attention: true
   add_sinusoid_posenc: true
+  is_conservative: false
 
 dataset_embedder:
   _target_: zatom.models.architectures.transformer.common.LabelEmbedder
