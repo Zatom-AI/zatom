@@ -40,6 +40,7 @@ class ModernAttentionPlatonic(nn.Module):
                                 has its own n_heads heads, i.e. there are G*n_heads total heads).
         solid_name:             String identifying the Platonic solid group.
         freq_sigma_platonic:    Standard deviation for sampling initial Platonic RoPE wave vectors.
+                                Optional. None disables Platonic RoPE.
         freq_init_platonic:     Platonic RoPE wave vector init heuristic ("random" or "spiral")
         learned_freqs_platonic: Whether Platonic RoPE wave vectors are static or learned.
         bias:                   Whether the Platonic linear projection maps apply biases or not.

@@ -84,6 +84,7 @@ class TransformerModulePlatonic(nn.Module):
                               dimension (in SMILES ordering).
         concat_combine_input: Whether to concatenate and combine inputs.
         is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
+        mask_material_coords: Whether or not material coordinates are masked in _get_embedding.
         normalize_per_g:      If False, Platonic normalization layers operate over the last
                               (channel) axis only. If True, acting on the group axis as well.
         custom_weight_init:   Custom weight initialization method.
@@ -111,6 +112,7 @@ class TransformerModulePlatonic(nn.Module):
         use_sequence_sin_ape: bool = True,
         concat_combine_input: bool = False,
         is_conservative: bool = False,
+        mask_material_coords: bool = True,
         normalize_per_g: bool = True,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
@@ -146,6 +148,7 @@ class TransformerModulePlatonic(nn.Module):
         self.use_sequence_sin_ape = use_sequence_sin_ape
         self.concat_combine_input = concat_combine_input
         self.is_conservative = is_conservative
+        self.mask_material_coords = mask_material_coords
         self.cond_dim = 6 if coords_embed is None else 7
 
         # __________________________________________________________________________________________
@@ -157,10 +160,9 @@ class TransformerModulePlatonic(nn.Module):
         self.time_encoding = TimeFourierEncoding(posenc_dim=c_model, max_len=200)
 
         # Node-wise E(3)-invariant embeddings
+        # fractional coordinates are *scalar* coefficients relative to equivariant lattice basis
         self.atom_type_embed = nn.Embedding(num_atom_types, c_model)
-        self.frac_coords_embed = nn.Linear(
-            spatial_dim, c_model, bias=False
-        )  # fractional coordinates are *scalar* coefficients relative to equivariant lattice basis
+        self.frac_coords_embed = nn.Linear(spatial_dim, c_model, bias=False)
         self.lengths_scaled_embed = nn.Linear(spatial_dim, c_model, bias=False)
         self.angles_radians_embed = nn.Linear(spatial_dim, c_model, bias=False)
         if use_sequence_sin_ape:
@@ -386,12 +388,13 @@ class TransformerModulePlatonic(nn.Module):
         dataset_idx = feats["dataset_idx"]
         spacegroup = feats["spacegroup"]
 
-        # Ensure atom coordinates are masked out for periodic samples and the
-        # remaining continuous modalities are masked out for non-periodic samples
-        coords = coords * ~token_is_periodic
+        # Ensure that material specific inputs are masked for non-materials
         frac_coords = frac_coords * token_is_periodic
         lengths_scaled = lengths_scaled * sample_is_periodic
         angles_radians = angles_radians * sample_is_periodic
+        # Optionally mask Euclidean coordinates for materials
+        if self.mask_material_coords:
+            coords = coords * ~token_is_periodic
 
         # __________________________________________________________________________________________
         # __INVARIANT_EMBEDDINGS____________________________________________________________________

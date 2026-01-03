@@ -1,4 +1,4 @@
-name: eval_sweep_tft_mp20_2025-12-29_16-30-00
+name: eval_sweep_tft_mp20_atom-types-and-steps_2026-01-03_06-30-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -20,7 +20,7 @@ parameters:
     value: 0.0
 
   date:
-    value: "2025-12-29_16-30-00"
+    value: "2026-01-03_06-30-00"
 
   experiment:
     value: eval
@@ -37,23 +37,23 @@ parameters:
   model.sampling.visualize:
     value: false
 
-  model.architecture.frac_coords_interpolant.white_noise_sampling_scale:
-    values: [0.01, 1.0]
+  model.architecture.atom_types_interpolant.temperature:
+    values: [0.8, 0.9, 1.0, 1.1, 1.2]
 
-  model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale:
-    values: [0.01, 1.0]
+  model.architecture.atom_types_interpolant.top_k:
+    values: [null, 5, 10, 20]
 
-  model.architecture.angles_radians_interpolant.white_noise_sampling_scale:
-    values: [0.01, 1.0]
+  model.architecture.atom_types_interpolant.top_p:
+    values: [null, 0.8, 0.9]
 
   model.sampling.steps:
-    values: [10, 25, 50, 100, 250, 500, 1000]
+    values: [50, 100, 200]
 
   name:
-    value: "eval_${hydra:runtime.choices.model/architecture}_fc-noise-${model.architecture.frac_coords_interpolant.white_noise_sampling_scale}_ls-noise-${model.architecture.lengths_scaled_interpolant.white_noise_sampling_scale}_ar-noise-${model.architecture.angles_radians_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_mp20"
+    value: "eval_${hydra:runtime.choices.model/architecture}_at-temp-${model.architecture.atom_types_interpolant.temperature}_at-top-k-${model.architecture.atom_types_interpolant.top_k}_at-top-p-${model.architecture.atom_types_interpolant.top_p}_steps-${model.sampling.steps}_mp20"
 
   seed:
-    value: 42
+    value: 43
 
   tags:
     value: ["mp20", "fm", "eval", "sweep"]

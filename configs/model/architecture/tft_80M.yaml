@@ -37,6 +37,9 @@ atom_types_interpolant:
   path_t_min: 0.0
   path_t_max: 1.0
   sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  temperature: 1.0
+  top_k: null
+  top_p: null
   time_factor:
     _target_: zatom.flow.time_factor.InverseTimeFactor
     max_value: 100.0

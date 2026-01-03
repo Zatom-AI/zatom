@@ -35,6 +35,7 @@ multimodal_model:
   num_properties: 3
   use_sequence_sin_ape: true
   concat_combine_input: true
+  mask_material_coords: true
   normalize_per_g: true
   custom_weight_init: null
 
