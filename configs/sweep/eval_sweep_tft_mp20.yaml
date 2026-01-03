@@ -1,4 +1,4 @@
-name: eval_sweep_tft_mp20_2026-01-02_15-30-00
+name: eval_sweep_tft_mp20_2026-01-03_06-30-00
 project: zatom
 entity: zatom
 program: zatom/eval_fm.py
@@ -20,7 +20,7 @@ parameters:
     value: 0.0
 
   date:
-    value: "2026-01-02_15-30-00"
+    value: "2026-01-03_06-30-00"
 
   experiment:
     value: eval
