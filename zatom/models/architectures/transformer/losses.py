@@ -1,6 +1,6 @@
 """Adapted from https://github.com/carlosinator/tabasco."""
 
-from typing import Callable, Tuple
+from typing import Callable, Literal, Tuple
 
 import torch
 from tensordict import TensorDict
@@ -139,9 +139,17 @@ class InterDistancesLoss(nn.Module):
         total_loss = avg_loss * self.loss_weight
         return total_loss, stats_dict
 
-def compute_force_loss(aux_target_masked: Tensor, aux_pred_masked: Tensor, num_atoms: int, eps: float = 1e-6, loss_choice: str = "mse") -> Tensor:
-    """Computes force loss using MSE, MAE, or Huber loss.
-    
+
+@typecheck
+def compute_force_loss(
+    aux_target_masked: Tensor,
+    aux_pred_masked: Tensor,
+    num_atoms: int,
+    eps: float = 1e-6,
+    loss_choice: Literal["mse", "mae", "huber"] = "mse",
+) -> Tensor:
+    """Compute force loss using MSE, MAE, or Huber loss.
+
     Args:
         aux_target_masked: Target force tensor of shape `(B, N_max, 3)`.
         aux_pred_masked: Predicted force tensor of shape `(B, N_max, 3)`.
@@ -151,7 +159,6 @@ def compute_force_loss(aux_target_masked: Tensor, aux_pred_masked: Tensor, num_a
     Returns:
         aux_loss_value: Computed force loss as a scalar tensor.
     """
-
     if loss_choice == "mse":
         per_atom_mse = ((aux_pred_masked - aux_target_masked) ** 2).sum(-1)  # (B, N_max)
         aux_loss_value = per_atom_mse.sum() / (num_atoms + eps)
@@ -159,10 +166,10 @@ def compute_force_loss(aux_target_masked: Tensor, aux_pred_masked: Tensor, num_a
         per_atom_mae = torch.abs(aux_pred_masked - aux_target_masked).sum(-1)  # (B, N_max)
         aux_loss_value = per_atom_mae.sum() / (num_atoms + eps)
     elif loss_choice == "huber":
-        huber_loss_fn = nn.HuberLoss(reduction='none')
+        huber_loss_fn = nn.HuberLoss(reduction="none")
         per_atom_huber = huber_loss_fn(aux_pred_masked, aux_target_masked).sum(-1)  # (B, N_max)
         aux_loss_value = per_atom_huber.sum() / (num_atoms + eps)
     else:
         raise ValueError(f"Unknown loss choice: {loss_choice}")
-    
+
     return aux_loss_value

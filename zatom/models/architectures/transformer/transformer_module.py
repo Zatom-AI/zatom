@@ -48,9 +48,9 @@ class TransformerModule(nn.Module):
         cross_attention: Whether to use cross-attention layers.
         add_sinusoid_posenc: Whether to add sinusoidal positional encoding.
         concat_combine_input: Whether to concatenate and combine inputs.
+        is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
         custom_weight_init: Custom weight initialization method (None, "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal").
             NOTE: "uniform" does not work well.
-        is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
     """
 
     @typecheck
@@ -77,15 +77,18 @@ class TransformerModule(nn.Module):
         cross_attention: bool = True,
         add_sinusoid_posenc: bool = True,
         concat_combine_input: bool = False,
+        is_conservative: bool = False,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
         ] = None,
-        is_conservative: bool = False,
         **kwargs,
     ):
         super().__init__()
 
-        # Normalize custom_weight_init if it's the string "None"
+        if is_conservative and not jvp_attn:
+            log.warning("JVP Flash Attention is recommended when predicting conservative forces.")
+
+        # Coerce `custom_weight_init` to `None` if it is passed as a string
         if isinstance(custom_weight_init, str) and custom_weight_init.lower() == "none":
             custom_weight_init = None
 
@@ -102,8 +105,8 @@ class TransformerModule(nn.Module):
         self.cross_attention = cross_attention
         self.add_sinusoid_posenc = add_sinusoid_posenc
         self.concat_combine_input = concat_combine_input
-        self.custom_weight_init = custom_weight_init
         self.is_conservative = is_conservative
+        self.custom_weight_init = custom_weight_init
 
         self.dataset_embedder = dataset_embedder
         self.spacegroup_embedder = spacegroup_embedder
@@ -267,7 +270,8 @@ class TransformerModule(nn.Module):
 
         self.global_property_head = nn.Linear(aux_hidden_dim, num_properties, bias=True)
         self.global_energy_head = nn.Linear(aux_hidden_dim, 1, bias=True)
-        self.atomic_forces_head = nn.Linear(aux_hidden_dim, 3, bias=False)
+        if not self.is_conservative:
+            self.atomic_forces_head = nn.Linear(aux_hidden_dim, 3, bias=False)
 
         self.auxiliary_tasks = ["global_property", "global_energy", "atomic_forces"]
 
@@ -592,14 +596,14 @@ class TransformerModule(nn.Module):
         global_energy = (
             self.global_energy_head(h_global_energy.mean(-2, keepdim=True)) * global_mask
         )
-        atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
-        
         if self.is_conservative:
-            # Compute conservative atomic forces as negative gradient of global energy w.r.t. positions
-            # NOTE: No need to explicitly include grad_outputs in the autograd call since we're summing the energies up anyway
-            conservative_atomic_forces = -torch.autograd.grad(global_energy.sum(), pos, create_graph=True, retain_graph=True)[0] * real_mask.unsqueeze(-1)
-            assert conservative_atomic_forces.shape == atomic_forces.shape, f"conservative_atomic_forces.shape: {conservative_atomic_forces.shape}, atomic_forces.shape: {atomic_forces.shape}"
-            atomic_forces = conservative_atomic_forces
+            # Compute conservative atomic forces as negative gradient of global energy w.r.t. 3D coordinates
+            # NOTE: No need to explicitly include grad_outputs in the autograd call, since we're summing up the energies anyway
+            atomic_forces = -torch.autograd.grad(
+                global_energy.sum(), pos, create_graph=True, retain_graph=True
+            )[0] * real_mask.unsqueeze(-1)
+        else:
+            atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
 
         pred_modals = (
             out_atom_types * real_mask.unsqueeze(-1),  # (B, M, V=self.vocab_size)
@@ -711,5 +715,3 @@ class TransformerModule(nn.Module):
             eps_aux.append(torch.cat([half_aux, half_aux], dim=0))
 
         return tuple(eps), tuple(eps_aux)
-
-if __name__ == "__main__":

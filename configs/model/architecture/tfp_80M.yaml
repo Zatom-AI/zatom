@@ -11,6 +11,7 @@ multimodal_model:
   context_length: ${globals.max_num_atoms}
   use_sequence_sin_ape: true
   concat_combine_input: false
+  is_conservative: false
   normalize_per_g: ${model.architecture.normalize_per_g}
   custom_weight_init: null
 
@@ -195,6 +196,7 @@ interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # NOTE: must be one of (`uniform`, `beta`, `histogram`)
 solid_name: tetrahedron # NOTE: must be one of `zatom.models.architectures.platoformer.PLATONIC_GROUPS_3D`
 attn_backend: SDPA # NOTE: must be one of (`SDPA`, `JVP_ATTN`, `MANUAL`)
+force_loss_choice: mse # NOTE: must be one of (`mse`, `mae`, `huber`)
 time_alpha_factor: 1.8
 normalize_per_g: true
 test_so3_equivariance: false

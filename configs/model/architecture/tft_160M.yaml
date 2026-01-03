@@ -138,6 +138,6 @@ aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 8
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # NOTE: must be one of (`uniform`, `beta`, `histogram`)
+force_loss_choice: mse # NOTE: must be one of (`mse`, `mae`, `huber`)
 time_alpha_factor: 1.8
 test_so3_equivariance: false
-force_loss_choice: mse # NOTE: must be one of (`mse`, `mae`, `huber`)

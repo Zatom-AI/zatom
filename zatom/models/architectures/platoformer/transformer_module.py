@@ -83,6 +83,7 @@ class TransformerModulePlatonic(nn.Module):
         use_sequence_sin_ape: Whether to add sinusoidal positional encoding along *sequence*
                               dimension (in SMILES ordering).
         concat_combine_input: Whether to concatenate and combine inputs.
+        is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
         normalize_per_g:      If False, Platonic normalization layers operate over the last
                               (channel) axis only. If True, acting on the group axis as well.
         custom_weight_init:   Custom weight initialization method.
@@ -109,6 +110,7 @@ class TransformerModulePlatonic(nn.Module):
         context_length: int = 2048,
         use_sequence_sin_ape: bool = True,
         concat_combine_input: bool = False,
+        is_conservative: bool = False,
         normalize_per_g: bool = True,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
@@ -117,7 +119,11 @@ class TransformerModulePlatonic(nn.Module):
     ):
         super().__init__()
 
-        # Normalize custom_weight_init if it's the string "None"
+        self.jvp_attn = kwargs.get("attn_backend", "MANUAL") == "JVP_ATTN"
+        if is_conservative and not self.jvp_attn:
+            log.warning("JVP Flash Attention is recommended when predicting conservative forces.")
+
+        # Coerce `custom_weight_init` to `None` if it is passed as a string
         if isinstance(custom_weight_init, str) and custom_weight_init.lower() == "none":
             custom_weight_init = None
 
@@ -136,10 +142,10 @@ class TransformerModulePlatonic(nn.Module):
         self.num_properties = num_properties
         self.context_length = context_length
 
-        self.jvp_attn = kwargs.get("attn_backend", "MANUAL") == "JVP_ATTN"
         self.use_cross_attn = cross_attn_factory is not None
         self.use_sequence_sin_ape = use_sequence_sin_ape
         self.concat_combine_input = concat_combine_input
+        self.is_conservative = is_conservative
         self.cond_dim = 6 if coords_embed is None else 7
 
         # __________________________________________________________________________________________
@@ -314,10 +320,13 @@ class TransformerModulePlatonic(nn.Module):
             ProjRegularToScalar(solid_name),  # (B, N, c_aux)
             nn.Linear(c_aux, 1, bias=True),  # (B, N, 1)
         )
-        self.atomic_forces_head = nn.Sequential(
-            PlatonicLinear(c_aux, spatial_dim, solid_name, bias=False),  # (B, N, G*spatial_dim)
-            ProjRegularToVector(solid_name, flatten=True),  # (B, N, spatial_dim)
-        )
+        if not self.is_conservative:
+            self.atomic_forces_head = nn.Sequential(
+                PlatonicLinear(
+                    c_aux, spatial_dim, solid_name, bias=False
+                ),  # (B, N, G*spatial_dim)
+                ProjRegularToVector(solid_name, flatten=True),  # (B, N, spatial_dim)
+            )
 
         # __________________________________________________________________________________________
         # __WEIGHT_INIT_____________________________________________________________________________
@@ -740,7 +749,14 @@ class TransformerModulePlatonic(nn.Module):
         # Final projection + unlifting
         global_property = self.global_property_head(h_global_property_mean) * global_mask
         global_energy = self.global_energy_head(h_global_energy_mean) * global_mask
-        atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
+        if self.is_conservative:
+            # Compute conservative atomic forces as negative gradient of global energy w.r.t. 3D coordinates
+            # NOTE: No need to explicitly include grad_outputs in the autograd call, since we're summing up the energies anyway
+            atomic_forces = -torch.autograd.grad(
+                global_energy.sum(), coords, create_graph=True, retain_graph=True
+            )[0] * real_mask.unsqueeze(-1)
+        else:
+            atomic_forces = self.atomic_forces_head(h_atomic_forces) * real_mask.unsqueeze(-1)
 
         # __________________________________________________________________________________________
         # __RETURN_PREDICTIONS______________________________________________________________________

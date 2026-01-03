@@ -18,7 +18,10 @@ from torch.nn.attention import SDPBackend
 
 from zatom.flow.interpolants import Interpolant
 from zatom.flow.path import FlowPath
-from zatom.models.architectures.transformer.losses import InterDistancesLoss, compute_force_loss
+from zatom.models.architectures.transformer.losses import (
+    InterDistancesLoss,
+    compute_force_loss,
+)
 from zatom.utils import pylogger
 from zatom.utils.sampling_utils import get_sample_schedule
 from zatom.utils.training_utils import (
@@ -58,10 +61,10 @@ class TFT(nn.Module):
         batch_size_scale_factor: Factor by which to scale the global batch size when using a specific (e.g., 80M) model variant.
         interdist_loss: Type of interatomic distance loss to use. If None, no interatomic distance loss is used.
         time_distribution: Distribution to sample time points from. Must be one of (`uniform`, `beta`, `histogram`).
+        force_loss_choice: Choice of force loss to use. Must be one of (`mse`, `mae`, `huber`).
         time_alpha_factor: Alpha factor for beta time distribution.
         force_loss_weight: Weighting factor for force loss when performing auxiliary force prediction.
         test_so3_equivariance: Whether to test the model for SO(3) equivariance after each forward pass.
-        force_loss_choice: Choice of force loss to use. Must be one of (`mse`, `mae`, `huber`).
     """
 
     @typecheck
@@ -83,10 +86,10 @@ class TFT(nn.Module):
         batch_size_scale_factor: int | float = 1,
         interdist_loss: InterDistancesLoss | None = None,
         time_distribution: Literal["uniform", "beta", "histogram"] = "beta",
+        force_loss_choice: Literal["mse", "mae", "huber"] = "mse",
         time_alpha_factor: float = 2.0,
         force_loss_weight: float = 5.0,
         test_so3_equivariance: bool = False,
-        force_loss_choice: str = "mse",
         **kwargs,
     ):
         super().__init__()
@@ -100,10 +103,10 @@ class TFT(nn.Module):
         self.batch_size_scale_factor = batch_size_scale_factor
         self.class_dropout_prob = dataset_embedder.dropout_prob
         self.interdist_loss = interdist_loss
+        self.force_loss_choice = force_loss_choice
         self.time_alpha_factor = time_alpha_factor
         self.force_loss_weight = force_loss_weight
         self.test_so3_equivariance = test_so3_equivariance
-        self.force_loss_choice = force_loss_choice
 
         self.vocab_size = max_num_elements
 
@@ -576,14 +579,14 @@ class TFT(nn.Module):
                 aux_target = path.x_1[aux_task]
                 aux_mask = ~aux_target.isnan()
                 aux_target = torch.where(aux_mask, aux_target, torch.zeros_like(aux_target))
-                
+
                 if aux_task == "global_property":
                     # Mean absolute error per example
                     err = (aux_pred - aux_target.unsqueeze(-2)) * aux_mask.unsqueeze(-2)
                     aux_loss_value = err.abs().sum(0).squeeze(0) / (aux_mask.sum(0) + eps)
                 elif aux_task == "global_energy":
                     # Mean squared error per example
-                    energy_pred = aux_pred.squeeze(-1) # B, 1
+                    energy_pred = aux_pred.squeeze(-1)  # B, 1
                     err = (energy_pred - aux_target) * aux_mask
                     aux_loss_value = err.pow(2).sum() / (aux_mask.sum() + eps)
                 elif aux_task == "atomic_forces":
@@ -591,13 +594,21 @@ class TFT(nn.Module):
                     valid_atoms = ~aux_target.isnan().any(-1) & real_mask  # (B, N_max)
 
                     aux_pred_masked = aux_pred * valid_atoms.unsqueeze(-1)
-                    aux_target_masked = aux_target.nan_to_num(0) * valid_atoms.unsqueeze(-1)
+                    aux_target_masked = aux_target * valid_atoms.unsqueeze(-1)
                     num_atoms = valid_atoms.sum()
 
-                    aux_loss_value = compute_force_loss(aux_pred_masked, aux_target_masked, num_atoms, loss_choice=self.force_loss_choice) * self.force_loss_weight
+                    aux_loss_value = (
+                        compute_force_loss(
+                            aux_pred_masked,
+                            aux_target_masked,
+                            num_atoms,
+                            loss_choice=self.force_loss_choice,
+                        )
+                        * self.force_loss_weight
+                    )
                 else:
                     raise ValueError(f"Unknown auxiliary task: {aux_task}")
-                
+
                 loss_dict[f"aux_{aux_task}_loss"] = aux_loss_value
             # Unused auxiliary task → add zero loss to computational graph
             else:
