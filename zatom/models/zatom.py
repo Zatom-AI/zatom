@@ -512,14 +512,14 @@ class Zatom(LightningModule):
                 batch.y[:, 0:1],
                 batch.batch,
                 max_num_nodes=self.max_num_nodes,
-            )
+            ) # B, N_max, 1
             atomic_forces, _ = to_dense_batch(
                 batch.y[:, 1:4],
                 batch.batch,
                 max_num_nodes=self.max_num_nodes,
-            )
-            dense_batch["global_energy"] = global_energy[:, 0, :]
-            dense_batch["atomic_forces"] = atomic_forces
+            ) # B, N_max, 3
+            dense_batch["global_energy"] = global_energy[:, 0, :] # B, 1, 1 – Access just one entry for all atoms in the molecule
+            dense_batch["atomic_forces"] = atomic_forces # B, N_max, 3
 
         # Run forward pass
         loss_dict, _ = self.model.forward(dense_batch, compute_stats=False)

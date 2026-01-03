@@ -140,3 +140,4 @@ interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
 time_distribution: beta # NOTE: must be one of (`uniform`, `beta`, `histogram`)
 time_alpha_factor: 1.8
 test_so3_equivariance: false
+force_loss_choice: mse # NOTE: must be one of (`mse`, `mae`, `huber`)
