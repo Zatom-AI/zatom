@@ -162,12 +162,18 @@ class DiscreteInterpolant(Interpolant):
         self.top_k = top_k
         self.top_p = top_p
 
-        assert top_k is None or (
-            isinstance(top_k, int) and top_k > 0
-        ), f"top_k must be a positive integer, got {top_k}."
-        assert top_p is None or (
-            isinstance(top_p, float) and 0.0 < top_p <= 1.0
-        ), f"top_p must be a float in (0, 1], got {top_p}."
+        # Coerce "None" strings to actual None values
+        if self.top_k == "None":
+            self.top_k = None
+        if self.top_p == "None":
+            self.top_p = None
+
+        assert self.top_k is None or (
+            isinstance(self.top_k, int) and self.top_k > 0
+        ), f"top_k must be a positive integer, got {self.top_k}."
+        assert self.top_p is None or (
+            isinstance(self.top_p, float) and 0.0 < self.top_p <= 1.0
+        ), f"top_p must be a float in (0, 1], got {self.top_p}."
 
     @typecheck
     def sample_noise(self, shape: torch.Size, pad_mask: Tensor) -> Tensor:
