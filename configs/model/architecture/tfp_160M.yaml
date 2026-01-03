@@ -11,7 +11,7 @@ multimodal_model:
   context_length: ${globals.max_num_atoms}
   use_sequence_sin_ape: true
   concat_combine_input: false
-  mask_material_coords: false
+  mask_material_coords: true
   normalize_per_g: ${model.architecture.normalize_per_g}
   custom_weight_init: null
 

@@ -110,7 +110,7 @@ class TransformerModulePlatonic(nn.Module):
         context_length: int = 2048,
         use_sequence_sin_ape: bool = True,
         concat_combine_input: bool = False,
-        mask_material_coords: bool = False,
+        mask_material_coords: bool = True,
         normalize_per_g: bool = True,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
