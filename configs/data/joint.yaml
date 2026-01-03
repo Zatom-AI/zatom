@@ -6,27 +6,27 @@ datamodule:
       _target_: zatom.data.components.mp20_dataset.MP20
       root: ${paths.data_dir}/mp_20
       proportion: 1.0
-      # Registry metadata
+      # registry metadata
       id: 0
-      type_label: 0 # Periodic
+      type_label: 0 # periodic
 
     qm9:
       _target_: torch_geometric.datasets.QM9
       root: ${paths.data_dir}/qm9
       removeHs: false # only retain heavy atoms
       proportion: 1.0
-      global_property: null # NOTE: if provided, must be either `all` or one of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
-      # Registry metadata
+      global_property: null # NOTE: if provided, must be a list of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html
+      # registry metadata
       id: 1
-      type_label: 1 # Non-periodic
+      type_label: 1 # non-periodic
 
     qmof150:
       _target_: zatom.data.components.qmof150_dataset.QMOF150
       root: ${paths.data_dir}/qmof
       proportion: 0.0
-      # Registry metadata
+      # registry metadata
       id: 2
-      type_label: 0 # Periodic
+      type_label: 0 # periodic
 
     omol25:
       _target_: zatom.data.components.omol25_dataset.OMol25
@@ -34,26 +34,35 @@ datamodule:
       proportion: 0.0
       subset: "_4M" # NOTE: must be one of ("", "_4M")
       global_energy: null # NOTE: if true, predict *both* global energy and per-atom forces; if false or null, skip energy and force prediction
-      # Registry metadata
+      # registry metadata
       id: 3
-      type_label: 1 # Non-periodic
+      type_label: 1 # non-periodic
 
     geom:
       _target_: zatom.data.components.geom_dataset.GEOM
       root: ${paths.data_dir}/geom
       proportion: 0.0
-      # Registry metadata
+      # registry metadata
       id: 4
-      type_label: 1 # Non-periodic
+      type_label: 1 # non-periodic
 
     mptrj:
       _target_: zatom.data.components.mptrj_dataset.MPtrj
       root: ${paths.data_dir}/mptrj
       proportion: 0.0
       global_energy: null # NOTE: if true, predict *both* global energy and per-atom forces; if false or null, skip energy and force prediction
-      # Registry metadata
+      # registry metadata
       id: 5
-      type_label: 0 # Periodic
+      type_label: 0 # periodic
+
+    matbench:
+      _target_: zatom.data.components.matbench_dataset.Matbench
+      root: ${paths.data_dir}/matbench
+      proportion: 0.0
+      global_property: matbench_mp_gap # NOTE: if provided, must be one of the properties listed in https://huggingface.co/datasets/Ty-Perez/matbench_properties#available-tasks-splits
+      # registry metadata
+      id: 6
+      type_label: 0 # periodic
 
   batch_size:
     base_world_size: 2
@@ -66,3 +75,5 @@ datamodule:
     train: 32
     val: 32
     test: 32
+    pin_memory: false
+    persistent_workers: false

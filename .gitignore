@@ -151,8 +151,12 @@ configs/local/default.yaml
 /tests/*.json
 /wandb/
 .env
+/scripts/*.pdf
 /scripts/**/logs/*.out
 /scripts/**/logs/*.err
 
 # Aim logging
 .aim
+
+# NFS files
+.nfs*

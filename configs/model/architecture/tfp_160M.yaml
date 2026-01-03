@@ -1,0 +1,206 @@
+_target_: zatom.models.architectures.tft.TFT
+
+# Modules
+multimodal_model:
+  _target_: zatom.models.architectures.platoformer.transformer_module.TransformerModulePlatonic
+  _partial_: True
+  solid_name: ${model.architecture.solid_name}
+  spatial_dim: ${globals.spatial_dim}
+  num_atom_types: ${globals.max_num_elements}
+  num_properties: ${globals.num_global_properties}
+  context_length: ${globals.max_num_atoms}
+  use_sequence_sin_ape: true
+  concat_combine_input: false
+  is_conservative: false
+  mask_material_coords: true
+  normalize_per_g: ${model.architecture.normalize_per_g}
+  custom_weight_init: null
+
+  coords_embed:
+    _target_: zatom.models.architectures.platoformer.positional_encoder.PlatonicLinearAPE
+    c_embed: ${model.architecture.hidden_size}
+    solid_name: ${model.architecture.solid_name}
+    spatial_dims: ${globals.spatial_dim}
+
+  transformer_factory:
+    _target_: zatom.models.architectures.platoformer.transformer.ModernTransformerPlatonic
+    _partial_: true
+    c_qk: ${int_divide:${model.architecture.hidden_size},${model.architecture.token_num_heads}} # per group element and head
+    c_val: ${int_divide:${model.architecture.hidden_size},${model.architecture.token_num_heads}} # per group element and head
+    n_heads: ${model.architecture.token_num_heads}
+    ### Platonic attention specific args
+    solid_name: ${model.architecture.solid_name}
+    freq_sigma_platonic: null
+    freq_init_platonic: "random"
+    learned_freqs_platonic: true
+    bias: false
+    mean_aggregation: false
+    linear_attention: false
+    use_key: true
+    ### Modern attention specific args
+    context_length: ${globals.max_num_atoms}
+    sequence_rope_base: ${globals.rope_base}
+    qk_layernorm: true
+    qk_norm_per_g: ${model.architecture.normalize_per_g}
+    attn_backend: ${model.architecture.attn_backend}
+    ### Normalization args
+    normalize_per_g: ${model.architecture.normalize_per_g}
+    norm_elementwise_affine: true
+
+  cross_attn_factory:
+    _target_: zatom.models.architectures.platoformer.transformer.ModernTransformerDecoderBlockPlatonic
+    _partial_: true
+    c_model: ${model.architecture.hidden_size}
+    c_qk: ${int_divide:${model.architecture.hidden_size},${model.architecture.token_num_heads}} # per group element and head
+    c_val: ${int_divide:${model.architecture.hidden_size},${model.architecture.token_num_heads}} # per group element and head
+    n_heads: ${model.architecture.token_num_heads}
+    ### Platonic attention specific args
+    solid_name: ${model.architecture.solid_name}
+    freq_sigma_platonic: ${..transformer_factory.freq_sigma_platonic}
+    freq_init_platonic: ${..transformer_factory.freq_init_platonic}
+    learned_freqs_platonic: ${..transformer_factory.learned_freqs_platonic}
+    bias: ${..transformer_factory.bias}
+    mean_aggregation: ${..transformer_factory.mean_aggregation}
+    linear_attention: ${..transformer_factory.linear_attention}
+    use_key: ${..transformer_factory.use_key}
+    ### Modern attention specific args
+    context_length: ${globals.max_num_atoms}
+    sequence_rope_base: ${globals.rope_base}
+    use_sequence_rope_cross: true
+    qk_layernorm: ${..transformer_factory.qk_layernorm}
+    qk_norm_per_g: ${..transformer_factory.qk_norm_per_g}
+    attn_backend: ${..transformer_factory.attn_backend}
+    ### Normalization args
+    normalize_per_g: ${model.architecture.normalize_per_g}
+    norm_elementwise_affine: ${..transformer_factory.norm_elementwise_affine}
+
+dataset_embedder:
+  _target_: zatom.models.architectures.transformer.common.LabelEmbedder
+  num_classes: ${globals.num_dataset_classes}
+  hidden_size: ${model.architecture.hidden_size}
+  dropout_prob: 0.1
+
+spacegroup_embedder:
+  _target_: zatom.models.architectures.transformer.common.LabelEmbedder
+  num_classes: ${globals.num_spacegroup_classes}
+  hidden_size: ${model.architecture.hidden_size}
+  dropout_prob: 0.1
+
+# Interpolants for each modality
+atom_types_interpolant:
+  _target_: zatom.flow.interpolants.DiscreteInterpolant
+  key: atom_types
+  loss_weight: 0.1
+  path_t_min: 0.0
+  path_t_max: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  temperature: 1.0
+  top_k: null
+  top_p: null
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+pos_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: pos
+  loss_weight: 1.0
+  path_t_min: 0.0
+  path_t_max: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: true
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.95
+  white_noise_sampling_scale: 50.0
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+frac_coords_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: frac_coords
+  loss_weight: 1.0
+  path_t_min: 0.0
+  path_t_max: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: false
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+lengths_scaled_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: lengths_scaled
+  loss_weight: 1.0
+  path_t_min: 0.0
+  path_t_max: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: false
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+angles_radians_interpolant:
+  _target_: zatom.flow.interpolants.SDEMetricInterpolant
+  key: angles_radians
+  loss_weight: 1.0
+  path_t_min: 0.0
+  path_t_max: 1.0
+  sample_schedule: log # NOTE: must be one of (`linear`, `power`, `log`)
+  centered: false
+  scale_noise_by_log_num_tokens: false
+  noise_scale: 1.0
+  langevin_sampling_schedule:
+    _target_: zatom.sampling.noise_schedule.SampleNoiseSchedule
+    cutoff: 0.9
+  white_noise_sampling_scale: 0.01
+  time_factor:
+    _target_: zatom.flow.time_factor.InverseTimeFactor
+    max_value: 100.0
+    min_value: 0.05
+    zero_before: 0.0
+    eps: 1e-6
+
+# General architecture parameters
+batch_size_scale_factor: 0.25 # 0.5, 0.25, 0.125 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
+hidden_size: 100 # 80, 100, 140 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
+num_layers: 16
+num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
+aux_hidden_size: 80 # (fixed) hidden size for auxiliary task layers
+aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
+token_num_heads: 4
+interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)
+time_distribution: beta # NOTE: must be one of (`uniform`, `beta`, `histogram`)
+solid_name: tetrahedron # NOTE: must be one of `zatom.models.architectures.platoformer.PLATONIC_GROUPS_3D`
+attn_backend: SDPA # NOTE: must be one of (`SDPA`, `JVP_ATTN`, `MANUAL`)
+force_loss_choice: mse # NOTE: must be one of (`mse`, `mae`, `huber`)
+time_alpha_factor: 1.8
+normalize_per_g: true
+test_so3_equivariance: false

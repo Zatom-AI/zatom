@@ -210,7 +210,7 @@ class Zatom(LightningModule):
             and self.hparams.datasets["qm9"].global_property is not None
         ):
             for target in QM9_TARGETS:
-                if self.hparams.datasets["qm9"].global_property in ("all", target):
+                if target in self.hparams.datasets["qm9"].global_property:
                     self.train_metrics[f"aux_global_property_loss_{target}_scaled"] = MeanMetric()
         for dataset in ("omol25", "mptrj"):
             if (
@@ -301,7 +301,7 @@ class Zatom(LightningModule):
             ):
                 # NOTE: QM9's `global_property` flag indicates how to modify the model architecture
                 for target in QM9_TARGETS:
-                    if self.hparams.datasets["qm9"].global_property in ("all", target):
+                    if target in self.hparams.datasets["qm9"].global_property:
                         val_metrics[dataset][
                             f"aux_global_property_loss_{target}_scaled"
                         ] = MeanMetric()
@@ -534,14 +534,16 @@ class Zatom(LightningModule):
                 batch.y[:, 0:1],
                 batch.batch,
                 max_num_nodes=self.max_num_nodes,
-            )
+            )  # (B, N_max, 1)
             atomic_forces, _ = to_dense_batch(
                 batch.y[:, 1:4],
                 batch.batch,
                 max_num_nodes=self.max_num_nodes,
-            )
-            dense_batch["global_energy"] = global_energy[:, 0, :]
-            dense_batch["atomic_forces"] = atomic_forces
+            )  # (B, N_max, 3)
+            dense_batch["global_energy"] = global_energy[
+                :, 0, :
+            ]  # (B, 1, 1) – Access just one entry for all atoms in the molecule
+            dense_batch["atomic_forces"] = atomic_forces  # (B, N_max, 3)
 
         # Run forward pass
         loss_dict, _ = self.model.forward(dense_batch, compute_stats=False)
@@ -563,7 +565,7 @@ class Zatom(LightningModule):
             and self.hparams.datasets["qm9"].global_property is not None
         ):
             for name, idx in QM9_TARGET_NAME_TO_IDX.items():
-                if self.hparams.datasets["qm9"].global_property in ("all", name):
+                if name in self.hparams.datasets["qm9"].global_property:
                     if is_qm9_dataset.any() or is_matbench_dataset.any():
                         aux_prop_scale = torch.ones_like(pred_aux_global_property[:, idx])
                         aux_prop_shift = torch.zeros_like(pred_aux_global_property[:, idx])
@@ -659,7 +661,9 @@ class Zatom(LightningModule):
                 )
                 aux_force_err = (aux_force_pred - aux_force_target) * mask_aux_atomic_forces
                 aux_force_loss_value = aux_force_err.abs().sum() / (
-                    mask_aux_atomic_forces.sum() + 1e-6
+                    # Normalize by number of valid atoms, not number of valid atom coordinates
+                    mask_aux_atomic_forces.all(-1).sum()
+                    + 1e-6
                 )
             else:
                 aux_energy_loss_value = torch.tensor(0.0, device=self.device)
@@ -748,7 +752,6 @@ class Zatom(LightningModule):
                 is_mptrj_dataset = batch.dataset_idx == self.dataset_to_index.get("mptrj", -1)
                 if is_omol25_dataset.any():
                     # Rotate non-periodic atomic forces accordingly
-                    # TODO: Decide if non-periodic forces need to be zero-centered just like `batch.pos[~batch.node_is_periodic]`
                     is_omol25_node = is_omol25_dataset[batch.batch]
                     forces_aug = torch.einsum(
                         "bi,bij->bj", batch.y[:, 1:4], rot_for_nodes.transpose(-2, -1)
@@ -969,14 +972,18 @@ class Zatom(LightningModule):
                     dir_name = "mp_20"
                 elif dataset == "qmof150":
                     dir_name = "qmof"
-                
+
                 primary_path = os.path.join(
                     self.hparams.sampling.data_dir, dir_name, "num_nodes_bincount.pt"
                 )
                 fallback_path = None
-                if dataset in self.hparams.datasets and hasattr(self.hparams.datasets[dataset], "root"):
-                    fallback_path = os.path.join(self.hparams.datasets[dataset].root, "num_nodes_bincount.pt")
-                
+                if dataset in self.hparams.datasets and hasattr(
+                    self.hparams.datasets[dataset], "root"
+                ):
+                    fallback_path = os.path.join(
+                        self.hparams.datasets[dataset].root, "num_nodes_bincount.pt"
+                    )
+
                 error_msg = (
                     f"num_nodes_bincount file not found for dataset '{dataset}'. "
                     f"Expected at: {primary_path}"
@@ -984,7 +991,7 @@ class Zatom(LightningModule):
                 if fallback_path:
                     error_msg += f" or {fallback_path}"
                 raise FileNotFoundError(error_msg)
-            
+
             # Validate dataset is in mapping
             if dataset not in self.dataset_to_index:
                 raise ValueError(
@@ -992,7 +999,7 @@ class Zatom(LightningModule):
                     f"Available datasets: {list(self.dataset_to_index.keys())}. "
                     f"Ensure the dataset has both 'id' and 'type_label' in its config."
                 )
-            
+
             generation_evaluators[dataset].device = metrics[dataset]["loss"].device
             t_start = time.time()
             for samples_so_far in tqdm(
@@ -1006,10 +1013,11 @@ class Zatom(LightningModule):
                 # Perform sampling and decoding to crystal structures
                 out, batch = self.sample_and_decode(
                     num_nodes_bincount=self.num_nodes_bincount[dataset],
-                    spacegroups_bincount=self.spacegroups_bincount.get(dataset),
+                    spacegroups_bincount=self.spacegroups_bincount[dataset],
                     batch_size=self.hparams.sampling.batch_size,
                     cfg_scale=self.hparams.sampling.cfg_scale,
-                    dataset_idx=self.dataset_to_index[dataset],
+                    dataset_index=self.dataset_to_index.get(dataset, -1),
+                    dataset_idx=self.dataset_to_idx.get(dataset, -1),
                     steps=self.hparams.sampling.get("steps", 100),
                 )
                 # Save predictions for metrics and visualisation
@@ -1145,9 +1153,7 @@ class Zatom(LightningModule):
         Returns:
             A tuple containing the sampled modalities and the original batch.
         """
-        # Save original dataset_idx for periodic check before mapping
-        original_dataset_idx = dataset_idx
-        sample_is_periodic = torch.isin(original_dataset_idx, self.periodic_datasets)
+        sample_is_periodic = torch.isin(dataset_index, self.periodic_datasets)
 
         # Sample random lengths from distribution: (B, 1)
         sample_lengths = torch.multinomial(
@@ -1157,14 +1163,11 @@ class Zatom(LightningModule):
         ).to(self.device)
 
         # Create dataset_idx tensor
-        # NOTE: Map dataset ID to dataset type (0=periodic, 1=non-periodic) to match embedding table size
-        # 0 -> null class within model, while 0 -> MP20 elsewhere, so increment by 1 (for classifier-free guidance or CFG)
+        # NOTE 0 -> null class within model, while 0 -> MP20 elsewhere, so increment by 1 (for classifier-free guidance or CFG)
         use_cfg = self.model.class_dropout_prob > 0
-        # Map dataset ID to dataset type, same as in forward() method
-        dataset_type = self.dataset_index_to_idx[original_dataset_idx]
         dataset_idx = torch.full(
             (batch_size,),
-            dataset_type + int(use_cfg),
+            dataset_idx + int(use_cfg),
             dtype=torch.int64,
             device=self.device,
         )

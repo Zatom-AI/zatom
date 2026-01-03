@@ -38,6 +38,7 @@ class CrystalDataset(Dataset):
         preprocess_workers: Number of workers for data preprocessing.
     """
 
+    @typecheck
     def __init__(
         self,
         name: ValueNode,
@@ -124,6 +125,7 @@ class CrystalDataset(Dataset):
         """Return the number of samples in the dataset."""
         return len(self.cached_data)
 
+    @typecheck
     def __getitem__(self, index: int) -> Data:
         """Get a sample from the dataset.
 
@@ -186,6 +188,7 @@ class CrystalDataset(Dataset):
 
         return data
 
+    @typecheck
     def __repr__(self) -> str:
         """Return a string representation of the dataset."""
         return f"CrystalDataset({self.name=}, {self.path=})"

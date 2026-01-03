@@ -1,0 +1,61 @@
+name: eval_sweep_tft_qm9-only_2025-12-26_09-00-00
+project: zatom
+entity: zatom
+program: zatom/eval_fm.py
+
+method: grid
+
+metric: # Does not matter, as we are using sweep to run the experiment.
+  goal: maximize
+  name: test_qm9/valid_rate
+
+parameters:
+  ckpt_path:
+    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_80M_QM9_2025-12-21_09-00-00/checkpoints/model-epoch@399-step@9600-val_qm9_valid_rate@0.9677-val_mp20_valid_rate@0.0000.ckpt"
+
+  data:
+    values: [joint]
+
+  data.datamodule.datasets.mp20.proportion:
+    value: 0.0
+
+  date:
+    value: "2025-12-26_09-00-00"
+
+  experiment:
+    value: eval
+
+  model/architecture:
+    values: [tft_80M]
+
+  model.sampling.batch_size:
+    value: 1000
+
+  model.sampling.num_samples:
+    value: 10000
+
+  model.sampling.visualize:
+    value: false
+
+  model.architecture.pos_interpolant.white_noise_sampling_scale:
+    values: [1.0, 10.0, 50.0, 100.0]
+
+  model.sampling.steps:
+    values: [5, 10, 25, 50, 100, 200]
+
+  name:
+    value: "eval_${hydra:runtime.choices.model/architecture}_noise-${model.architecture.pos_interpolant.white_noise_sampling_scale}_steps-${model.sampling.steps}_qm9-only"
+
+  seed:
+    value: 42
+
+  tags:
+    value: ["qm9-only", "fm", "eval", "sweep"]
+
+command:
+  - ${env}
+  - HYDRA_FULL_ERROR=1
+  - WANDB_START_METHOD=thread
+  - python
+  - ${program}
+  - ${args_no_hyphens}

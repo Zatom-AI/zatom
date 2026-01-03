@@ -1,8 +1,9 @@
 """Adapted from https://github.com/carlosinator/tabasco."""
 
-from typing import Callable, Tuple
+from typing import Callable, Literal, Tuple
 
 import torch
+import torch.nn.functional as F
 from tensordict import TensorDict
 from torch import Tensor, nn
 
@@ -138,3 +139,39 @@ class InterDistancesLoss(nn.Module):
 
         total_loss = avg_loss * self.loss_weight
         return total_loss, stats_dict
+
+
+@typecheck
+def compute_force_loss(
+    aux_target_masked: Tensor,
+    aux_pred_masked: Tensor,
+    num_atoms: int | Tensor,
+    eps: float = 1e-6,
+    loss_choice: Literal["mse", "mae", "huber"] = "mse",
+) -> Tensor:
+    """Compute force loss using MSE, MAE, or Huber loss.
+
+    Args:
+        aux_target_masked: Target force tensor of shape `(B, N_max, 3)`.
+        aux_pred_masked: Predicted force tensor of shape `(B, N_max, 3)`.
+        num_atoms: Number of valid atoms in the batch as an integer or tensor of shape `(,)`.
+        loss_choice: Choice of loss function - "mse", "mae", or "huber".
+
+    Returns:
+        aux_loss_value: Computed force loss as a scalar tensor.
+    """
+    if loss_choice == "mse":
+        per_atom_mse = ((aux_pred_masked - aux_target_masked) ** 2).sum(-1)  # (B, N_max)
+        aux_loss_value = per_atom_mse.sum() / (num_atoms + eps)
+    elif loss_choice == "mae":
+        per_atom_mae = torch.abs(aux_pred_masked - aux_target_masked).sum(-1)  # (B, N_max)
+        aux_loss_value = per_atom_mae.sum() / (num_atoms + eps)
+    elif loss_choice == "huber":
+        per_atom_huber = F.huber_loss(aux_pred_masked, aux_target_masked, reduction="none").sum(
+            -1
+        )  # (B, N_max)
+        aux_loss_value = per_atom_huber.sum() / (num_atoms + eps)
+    else:
+        raise ValueError(f"Unknown loss choice: {loss_choice}")
+
+    return aux_loss_value

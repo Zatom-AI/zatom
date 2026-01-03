@@ -12,7 +12,7 @@
 
 <!-- [![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/paper/2020) -->
 
-<img src="./overview.png" width="600">
+<img src="./overview.png">
 
 </div>
 
@@ -70,6 +70,18 @@ pre-commit install
 ```
 
 > 💡 Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
+
+> If run into GLIBC incompatibility issues on SLURM, most likely caused by `torch-scatter`, we recommend the following:
+>
+> ```bash
+> $ module avail gcc
+> $ module load GCC/12.2.0
+> $ conda uninstall torch-scatter
+> $ pip uninstall torch-scatter
+> $ pip install torch-scatter --no-binary torch-scatter --no-cache-dir --no-build-isolation
+> ```
+>
+> This installs the source tarball and compiles it locally, linking against your cluster's GLIBC.
 
 ### `uv`
 
@@ -140,7 +152,7 @@ Train model with chosen experiment configuration from [configs/experiment/](conf
 python zatom/train_fm.py experiment=experiment_name.yaml
 ```
 
-For example, reproduce Zatom's default model training run
+For example, reproduce Zatom's default model (pre)training run
 
 ```bash
 python zatom/train_fm.py experiment=train
@@ -152,7 +164,7 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the `[DEBUG] train_fm.py` config within `.vscode/launch.json` for a full example of how to customize or debug model training.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within `.vscode/launch.json` for full examples of how to locally customize or debug model training. The scripts within `scripts/perlmutter/` additionally describe how to train models on a SLURM cluster.
 
 ## Evaluation
 
@@ -165,7 +177,7 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt tra
 To evaluate Zatom's molecule property predictions
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=all model.architecture.num_aux_layers=4 model.sampling.num_samples=1 model.sampling.batch_size=1 seed=42 trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C] model.architecture.num_aux_layers=4 model.sampling.num_samples=1 model.sampling.batch_size=1 seed=42 trainer=gpu
 ```
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
@@ -181,7 +193,7 @@ export PROJECT_ROOT=$(pwd)/forks/flowmm
 export PMG_VASP_PSP_DIR=PATH_TO_YOUR_PSEUDOPOTENTIALS
 
 # Change as needed
-eval_dir="$(pwd)/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00"
+eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_80M_MP20_pbzagonf_2025-10-30_10-30-00"
 
 eval_for_dft_samples="$eval_dir/mp20_test_0"
 eval_for_dft_json="$eval_dir/mp20_test_0.json"

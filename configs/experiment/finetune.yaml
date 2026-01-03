@@ -3,16 +3,15 @@
 # Options for finetuning:
 # - /model: [zatom]
 # - /model/architecture:
-#         [tft_70M, tft_160M, tft_300M,
-#          mft_80M, mft_180M, mft_500M,
-#          mfp_80M, mfp_180M, mfp_500M]
+#         [tft_80M, tft_160M, tft_300M,
+#          tfp_80M, tfp_160M, tfp_300M]
 # - /logger: [null, wandb]
 # - /trainer: [default, mps, ddp, fsdp]
 
 defaults:
   - override /data: joint
   - override /model: zatom
-  - override /model/architecture: tft_70M
+  - override /model/architecture: tft_80M
   - override /callbacks: default_finetuning
   - override /logger: wandb
   - override /strategy: optimized_ddp
@@ -28,7 +27,28 @@ data:
         proportion: 0.0
       qm9:
         proportion: 1.0
-        global_property: all
+        global_property:
+          [
+            mu,
+            alpha,
+            homo,
+            lumo,
+            gap,
+            r2,
+            zpve,
+            U0,
+            U,
+            H,
+            G,
+            Cv,
+            U0_atom,
+            U_atom,
+            H_atom,
+            G_atom,
+            A,
+            B,
+            C,
+          ]
       qmof150:
         proportion: 0.0
       omol25:
@@ -39,9 +59,20 @@ data:
       mptrj:
         proportion: 0.0
         global_energy: null
+      matbench:
+        proportion: 0.0
+        global_property: matbench_mp_gap
 
 model:
   architecture:
     num_aux_layers: 4
   augmentations:
     frac_coords: false
+  sampling:
+    n_jobs: 1
+    num_samples: 1
+    batch_size: 1
+
+trainer:
+  max_epochs: 1000
+  max_time: "10:00:00:00"

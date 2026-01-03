@@ -364,6 +364,7 @@ class ModernTransformer(nn.Module):
         qk_layernorm: Whether to apply RMS normalization to queries and keys
         use_sdpa: Whether to use PyTorch's scaled dot-product attention
         jvp_attn: Whether to use JVP-compatible attention
+        is_decoder: Whether the transformer is used as a (cross-attention) decoder
     """
 
     @typecheck
@@ -378,6 +379,7 @@ class ModernTransformer(nn.Module):
         qk_layernorm: bool = True,
         use_sdpa: bool = True,
         jvp_attn: bool = False,
+        is_decoder: bool = False,
     ):
         super().__init__()
         self.dim = dim
@@ -385,10 +387,12 @@ class ModernTransformer(nn.Module):
         self.num_heads = num_heads
         self.max_seq_len = context_length
         self.repr_layer = repr_layer
+        self.is_decoder = is_decoder
 
+        layer_class = ModernTransformerDecoderBlock if is_decoder else ModernTransformerBlock
         self.layers = nn.ModuleList(
             [
-                ModernTransformerBlock(
+                layer_class(
                     dim,
                     num_heads,
                     context_length=context_length,
@@ -409,17 +413,26 @@ class ModernTransformer(nn.Module):
     def forward(
         self,
         h: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
         pos_ids: Optional[torch.Tensor] = None,
         padding_mask: Optional[torch.Tensor] = None,
+        tgt_key_padding_mask: Optional[torch.Tensor] = None,
+        memory_key_padding_mask: Optional[torch.Tensor] = None,
         attn_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor | Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass through the modern transformer.
 
         Args:
             h: Input tensor of shape [batch_size, seq_len, dim].
-            pos_ids: Position ids for rotary embeddings
+            memory: Optional memory tensor for cross-attention (if decoder).
+                Shape: [batch_size, seq_len, dim]
+            pos_ids: Position ids for rotary embeddings.
                 Shape: [batch_size, seq_len]
-            padding_mask: Boolean mask for padding tokens (True means ignore)
+            padding_mask: Boolean mask for padding tokens (True means ignore).
+                Shape: [batch_size, seq_len]
+            tgt_key_padding_mask: Boolean mask for target padding tokens if decoder (True means ignore).
+                Shape: [batch_size, seq_len]
+            memory_key_padding_mask: Boolean mask for memory padding tokens if decoder (True means ignore).
                 Shape: [batch_size, seq_len]
             attn_mask: Mask to prevent attention to certain positions.
                 Values should be 0 for positions to attend to, and -inf for masked positions.
@@ -435,9 +448,17 @@ class ModernTransformer(nn.Module):
             self.max_seq_len is None or seq_len <= self.max_seq_len
         ), "Sequence length exceeds model's maximum sequence length"
 
+        attention_kwargs = {"padding_mask": padding_mask}
+        if self.is_decoder:
+            attention_kwargs = {
+                "memory": memory,
+                "tgt_key_padding_mask": tgt_key_padding_mask,
+                "memory_key_padding_mask": memory_key_padding_mask,
+            }
+
         repr = None
         for i, layer in enumerate(self.layers):
-            h = layer(h, pos_ids=pos_ids, padding_mask=padding_mask, attn_mask=attn_mask)
+            h = layer(h, pos_ids=pos_ids, attn_mask=attn_mask, **attention_kwargs)
             if self.repr_layer is not None and i == self.repr_layer:
                 repr = h.clone()
 

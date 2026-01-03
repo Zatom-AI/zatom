@@ -12,6 +12,7 @@ import torch
 from torch_geometric.data import Data, InMemoryDataset
 
 from zatom.data.components.preprocessing_utils import preprocess
+from zatom.utils.typing_utils import typecheck
 
 warnings.simplefilter("ignore", UserWarning)
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -44,6 +45,7 @@ class MP20(InMemoryDataset):
             (default: `False`)
     """
 
+    @typecheck
     def __init__(
         self,
         root: str,

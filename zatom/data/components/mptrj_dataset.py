@@ -8,6 +8,7 @@ import torch
 from torch_geometric.data import Data, InMemoryDataset
 
 from zatom.data.components.preprocessing_utils import preprocess_parquet
+from zatom.utils.typing_utils import typecheck
 
 warnings.simplefilter("ignore", UserWarning)
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -48,6 +49,7 @@ class MPtrj(InMemoryDataset):
             (default: `train`)
     """
 
+    @typecheck
     def __init__(
         self,
         root: str,
@@ -186,6 +188,7 @@ class MPtrj(InMemoryDataset):
 
         self.save(data_list, os.path.join(self.root, "processed", f"{self.split}.pt"))
 
+    @typecheck
     def get(self, idx: int) -> Data:
         """Get the data object at index idx and normalize its energies and forces.
 

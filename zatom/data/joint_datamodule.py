@@ -17,12 +17,17 @@ from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 from zatom.data.components.geom_dataset import GEOM
+from zatom.data.components.matbench_dataset import Matbench
 from zatom.data.components.mp20_dataset import MP20
 from zatom.data.components.mptrj_dataset import MPtrj
 from zatom.data.components.omol25_dataset import OMol25
 from zatom.data.components.qmof150_dataset import QMOF150
 from zatom.utils import pylogger
-from zatom.utils.data_utils import get_mptrj_stats, get_omol25_per_atom_energy_and_stats
+from zatom.utils.data_utils import (
+    get_matbench_stats,
+    get_mptrj_stats,
+    get_omol25_per_atom_energy_and_stats,
+)
 from zatom.utils.typing_utils import typecheck
 
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
@@ -127,6 +132,7 @@ class JointDataModule(LightningDataModule):
     - OMol25: chemically diverse molecules
     - GEOM-Drugs: drug-like molecules
     - MPtrj: materials trajectories
+    - Matbench: materials properties benchmark
 
     A `LightningDataModule` implements 7 key methods:
 
@@ -163,6 +169,7 @@ class JointDataModule(LightningDataModule):
         https://lightning.ai/docs/pytorch/latest/data/datamodule.html
     """
 
+    @typecheck
     def __init__(
         self,
         datasets: DictConfig,
@@ -175,6 +182,7 @@ class JointDataModule(LightningDataModule):
         # Also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
+    @typecheck
     def setup(self, stage: str | None = None) -> None:
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
@@ -208,36 +216,35 @@ class JointDataModule(LightningDataModule):
         #     os.path.join(self.hparams.datasets.qm9.root, "num_nodes_bincount.pt"),
         # )
         # torch.save(smiles, os.path.join(self.hparams.datasets.qm9.root, "smiles.pt"))
-        # Select target property if specified
-        qm9_target_name = self.hparams.datasets.qm9.global_property
-        if qm9_target_name is not None:
-            assert (
-                qm9_target_name == "all" or qm9_target_name in QM9_TARGET_NAME_TO_IDX
-            ), f"QM9 target property '{qm9_target_name}' not recognized. Must be one of {QM9_TARGETS}."
+        # Select target properties if specified
+        qm9_target_names = self.hparams.datasets.qm9.global_property
+        if qm9_target_names is not None:
+            assert all(
+                name in QM9_TARGET_NAME_TO_IDX for name in qm9_target_names
+            ), f"QM9 target properties '{qm9_target_names}' not recognized. Must be a list of the properties listed in https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.datasets.QM9.html."
             qm9_dataset = QM9(
                 root=self.hparams.datasets.qm9.root,
                 transform=partial(
                     qm9_custom_transform, removeHs=self.hparams.datasets.qm9.removeHs
                 ),
             )
-            if qm9_target_name == "all":
-                log.info(
-                    f"QM9 target property set to 'all' ({qm9_dataset.data.y.shape[1]} properties)."
-                )
-            else:
-                qm9_target_idx = QM9_TARGET_NAME_TO_IDX[qm9_target_name]
-                qm9_dataset.data.y = torch.where(
+            qm9_target_idx = torch.tensor(
+                [QM9_TARGET_NAME_TO_IDX[name] for name in qm9_target_names]
+            )
+            qm9_dataset.data.y = torch.where(
+                torch.isin(
                     torch.arange(
                         qm9_dataset.data.y.size(1), device=qm9_dataset.data.y.device
-                    ).unsqueeze(0)
-                    == qm9_target_idx,
-                    qm9_dataset.data.y,
-                    float("nan"),
-                )
-                log.info(
-                    f"QM9 target property set to '{qm9_target_name}' (index {qm9_target_idx})"
-                    f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean().item():.4f} and std {qm9_dataset.data.y[:, qm9_target_idx].std().item():.4f}."
-                )
+                    ).unsqueeze(0),
+                    qm9_target_idx,
+                ),
+                qm9_dataset.data.y,
+                float("nan"),
+            )
+            log.info(
+                f"QM9 target properties set to '{qm9_target_names}' (indices {qm9_target_idx.tolist()})"
+                f" with mean {qm9_dataset.data.y[:, qm9_target_idx].mean(dim=0).tolist()} and std {qm9_dataset.data.y[:, qm9_target_idx].std(dim=0).tolist()}."
+            )
             # Create property prediction train/val/test splits (n.b., same as Platonic Transformer)
             qm9_random_state = np.random.RandomState(seed=42)
             qm9_perm = torch.from_numpy(qm9_random_state.permutation(np.arange(130831)))
@@ -563,6 +570,93 @@ class JointDataModule(LightningDataModule):
             )
         ]
 
+        # Matbench dataset
+        # Create train, val, test splits
+        self.matbench_train_dataset = Matbench(
+            root=self.hparams.datasets.matbench.root,
+            load=self.hparams.datasets.matbench.proportion > 0.0,
+            task_name=self.hparams.datasets.matbench.global_property,
+            split="train",
+        )  # .shuffle()
+        self.matbench_val_dataset = Matbench(
+            root=self.hparams.datasets.matbench.root,
+            load=self.hparams.datasets.matbench.proportion > 0.0,
+            task_name=self.hparams.datasets.matbench.global_property,
+            split="train",  # NOTE: Matbench does not have a val split, so use train split instead
+        )
+        self.matbench_test_dataset = Matbench(
+            root=self.hparams.datasets.matbench.root,
+            load=self.hparams.datasets.matbench.proportion > 0.0,
+            task_name=self.hparams.datasets.matbench.global_property,
+            split="test",
+        )
+        # # Save num_nodes histogram for sampling from generative models
+        # num_nodes = torch.tensor(
+        #     [
+        #         data["num_nodes"]
+        #         for dataset in [
+        #             self.matbench_train_dataset,
+        #             self.matbench_val_dataset,
+        #             self.matbench_test_dataset,
+        #         ]
+        #         for data in dataset
+        #     ]
+        # )
+        # spacegroups = torch.tensor(
+        #     [
+        #         data["spacegroup"]
+        #         for dataset in [
+        #             self.matbench_train_dataset,
+        #             self.matbench_val_dataset,
+        #             self.matbench_test_dataset,
+        #         ]
+        #         for data in dataset
+        #     ]
+        # )
+        # torch.save(
+        #     torch.bincount(num_nodes),
+        #     os.path.join(self.hparams.datasets.matbench.root, "num_nodes_bincount.pt"),
+        # )
+        # torch.save(
+        #     torch.bincount(spacegroups),
+        #     os.path.join(self.hparams.datasets.matbench.root, "spacegroups_bincount.pt"),
+        # )
+        # Normalize property prediction targets per data sample using training set statistics
+        matbench_train_dataset_stats = get_matbench_stats(
+            dataset=self.matbench_train_dataset,
+            task_name=self.hparams.datasets.matbench.global_property,
+            coef_path=self.hparams.datasets.matbench.root,
+            recalculate=False,
+        )
+        self.matbench_train_dataset.shift = matbench_train_dataset_stats["shift"]
+        self.matbench_train_dataset.scale = matbench_train_dataset_stats["scale"]
+        self.matbench_val_dataset.shift = matbench_train_dataset_stats["shift"]
+        self.matbench_val_dataset.scale = matbench_train_dataset_stats["scale"]
+        self.matbench_test_dataset.shift = matbench_train_dataset_stats["shift"]
+        self.matbench_test_dataset.scale = matbench_train_dataset_stats["scale"]
+        # Retain subset of dataset; can be used to train on only one dataset, too
+        matbench_train_subset_size = int(
+            len(self.matbench_train_dataset) * self.hparams.datasets.matbench.proportion
+        )
+        self.matbench_train_dataset = self.matbench_train_dataset[:matbench_train_subset_size]
+        self.matbench_val_dataset = self.matbench_val_dataset[
+            : max(
+                matbench_train_subset_size,
+                # NOTE: Using smaller proportion for val (i.e., duplicate train) set to mitigate overfitting
+                int(
+                    len(self.matbench_val_dataset)
+                    * self.hparams.datasets.matbench.proportion
+                    * 0.1
+                ),
+            )
+        ]
+        self.matbench_test_dataset = self.matbench_test_dataset[
+            : max(
+                matbench_train_subset_size,
+                int(len(self.matbench_test_dataset) * self.hparams.datasets.matbench.proportion),
+            )
+        ]
+
         if stage is None or stage in ["fit", "validate"]:
             self.train_dataset = ConcatDataset(
                 [
@@ -572,10 +666,11 @@ class JointDataModule(LightningDataModule):
                     self.omol25_train_dataset,
                     self.geom_train_dataset,
                     self.mptrj_train_dataset,
+                    self.matbench_train_dataset,
                 ]
             )
             log.info(
-                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)}, GEOM: {len(self.geom_train_dataset)}, MPtrj: {len(self.mptrj_train_dataset)})"
+                f"Training dataset: {len(self.train_dataset)} samples (MP20: {len(self.mp20_train_dataset)}, QM9: {len(self.qm9_train_dataset)}, QMOF150: {len(self.qmof150_train_dataset)}, OMol25: {len(self.omol25_train_dataset)}, GEOM: {len(self.geom_train_dataset)}, MPtrj: {len(self.mptrj_train_dataset)}, Matbench: {len(self.matbench_train_dataset)})"
             )
             log.info(f"MP20 validation dataset: {len(self.mp20_val_dataset)} samples")
             log.info(f"QM9 validation dataset: {len(self.qm9_val_dataset)} samples")
@@ -583,6 +678,7 @@ class JointDataModule(LightningDataModule):
             log.info(f"OMol25 validation dataset: {len(self.omol25_val_dataset)} samples")
             log.info(f"GEOM validation dataset: {len(self.geom_val_dataset)} samples")
             log.info(f"MPtrj validation dataset: {len(self.mptrj_val_dataset)} samples")
+            log.info(f"Matbench validation dataset: {len(self.matbench_val_dataset)} samples")
 
         if stage is None or stage in ["test", "predict"]:
             log.info(f"MP20 test dataset: {len(self.mp20_test_dataset)} samples")
@@ -591,7 +687,9 @@ class JointDataModule(LightningDataModule):
             log.info(f"OMol25 test dataset: {len(self.omol25_test_dataset)} samples")
             log.info(f"GEOM test dataset: {len(self.geom_test_dataset)} samples")
             log.info(f"MPtrj test dataset: {len(self.mptrj_test_dataset)} samples")
+            log.info(f"Matbench test dataset: {len(self.matbench_test_dataset)} samples")
 
+    @typecheck
     def train_dataloader(self) -> DataLoader:
         """Create and return the train dataloader.
 
@@ -602,11 +700,13 @@ class JointDataModule(LightningDataModule):
             dataset=self.train_dataset,
             batch_size=self.hparams.batch_size.train,
             num_workers=self.hparams.num_workers.train,
-            pin_memory=False,
+            persistent_workers=self.hparams.num_workers.persistent_workers,
+            pin_memory=self.hparams.num_workers.pin_memory,
             shuffle=True,
             drop_last=True,
         )
 
+    @typecheck
     def val_dataloader(self) -> Sequence[DataLoader]:
         """Create and return the validation dataloader.
 
@@ -618,46 +718,61 @@ class JointDataModule(LightningDataModule):
                 dataset=self.mp20_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.qm9_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.qmof150_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.omol25_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.geom_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.mptrj_val_dataset,
                 batch_size=self.hparams.batch_size.val,
                 num_workers=self.hparams.num_workers.val,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
+                shuffle=False,
+            ),
+            DataLoader(
+                dataset=self.matbench_val_dataset,
+                batch_size=self.hparams.batch_size.val,
+                num_workers=self.hparams.num_workers.val,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
         ]
 
+    @typecheck
     def test_dataloader(self) -> Sequence[DataLoader]:
         """Create and return the test dataloader.
 
@@ -669,42 +784,56 @@ class JointDataModule(LightningDataModule):
                 dataset=self.mp20_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.qm9_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.qmof150_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.omol25_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.geom_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
             DataLoader(
                 dataset=self.mptrj_test_dataset,
                 batch_size=self.hparams.batch_size.test,
                 num_workers=self.hparams.num_workers.test,
-                pin_memory=False,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
+                shuffle=False,
+            ),
+            DataLoader(
+                dataset=self.matbench_test_dataset,
+                batch_size=self.hparams.batch_size.test,
+                num_workers=self.hparams.num_workers.test,
+                persistent_workers=self.hparams.num_workers.persistent_workers,
+                pin_memory=self.hparams.num_workers.pin_memory,
                 shuffle=False,
             ),
         ]

@@ -47,6 +47,7 @@ class QMOF150(InMemoryDataset):
             (default: `False`)
     """
 
+    @typecheck
     def __init__(
         self,
         root: str,

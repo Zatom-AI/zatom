@@ -1,0 +1,64 @@
+name: eval_sweep_tft_300M_geom-speed_2025-12-27_15-00-00
+project: zatom
+entity: zatom
+program: zatom/eval_fm.py
+
+method: grid
+
+metric: # Does not matter, as we are using sweep to run the experiment.
+  goal: maximize
+  name: test_geom/valid_rate
+
+parameters:
+  ckpt_path:
+    value: null
+
+  data:
+    values: [joint]
+
+  data.datamodule.datasets.mp20.proportion:
+    value: 0.0
+
+  data.datamodule.datasets.qm9.proportion:
+    value: 0.0
+
+  data.datamodule.datasets.geom.proportion:
+    value: 1.0
+
+  date:
+    value: "2025-12-27_15-00-00"
+
+  experiment:
+    value: eval
+
+  model/architecture:
+    values: [tft_300M]
+
+  model.sampling.batch_size:
+    value: 1000
+
+  model.sampling.num_samples:
+    value: 10000
+
+  model.sampling.visualize:
+    value: false
+
+  model.sampling.steps:
+    values: [10, 25, 50, 100, 250, 500, 750, 1000]
+
+  name:
+    value: "eval_${hydra:runtime.choices.model/architecture}_steps-${model.sampling.steps}_geom-speed"
+
+  seed:
+    value: 42
+
+  tags:
+    value: ["geom", "fm", "eval", "sweep", "speed"]
+
+command:
+  - ${env}
+  - HYDRA_FULL_ERROR=1
+  - WANDB_START_METHOD=thread
+  - python
+  - ${program}
+  - ${args_no_hyphens}

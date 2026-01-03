@@ -139,13 +139,41 @@ class DiscreteInterpolant(Interpolant):
     """Interpolant between two discrete distributions.
 
     Args:
+        temperature: During sampling, controls the sharpness of the prediction distribution.
+                        Lower values (<1.0) make it sharper (less random),
+                        higher values (>1.0) make it flatter (more random).
+        top_k: During sampling, if set, only the `k` most likely tokens are considered for sampling.
+        top_p: During sampling, if set, nucleus sampling is used, considering the smallest set of
+                tokens whose cumulative probability exceeds `p`.
         **kwargs: Forwarded to `Interpolant.__init__`.
     """
 
     @typecheck
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        top_k: int | None = None,
+        top_p: float | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.ce_loss = nn.CrossEntropyLoss(reduction="none")
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
+
+        # Coerce "None" strings to actual None values
+        if self.top_k == "None":
+            self.top_k = None
+        if self.top_p == "None":
+            self.top_p = None
+
+        assert self.top_k is None or (
+            isinstance(self.top_k, int) and self.top_k > 0
+        ), f"top_k must be a positive integer, got {self.top_k}."
+        assert self.top_p is None or (
+            isinstance(self.top_p, float) and 0.0 < self.top_p <= 1.0
+        ), f"top_p must be a float in (0, 1], got {self.top_p}."
 
     @typecheck
     def sample_noise(self, shape: torch.Size, pad_mask: Tensor) -> Tensor:
@@ -247,23 +275,67 @@ class DiscreteInterpolant(Interpolant):
         Returns:
             One-hot tensor representing the new discrete state.
         """
-        t = t[self.key].unsqueeze(-1).unsqueeze(-1)
-        dt = dt[self.key].unsqueeze(-1).unsqueeze(-1)
-        assert (
-            dt.shape == t.shape == (batch_t[self.key].shape[0], 1, 1)
-        ), f"t shape: {t.shape}, dt shape: {dt.shape}, batch_t shape: {batch_t[self.key].shape}"
+        logits = pred[self.key]
 
-        x1_probs = torch.nn.functional.softmax(pred[self.key], dim=-1)
+        # 1. Apply Temperature Scaling
+        if self.temperature != 1.0:
+            logits = logits / self.temperature
+
+        # 2. Apply Top-k / Top-p filtering
+        if self.top_k is not None or self.top_p is not None:
+            # Sort logits in descending order
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True, dim=-1)
+
+            if self.top_k is not None:
+                # Zero out logits for tokens not in the top-k
+                indices_to_remove = sorted_indices[:, :, self.top_k :]
+                logits.scatter_(-1, indices_to_remove, -float("Inf"))
+
+            if self.top_p is not None:
+                # Convert logits to probabilities to calculate cumulative sum
+                sorted_probs = torch.nn.functional.softmax(sorted_logits, dim=-1)
+                cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+
+                # Create a mask for tokens to remove
+                sorted_indices_to_remove = cumulative_probs > self.top_p
+                # Shift the mask to the right to keep the first token that exceeds p
+                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                sorted_indices_to_remove[..., 0] = 0
+
+                # Scatter the removal mask back to the original logit positions
+                indices_to_remove = torch.gather(
+                    sorted_indices, -1, sorted_indices_to_remove.long()
+                )
+                logits.scatter_(-1, indices_to_remove, -float("Inf"))
+
+        # Sample with the (potentially modified) logits
+        x1_probs = torch.nn.functional.softmax(logits, dim=-1)
         curr_state = batch_t[self.key].argmax(dim=-1)
 
-        step_probs = ((dt / (1 - t)) * x1_probs).clamp(max=1.0)
-        step_probs.scatter_(-1, curr_state[:, :, None], 0.0)
-        step_probs.scatter_(-1, curr_state[:, :, None], 1.0 - step_probs.sum(dim=-1, keepdim=True))
-        step_probs = step_probs.clamp(min=0.0)
+        t_val = t[self.key].unsqueeze(-1).unsqueeze(-1)
+        dt_val = dt[self.key].unsqueeze(-1).unsqueeze(-1)
 
+        assert (
+            dt_val.shape == t_val.shape == (curr_state.shape[0], 1, 1)
+        ), f"t shape: {t_val.shape}, dt shape: {dt_val.shape}, curr_state shape: {curr_state.shape}"
+
+        # Avoid division by zero at t=1
+        rate_factor = dt_val / (1 - t_val + 1e-8)
+
+        step_probs = (rate_factor * x1_probs).clamp(max=1.0)
+
+        # Set probability of transitioning to the current state to 0 for now
+        step_probs.scatter_(-1, curr_state[:, :, None], 0.0)
+
+        # The probability of staying is 1 minus the sum of probabilities of transitioning elsewhere
+        prob_stay = 1.0 - step_probs.sum(dim=-1, keepdim=True)
+        step_probs.scatter_(-1, curr_state[:, :, None], prob_stay)
+
+        # Clamp and re-normalize for numerical stability
+        step_probs = step_probs.clamp(min=0.0)
         step_probs = step_probs / step_probs.sum(dim=-1, keepdim=True)
 
-        x_next = torch.distributions.Categorical(step_probs).sample()
+        x_next = torch.distributions.Categorical(probs=step_probs).sample()
         x_next = F.one_hot(x_next, num_classes=batch_t[self.key].shape[-1])
 
         return x_next

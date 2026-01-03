@@ -10,6 +10,7 @@ from torch_geometric.data import Data, Dataset, download_url
 
 from zatom.utils import pylogger
 from zatom.utils.data_utils import extract_tar_gz, normalize_energy
+from zatom.utils.typing_utils import typecheck
 
 warnings.simplefilter("ignore", UserWarning)
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -158,6 +159,7 @@ class OMol25(Dataset):
             (default: `1.0`)
     """
 
+    @typecheck
     def __init__(
         self,
         root: str,
@@ -249,10 +251,12 @@ class OMol25(Dataset):
         # Extract raw data
         extract_tar_gz(output_file, os.path.dirname(self.dataset_path))
 
+    @typecheck
     def len(self) -> int:
         """Return the number of examples."""
         return self.dataset_length
 
+    @typecheck
     def get(self, idx) -> Data:
         """Get a single example."""
         dataset = self._init_dataset()
