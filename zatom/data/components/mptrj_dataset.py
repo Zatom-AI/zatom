@@ -45,6 +45,8 @@ class MPtrj(InMemoryDataset):
             (default: `0.0`)
         scale: Scale value for energy normalization.
             (default: `1.0`)
+        force_scale: Scale value for force normalization.
+            (default: `1.0`)
         split: The dataset split to load (train, val, test).
             (default: `train`)
     """
@@ -60,10 +62,12 @@ class MPtrj(InMemoryDataset):
         force_reload: bool = False,
         shift: float = 0.0,
         scale: float = 1.0,
+        force_scale: float = 1.0,
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         self.shift = shift
         self.scale = scale
+        self.force_scale = force_scale
         self.split = split
         self.split_files = {
             "train": [
@@ -113,7 +117,7 @@ class MPtrj(InMemoryDataset):
             parquet_df = pd.concat([pd.read_parquet(f) for f in parquet_files], ignore_index=True)
             cached_data = preprocess_parquet(
                 parquet_df,
-                prop_list=["corrected_total_energy", "forces"],
+                prop_list=["corrected_total_energy_referenced", "forces"],
                 num_workers=32,
             )
             torch.save(cached_data, os.path.join(self.root, "raw", f"{self.split}.pt"))
@@ -132,7 +136,9 @@ class MPtrj(InMemoryDataset):
             num_atoms = graph_arrays["num_atoms"]
 
             # Prepare target values (energy and forces)
-            energy = torch.tensor([data_dict["corrected_total_energy"].astype(np.float32)])
+            energy = torch.tensor(
+                [data_dict["corrected_total_energy_referenced"].astype(np.float32)]
+            )
             forces = torch.from_numpy(np.stack(data_dict["forces"]).astype(np.float32))
 
             y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
@@ -204,7 +210,7 @@ class MPtrj(InMemoryDataset):
         forces = data.y[:, 1:4]
 
         energy = (energy - self.shift) / self.scale
-        forces = forces / self.scale
+        forces = forces / self.force_scale
 
         num_atoms = data.num_atoms.item()
         data.y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)

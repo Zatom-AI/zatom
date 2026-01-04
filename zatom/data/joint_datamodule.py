@@ -25,7 +25,6 @@ from zatom.data.components.qmof150_dataset import QMOF150
 from zatom.utils import pylogger
 from zatom.utils.data_utils import (
     get_matbench_stats,
-    get_mptrj_stats,
     get_omol25_per_atom_energy_and_stats,
 )
 from zatom.utils.typing_utils import typecheck
@@ -541,17 +540,22 @@ class JointDataModule(LightningDataModule):
         # )
         # Normalize energy and force prediction targets per data sample using training set statistics
         if self.hparams.datasets.mptrj.global_energy:
-            mptrj_train_dataset_stats = get_mptrj_stats(
-                dataset=self.mptrj_train_dataset,
-                coef_path=self.hparams.datasets.mptrj.root,
-                recalculate=False,
+            self.mptrj_train_energy_mean = self.mptrj_train_dataset.data.y[:, 0:1].mean(
+                dim=0, keepdim=True
             )
-            self.mptrj_train_dataset.shift = mptrj_train_dataset_stats["shift"]
-            self.mptrj_train_dataset.scale = mptrj_train_dataset_stats["scale"]
-            self.mptrj_val_dataset.shift = mptrj_train_dataset_stats["shift"]
-            self.mptrj_val_dataset.scale = mptrj_train_dataset_stats["scale"]
-            self.mptrj_test_dataset.shift = mptrj_train_dataset_stats["shift"]
-            self.mptrj_test_dataset.scale = mptrj_train_dataset_stats["scale"]
+            self.mptrj_train_energy_std = self.mptrj_train_dataset.data.y[:, 0:1].std(
+                dim=0, keepdim=True
+            )
+            self.mptrj_train_forces_std = self.mptrj_train_dataset.data.y[:, 1:4].std()
+            self.mptrj_train_dataset.shift = self.mptrj_train_energy_mean
+            self.mptrj_train_dataset.scale = self.mptrj_train_energy_std
+            self.mptrj_train_dataset.force_scale = self.mptrj_train_forces_std
+            self.mptrj_val_dataset.shift = self.mptrj_train_energy_mean
+            self.mptrj_val_dataset.scale = self.mptrj_train_energy_std
+            self.mptrj_val_dataset.force_scale = self.mptrj_train_forces_std
+            self.mptrj_test_dataset.shift = self.mptrj_train_energy_mean
+            self.mptrj_test_dataset.scale = self.mptrj_train_energy_std
+            self.mptrj_test_dataset.force_scale = self.mptrj_train_forces_std
         # Retain subset of dataset; can be used to train on only one dataset, too
         mptrj_train_subset_size = int(
             len(self.mptrj_train_dataset) * self.hparams.datasets.mptrj.proportion

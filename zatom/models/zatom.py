@@ -619,8 +619,12 @@ class Zatom(LightningModule):
         ):
             if is_omol25_dataset.any() or is_mptrj_dataset.any():
                 aux_energy_scale = torch.ones_like(pred_aux_global_energy)
+                aux_force_scale = torch.ones_like(pred_aux_atomic_forces)
                 aux_energy_shift = torch.zeros_like(pred_aux_global_energy)
                 aux_energy_scale[is_omol25_dataset] = (
+                    self.trainer.datamodule.omol25_train_dataset.scale
+                )
+                aux_force_scale[is_omol25_dataset] = (
                     self.trainer.datamodule.omol25_train_dataset.scale
                 )
                 aux_energy_shift[is_omol25_dataset] = (
@@ -628,6 +632,9 @@ class Zatom(LightningModule):
                 )
                 aux_energy_scale[is_mptrj_dataset] = (
                     self.trainer.datamodule.mptrj_train_dataset.scale
+                )
+                aux_force_scale[is_mptrj_dataset] = (
+                    self.trainer.datamodule.mptrj_train_dataset.force_scale
                 )
                 aux_energy_shift[is_mptrj_dataset] = (
                     self.trainer.datamodule.mptrj_train_dataset.shift
@@ -653,12 +660,8 @@ class Zatom(LightningModule):
                     mask_aux_global_energy.sum() + 1e-6
                 )
                 # Atomic forces mean absolute error (in meV/Å <- eV/Å)
-                aux_force_pred = (
-                    pred_aux_atomic_forces * aux_energy_scale.unsqueeze(-1) * EV_TO_MEV
-                )
-                aux_force_target = (
-                    target_aux_atomic_forces * aux_energy_scale.unsqueeze(-1) * EV_TO_MEV
-                )
+                aux_force_pred = pred_aux_atomic_forces * aux_force_scale * EV_TO_MEV
+                aux_force_target = target_aux_atomic_forces * aux_force_scale * EV_TO_MEV
                 aux_force_err = (aux_force_pred - aux_force_target) * mask_aux_atomic_forces
                 aux_force_loss_value = aux_force_err.abs().sum() / (
                     # Normalize by number of valid atoms, not number of valid atom coordinates
