@@ -840,11 +840,21 @@ class Zatom(LightningModule):
 
         # Log throughput metrics
         step_time = time.time() - t_start
+        atoms_per_second = torch.tensor(
+            len(batch.batch) / step_time, device=self.device, dtype=torch.float32
+        )
         examples_per_second = torch.tensor(
             batch.batch_size / step_time, device=self.device, dtype=torch.float32
         )
         example_length = torch.bincount(batch.batch).float().mean()
 
+        self.log(
+            "train/atoms_per_second",
+            atoms_per_second,
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
         self.log(
             "train/examples_per_second",
             examples_per_second,
@@ -928,6 +938,8 @@ class Zatom(LightningModule):
             dataloader_idx: The index of the dataloader.
             stage: The stage of evaluation ('val' or 'test').
         """
+        t_start = time.time()
+
         if stage not in ["val", "test"]:
             raise ValueError("The `stage` must be `val` or `test`.")
 
@@ -956,6 +968,38 @@ class Zatom(LightningModule):
                 sync_dist=True,
                 add_dataloader_idx=False,
             )
+
+        # Log throughput metrics
+        step_time = time.time() - t_start
+        atoms_per_second = torch.tensor(
+            len(batch.batch) / step_time, device=self.device, dtype=torch.float32
+        )
+        examples_per_second = torch.tensor(
+            batch.batch_size / step_time, device=self.device, dtype=torch.float32
+        )
+        example_length = torch.bincount(batch.batch).float().mean()
+
+        self.log(
+            f"{stage}/atoms_per_second",
+            atoms_per_second,
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            f"{stage}/examples_per_second",
+            examples_per_second,
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
+        self.log(
+            f"{stage}/example_length",
+            example_length,
+            on_step=True,
+            on_epoch=False,
+            sync_dist=True,
+        )
 
     @typecheck
     def on_evaluation_epoch_end(self, stage: Literal["val", "test"]) -> None:
