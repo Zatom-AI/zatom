@@ -82,7 +82,7 @@ bash -c "
     srun --kill-on-bad-exit=1 shifter python zatom/train_fm.py \
     pretrained_ckpt_path=$PRETRAINED_CKPT_PATH \
     ckpt_path=$CKPT_PATH \
-    callbacks.model_checkpoint.monitor=val_omol25/aux_atomic_forces_loss \
+    callbacks.model_checkpoint.monitor=val_omol25/aux_global_energy_loss \
     data=$DATASET \
     data.datamodule.batch_size.train=32 \
     data.datamodule.batch_size.val=32 \
