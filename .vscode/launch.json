@@ -11,7 +11,12 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": []
+            "args": [
+                // "logs/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/old-module-imports-model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt",
+                // "logs/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/old-module-imports-model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt",
+                // "logs/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt",
+                // "--skip_key_merging",
+            ]
         },
         {
             "name": "[TRAIN] train_fm.py",
@@ -100,7 +105,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zatom/eval_fm.py",
             "console": "integratedTerminal",
-            "justMyCode": false,
+            "justMyCode": true,
             "env": {
                 // "TRITON_INTERPRET": "1",
                 // "TRITON_FRONT_END_DEBUGGING": "1",
