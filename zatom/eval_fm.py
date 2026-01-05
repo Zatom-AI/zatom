@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -36,7 +35,6 @@ from zatom import (
     resolve_omegaconf_variable,
     set_omegaconf_flag_recursive,
 )
-from zatom.models.architectures.transformer import common
 from zatom.utils import (
     RankedLogger,
     extras,
@@ -196,9 +194,6 @@ def main(cfg: DictConfig) -> None:
         torch.backends.cuda.matmul.allow_tf32 = True
     if cfg.cudnn_allow_tf32:
         torch.backends.cudnn.allow_tf32 = True
-
-    # Support checkpoints using old module names - TODO: remove this in future versions
-    sys.modules["zatom.models.architectures.dit.layers"] = common
 
     # Run evaluation
     set_omegaconf_flag_recursive(
