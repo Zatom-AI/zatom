@@ -985,6 +985,7 @@ class Zatom(LightningModule):
             on_step=True,
             on_epoch=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
         self.log(
             f"{stage}/examples_per_second",
@@ -992,6 +993,7 @@ class Zatom(LightningModule):
             on_step=True,
             on_epoch=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
         self.log(
             f"{stage}/example_length",
@@ -999,6 +1001,7 @@ class Zatom(LightningModule):
             on_step=True,
             on_epoch=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
 
     @typecheck
