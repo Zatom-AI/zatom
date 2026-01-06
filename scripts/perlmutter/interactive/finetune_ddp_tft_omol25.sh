@@ -34,7 +34,7 @@ mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="xe2f0pme"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_ID="ae2f0pme"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
 DEFAULT_RUN_DATE="2026-01-06_09-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
@@ -84,9 +84,9 @@ bash -c "
     ckpt_path=$CKPT_PATH \
     callbacks.model_checkpoint.monitor=val_omol25/aux_global_energy_loss \
     data=$DATASET \
-    data.datamodule.batch_size.train=32 \
-    data.datamodule.batch_size.val=32 \
-    data.datamodule.batch_size.test=32 \
+    data.datamodule.batch_size.train=64 \
+    data.datamodule.batch_size.val=64 \
+    data.datamodule.batch_size.test=64 \
     data.datamodule.datasets.qm9.proportion=0.0 \
     data.datamodule.datasets.qm9.global_property=null \
     data.datamodule.datasets.mptrj.proportion=1.0 \
