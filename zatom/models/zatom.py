@@ -753,16 +753,17 @@ class Zatom(LightningModule):
 
                 is_omol25_dataset = batch.dataset_idx == self.dataset_to_index.get("omol25", -1)
                 is_mptrj_dataset = batch.dataset_idx == self.dataset_to_index.get("mptrj", -1)
-                if is_omol25_dataset.any():
-                    # Rotate non-periodic atomic forces accordingly
-                    is_omol25_node = is_omol25_dataset[batch.batch]
+                if is_omol25_dataset.any() or is_mptrj_dataset.any():
+                    # Rotate atomic forces accordingly
                     forces_aug = torch.einsum(
                         "bi,bij->bj", batch.y[:, 1:4], rot_for_nodes.transpose(-2, -1)
                     )
-                    batch.y[is_omol25_node, 1:4] = forces_aug[is_omol25_node]
-                # if is_mptrj_dataset.any():
-                #     # NOTE: Force rotation augmentation is not implemented for MPtrj dataset samples
-                #     pass
+                    if is_omol25_dataset.any():
+                        is_omol25_node = is_omol25_dataset[batch.batch]
+                        batch.y[is_omol25_node, 1:4] = forces_aug[is_omol25_node]
+                    if is_mptrj_dataset.any():
+                        is_mptrj_node = is_mptrj_dataset[batch.batch]
+                        batch.y[is_mptrj_node, 1:4] = forces_aug[is_mptrj_node]
 
             if self.hparams.augmentations.frac_coords is True:
                 if batch.sample_is_periodic.any():
