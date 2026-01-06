@@ -90,7 +90,7 @@ bash -c "
     data.datamodule.datasets.qm9.proportion=0.0 \
     data.datamodule.datasets.qm9.global_property=null \
     data.datamodule.datasets.mptrj.proportion=0.0 \
-    data.datamodule.datasets.mptrj.global_energy=true \
+    data.datamodule.datasets.mptrj.global_energy=null \
     data.datamodule.datasets.omol25.proportion=1.0 \
     data.datamodule.datasets.omol25.global_energy=true \
     date=$RUN_DATE \
