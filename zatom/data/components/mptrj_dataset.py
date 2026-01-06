@@ -117,7 +117,7 @@ class MPtrj(InMemoryDataset):
             parquet_df = pd.concat([pd.read_parquet(f) for f in parquet_files], ignore_index=True)
             cached_data = preprocess_parquet(
                 parquet_df,
-                prop_list=["corrected_total_energy_referenced", "forces"],
+                prop_list=["energy_referenced", "forces"],
                 num_workers=32,
             )
             torch.save(cached_data, os.path.join(self.root, "raw", f"{self.split}.pt"))
@@ -136,9 +136,7 @@ class MPtrj(InMemoryDataset):
             num_atoms = graph_arrays["num_atoms"]
 
             # Prepare target values (energy and forces)
-            energy = torch.tensor(
-                [data_dict["corrected_total_energy_referenced"].astype(np.float32)]
-            )
+            energy = torch.tensor([data_dict["energy_referenced"].astype(np.float32)])
             forces = torch.from_numpy(np.stack(data_dict["forces"]).astype(np.float32))
 
             y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
