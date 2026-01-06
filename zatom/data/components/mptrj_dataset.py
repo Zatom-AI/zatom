@@ -117,7 +117,10 @@ class MPtrj(InMemoryDataset):
             parquet_df = pd.concat([pd.read_parquet(f) for f in parquet_files], ignore_index=True)
             cached_data = preprocess_parquet(
                 parquet_df,
-                prop_list=["energy_referenced", "forces"],
+                prop_list=[
+                    "energy_referenced",
+                    "forces",
+                ],  # Follow OMol25 convention in predicting referenced energy
                 num_workers=32,
             )
             torch.save(cached_data, os.path.join(self.root, "raw", f"{self.split}.pt"))
