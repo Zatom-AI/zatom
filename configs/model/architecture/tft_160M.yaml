@@ -137,6 +137,7 @@ hidden_size: 768 # 512, 768, 1024 -> 80M, 160M, 300M model sizes
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
 aux_hidden_size: 512 # (fixed) hidden size for auxiliary task layers
+aux_mlip_hidden_size: ${model.architecture.aux_hidden_size} # (fixed) hidden size for auxiliary energy and force prediction tasks
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
 token_num_heads: 8
 interdist_loss: null # NOTE: must be one of (`l1`, `l2`, null)

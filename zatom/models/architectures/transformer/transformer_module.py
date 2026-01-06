@@ -32,7 +32,8 @@ class TransformerModule(nn.Module):
         num_heads: Number of attention heads.
         num_layers: Number of transformer layers.
         num_aux_layers: Number of auxiliary transformer layers.
-        aux_hidden_dim: Dimension auxiliary transformer layers.
+        aux_hidden_dim: Dimension of auxiliary transformer layers.
+        aux_mlip_hidden_dim: Dimension of auxiliary energy and force prediction transformer layers.
         aux_layer: Layer at which to extract representations for auxiliary tasks.
         hidden_dim: Dimension of the hidden layers.
         num_properties: Number of global properties to predict.
@@ -62,6 +63,7 @@ class TransformerModule(nn.Module):
         num_layers: int,
         num_aux_layers: int,
         aux_hidden_dim: int,
+        aux_mlip_hidden_dim: int,
         aux_layer: int,
         hidden_dim: int,
         num_properties: int,
@@ -221,13 +223,13 @@ class TransformerModule(nn.Module):
             else nn.Identity()
         )
         self.global_energy_proj = (
-            nn.Linear(hidden_dim, aux_hidden_dim, bias=False)
-            if hidden_dim != aux_hidden_dim
+            nn.Linear(hidden_dim, aux_mlip_hidden_dim, bias=False)
+            if hidden_dim != aux_mlip_hidden_dim
             else nn.Identity()
         )
         self.atomic_forces_proj = (
-            nn.Linear(hidden_dim, aux_hidden_dim, bias=False)
-            if hidden_dim != aux_hidden_dim
+            nn.Linear(hidden_dim, aux_mlip_hidden_dim, bias=False)
+            if hidden_dim != aux_mlip_hidden_dim
             else nn.Identity()
         )
 
@@ -258,20 +260,20 @@ class TransformerModule(nn.Module):
                 depth=num_aux_layers,
             )
             self.global_energy_transformer = transformer_class(
-                dim=aux_hidden_dim,
+                dim=aux_mlip_hidden_dim,
                 num_heads=num_heads,
                 depth=num_aux_layers,
             )
             self.atomic_forces_transformer = transformer_class(
-                dim=aux_hidden_dim,
+                dim=aux_mlip_hidden_dim,
                 num_heads=num_heads,
                 depth=num_aux_layers,
             )
 
         self.global_property_head = nn.Linear(aux_hidden_dim, num_properties, bias=True)
-        self.global_energy_head = nn.Linear(aux_hidden_dim, 1, bias=True)
+        self.global_energy_head = nn.Linear(aux_mlip_hidden_dim, 1, bias=True)
         if not self.is_conservative:
-            self.atomic_forces_head = nn.Linear(aux_hidden_dim, 3, bias=False)
+            self.atomic_forces_head = nn.Linear(aux_mlip_hidden_dim, 3, bias=False)
 
         self.auxiliary_tasks = ["global_property", "global_energy", "atomic_forces"]
 

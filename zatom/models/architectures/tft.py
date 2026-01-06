@@ -55,6 +55,7 @@ class TFT(nn.Module):
         angles_radians_interpolant: Interpolant for angles in radians modality.
         hidden_size: Hidden size of the model.
         aux_hidden_size: Hidden size for auxiliary task projections.
+        aux_mlip_hidden_size: Hidden size for auxiliary energy and force prediction tasks.
         num_layers: Number of transformer layers in the token trunk.
         token_num_heads: Number of (token) attention heads in the token trunk.
         max_num_elements: Maximum number of elements in the dataset.
@@ -80,6 +81,7 @@ class TFT(nn.Module):
         angles_radians_interpolant: Interpolant,
         hidden_size: int = 512,
         aux_hidden_size: int = 512,
+        aux_mlip_hidden_size: int = 512,
         num_layers: int = 16,
         token_num_heads: int = 8,
         max_num_elements: int = 100,
@@ -131,6 +133,7 @@ class TFT(nn.Module):
                 # Support TFP-style config args
                 "c_model": hidden_size,
                 "c_aux": aux_hidden_size,
+                "c_aux_mlip": aux_mlip_hidden_size,
             }
         )
         self.model = multimodal_model(
@@ -138,6 +141,7 @@ class TFT(nn.Module):
             num_layers=num_layers,
             hidden_dim=hidden_size,
             aux_hidden_dim=aux_hidden_size,
+            aux_mlip_hidden_dim=aux_mlip_hidden_size,
             dataset_embedder=dataset_embedder,
             spacegroup_embedder=spacegroup_embedder,
             **kwargs,

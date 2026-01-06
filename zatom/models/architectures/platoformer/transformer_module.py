@@ -58,6 +58,7 @@ class TransformerModulePlatonic(nn.Module):
         spatial_dim:          Dimension of spatial coordinates (e.g., 3 for 3D).
         c_model:              Number of channels per group element.
         c_aux:                Number of channels per group element in the auxiliary task heads.
+        c_aux_mlip:           Number of channels per group element in the auxiliary energy and force prediction task heads.
         num_atom_types:       Number of atom types.
         num_layers:           Number of Platonic Transformer blocks in the trunk transformer
         num_aux_layers:       Number of Platonic Transformer blocks in the auxiliary transformer.
@@ -98,6 +99,7 @@ class TransformerModulePlatonic(nn.Module):
         spatial_dim: int,
         c_model: int,
         c_aux: int,
+        c_aux_mlip: int,
         num_atom_types: int,
         num_layers: int,
         num_aux_layers: int,
@@ -131,12 +133,13 @@ class TransformerModulePlatonic(nn.Module):
 
         self.solid_name = solid_name
         self.group = get_platonic_group(solid_name)
-        self.G = G = self.group.G
+        self.G = self.group.G
         self.G_lift_scalars = partial(lift, vectors=None, group=self.group)
 
         self.spatial_dim = spatial_dim
         self.c_model = c_model
         self.c_aux = c_aux
+        self.c_aux_mlip = c_aux_mlip
         self.num_atom_types = num_atom_types
         self.num_layers = num_layers
         self.num_aux_layers = num_aux_layers
@@ -270,13 +273,13 @@ class TransformerModulePlatonic(nn.Module):
             else nn.Identity()
         )
         self.global_energy_proj = (
-            PlatonicLinear(c_model, c_aux, solid_name=solid_name, bias=False)
-            if c_model != c_aux
+            PlatonicLinear(c_model, c_aux_mlip, solid_name=solid_name, bias=False)
+            if c_model != c_aux_mlip
             else nn.Identity()
         )
         self.atomic_forces_proj = (
-            PlatonicLinear(c_model, c_aux, solid_name=solid_name, bias=False)
-            if c_model != c_aux
+            PlatonicLinear(c_model, c_aux_mlip, solid_name=solid_name, bias=False)
+            if c_model != c_aux_mlip
             else nn.Identity()
         )
 
@@ -309,9 +312,16 @@ class TransformerModulePlatonic(nn.Module):
                     repr_layer=None,
                 )
             )
+            aux_mlip_transformer_kwargs = vars(
+                SimpleNamespace(
+                    c_model=c_aux_mlip,
+                    depth=num_aux_layers,
+                    repr_layer=None,
+                )
+            )
             self.global_property_transformer = transformer_factory(**aux_transformer_kwargs)
-            self.global_energy_transformer = transformer_factory(**aux_transformer_kwargs)
-            self.atomic_forces_transformer = transformer_factory(**aux_transformer_kwargs)
+            self.global_energy_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
+            self.atomic_forces_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
 
         # Final projection + unlifting
         self.global_property_head = nn.Sequential(
@@ -319,13 +329,13 @@ class TransformerModulePlatonic(nn.Module):
             nn.Linear(c_aux, num_properties, bias=True),  # (B, N, num_properties)
         )
         self.global_energy_head = nn.Sequential(
-            ProjRegularToScalar(solid_name),  # (B, N, c_aux)
-            nn.Linear(c_aux, 1, bias=True),  # (B, N, 1)
+            ProjRegularToScalar(solid_name),  # (B, N, c_aux_mlip)
+            nn.Linear(c_aux_mlip, 1, bias=True),  # (B, N, 1)
         )
         if not self.is_conservative:
             self.atomic_forces_head = nn.Sequential(
                 PlatonicLinear(
-                    c_aux, spatial_dim, solid_name, bias=False
+                    c_aux_mlip, spatial_dim, solid_name, bias=False
                 ),  # (B, N, G*spatial_dim)
                 ProjRegularToVector(solid_name, flatten=True),  # (B, N, spatial_dim)
             )
