@@ -981,7 +981,7 @@ class Zatom(LightningModule):
         example_length = torch.bincount(batch.batch).float().mean()
 
         self.log(
-            f"{stage}/atoms_per_second",
+            f"{stage}_{self.index_to_dataset[dataloader_idx]}/atoms_per_second",
             atoms_per_second,
             on_step=True,
             on_epoch=False,
@@ -989,7 +989,7 @@ class Zatom(LightningModule):
             add_dataloader_idx=False,
         )
         self.log(
-            f"{stage}/examples_per_second",
+            f"{stage}_{self.index_to_dataset[dataloader_idx]}/examples_per_second",
             examples_per_second,
             on_step=True,
             on_epoch=False,
@@ -997,7 +997,7 @@ class Zatom(LightningModule):
             add_dataloader_idx=False,
         )
         self.log(
-            f"{stage}/example_length",
+            f"{stage}_{self.index_to_dataset[dataloader_idx]}/example_length",
             example_length,
             on_step=True,
             on_epoch=False,
