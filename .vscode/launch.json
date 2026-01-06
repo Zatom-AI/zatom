@@ -87,6 +87,7 @@
                 "model=zatom",
                 "model/architecture=tft_80M",
                 // "model.architecture.aux_mlip_hidden_size=1024",
+                // "model.architecture.multimodal_model.mask_material_coords=false",
                 // "model.augmentations.scale=1.0",
                 // "model.augmentations.frac_coords=false",
                 "model.optimizer.lr=1e-4",

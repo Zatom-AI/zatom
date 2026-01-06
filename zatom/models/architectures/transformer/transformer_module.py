@@ -50,6 +50,7 @@ class TransformerModule(nn.Module):
         add_sinusoid_posenc: Whether to add sinusoidal positional encoding.
         concat_combine_input: Whether to concatenate and combine inputs.
         is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
+        mask_material_coords: Whether or not material coordinates are masked in forward().
         custom_weight_init: Custom weight initialization method (None, "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal").
             NOTE: "uniform" does not work well.
     """
@@ -80,6 +81,7 @@ class TransformerModule(nn.Module):
         add_sinusoid_posenc: bool = True,
         concat_combine_input: bool = False,
         is_conservative: bool = False,
+        mask_material_coords: bool = True,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
         ] = None,
@@ -108,6 +110,7 @@ class TransformerModule(nn.Module):
         self.add_sinusoid_posenc = add_sinusoid_posenc
         self.concat_combine_input = concat_combine_input
         self.is_conservative = is_conservative
+        self.mask_material_coords = mask_material_coords
         self.custom_weight_init = custom_weight_init
 
         self.dataset_embedder = dataset_embedder
@@ -386,10 +389,12 @@ class TransformerModule(nn.Module):
 
         # Ensure atom positions are masked out for periodic samples and the
         # remaining continuous modalities are masked out for non-periodic samples
-        pos = pos * ~token_is_periodic
         frac_coords = frac_coords * token_is_periodic
         lengths_scaled = lengths_scaled * sample_is_periodic
         angles_radians = angles_radians * sample_is_periodic
+        # Optionally mask Euclidean coordinates for materials
+        if self.mask_material_coords:
+            pos = pos * ~token_is_periodic
 
         real_mask = 1 - padding_mask.int()
         global_mask = real_mask.any(-1, keepdim=True).unsqueeze(-1)  # (B, 1, 1)
