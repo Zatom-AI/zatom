@@ -85,7 +85,8 @@ class TransformerModulePlatonic(nn.Module):
         use_sequence_sin_ape: Whether to add sinusoidal positional encoding along *sequence*
                               dimension (in SMILES ordering).
         concat_combine_input: Whether to concatenate and combine inputs.
-        is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
+        is_conservative:      Whether to enforce conservative atomic forces as negative gradients of global energy.
+        separate_energy_force_transformers: Whether to use separate transformers for energy and force predictions.
         mask_material_coords: Whether or not material coordinates are masked in _get_embedding.
         normalize_per_g:      If False, Platonic normalization layers operate over the last
                               (channel) axis only. If True, acting on the group axis as well.
@@ -116,6 +117,7 @@ class TransformerModulePlatonic(nn.Module):
         use_sequence_sin_ape: bool = True,
         concat_combine_input: bool = False,
         is_conservative: bool = False,
+        separate_energy_force_transformers: bool = True,
         mask_material_coords: bool = True,
         normalize_per_g: bool = True,
         custom_weight_init: Optional[
@@ -154,6 +156,7 @@ class TransformerModulePlatonic(nn.Module):
         self.use_sequence_sin_ape = use_sequence_sin_ape
         self.concat_combine_input = concat_combine_input
         self.is_conservative = is_conservative
+        self.separate_energy_force_transformers = separate_energy_force_transformers
         self.mask_material_coords = mask_material_coords
         self.cond_dim = 6 if coords_embed is None else 7
 
@@ -282,7 +285,7 @@ class TransformerModulePlatonic(nn.Module):
         )
         self.atomic_forces_proj = (
             PlatonicLinear(c_model, c_aux_mlip, solid_name=solid_name, bias=False)
-            if c_model != c_aux_mlip
+            if c_model != c_aux_mlip and self.separate_energy_force_transformers
             else nn.Identity()
         )
 
@@ -304,7 +307,8 @@ class TransformerModulePlatonic(nn.Module):
         if self.num_aux_mlip_layers > 0:
             if self.use_cross_attn:
                 self.global_energy_cross_attention = cross_attn_factory()
-                self.atomic_forces_cross_attention = cross_attn_factory()
+                if self.separate_energy_force_transformers:
+                    self.atomic_forces_cross_attention = cross_attn_factory()
 
             self.global_energy_charge_proj = ChargeSpinEmbedding(
                 embedding_type="pos_emb",
@@ -329,7 +333,8 @@ class TransformerModulePlatonic(nn.Module):
                 )
             )
             self.global_energy_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
-            self.atomic_forces_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
+            if self.separate_energy_force_transformers:
+                self.atomic_forces_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
 
         # Final projection + unlifting
         self.global_property_head = nn.Sequential(
@@ -763,7 +768,11 @@ class TransformerModulePlatonic(nn.Module):
                     )
                 )
                 h_global_energy = self.global_energy_cross_attention(**aux_cross_attn_kwargs)
-                h_atomic_forces = self.atomic_forces_cross_attention(**aux_cross_attn_kwargs)
+                h_atomic_forces = (
+                    self.atomic_forces_cross_attention(**aux_cross_attn_kwargs)
+                    if self.separate_energy_force_transformers
+                    else h_global_energy
+                )
 
             # Compute scalar charge/spin embeddings,  lift them to the group.
             ce = self.global_energy_charge_proj(feats["charge"])
@@ -772,7 +781,6 @@ class TransformerModulePlatonic(nn.Module):
             cse = self.G_lift_scalars(cse)  # (B, 1, G*c_model)
 
             h_global_energy = h_global_energy + cse
-            h_atomic_forces = h_atomic_forces + cse
 
             aux_self_attn_kwargs = vars(
                 SimpleNamespace(
@@ -787,10 +795,14 @@ class TransformerModulePlatonic(nn.Module):
                 feat=self.global_energy_proj(h_global_energy),
                 **aux_self_attn_kwargs,
             )  # (B, N, G*c_aux)
-            h_atomic_forces = self.atomic_forces_transformer(
-                feat=self.atomic_forces_proj(h_atomic_forces),
-                **aux_self_attn_kwargs,
-            )  # (B, N, G*c_aux)
+            if self.separate_energy_force_transformers:
+                h_atomic_forces = h_atomic_forces + cse
+                h_atomic_forces = self.atomic_forces_transformer(
+                    feat=self.atomic_forces_proj(h_atomic_forces),
+                    **aux_self_attn_kwargs,
+                )  # (B, N, G*c_aux)
+            else:
+                h_atomic_forces = h_global_energy
 
         else:
             h_global_energy = self.global_energy_proj(h_global_energy)  # (B, N, G*c_aux)

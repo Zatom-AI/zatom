@@ -51,6 +51,7 @@ class TransformerModule(nn.Module):
         add_sinusoid_posenc: Whether to add sinusoidal positional encoding.
         concat_combine_input: Whether to concatenate and combine inputs.
         is_conservative: Whether to enforce conservative atomic forces as negative gradients of global energy.
+        separate_energy_force_transformers: Whether to use separate transformers for energy and force predictions.
         mask_material_coords: Whether or not material coordinates are masked in forward().
         custom_weight_init: Custom weight initialization method (None, "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal").
             NOTE: "uniform" does not work well.
@@ -83,6 +84,7 @@ class TransformerModule(nn.Module):
         add_sinusoid_posenc: bool = True,
         concat_combine_input: bool = False,
         is_conservative: bool = False,
+        separate_energy_force_transformers: bool = True,
         mask_material_coords: bool = True,
         custom_weight_init: Optional[
             Literal["none", "xavier", "kaiming", "orthogonal", "uniform", "eye", "normal"]
@@ -113,6 +115,7 @@ class TransformerModule(nn.Module):
         self.add_sinusoid_posenc = add_sinusoid_posenc
         self.concat_combine_input = concat_combine_input
         self.is_conservative = is_conservative
+        self.separate_energy_force_transformers = separate_energy_force_transformers
         self.mask_material_coords = mask_material_coords
         self.custom_weight_init = custom_weight_init
 
@@ -235,7 +238,7 @@ class TransformerModule(nn.Module):
         )
         self.atomic_forces_proj = (
             nn.Linear(hidden_dim, aux_mlip_hidden_dim, bias=False)
-            if hidden_dim != aux_mlip_hidden_dim
+            if hidden_dim != aux_mlip_hidden_dim and self.separate_energy_force_transformers
             else nn.Identity()
         )
 
@@ -252,7 +255,8 @@ class TransformerModule(nn.Module):
         if self.num_aux_mlip_layers > 0:
             if self.cross_attention:
                 self.global_energy_cross_attention = decoder_layer()
-                self.atomic_forces_cross_attention = decoder_layer()
+                if self.separate_energy_force_transformers:
+                    self.atomic_forces_cross_attention = decoder_layer()
 
             self.global_energy_charge_proj = ChargeSpinEmbedding(
                 embedding_type="pos_emb",
@@ -274,11 +278,12 @@ class TransformerModule(nn.Module):
                 num_heads=num_heads,
                 depth=num_aux_mlip_layers,
             )
-            self.atomic_forces_transformer = transformer_class(
-                dim=aux_mlip_hidden_dim,
-                num_heads=num_heads,
-                depth=num_aux_mlip_layers,
-            )
+            if self.separate_energy_force_transformers:
+                self.atomic_forces_transformer = transformer_class(
+                    dim=aux_mlip_hidden_dim,
+                    num_heads=num_heads,
+                    depth=num_aux_mlip_layers,
+                )
 
         self.global_property_head = nn.Linear(aux_hidden_dim, num_properties, bias=True)
         self.global_energy_head = nn.Linear(aux_mlip_hidden_dim, 1, bias=True)
@@ -579,32 +584,38 @@ class TransformerModule(nn.Module):
                     memory_key_padding_mask=padding_mask,
                     **attention_kwargs,
                 )
-                h_atomic_forces = self.atomic_forces_cross_attention(
-                    h_aux,
-                    h_in,
-                    tgt_key_padding_mask=padding_mask,
-                    memory_key_padding_mask=padding_mask,
-                    **attention_kwargs,
+                h_atomic_forces = (
+                    self.atomic_forces_cross_attention(
+                        h_aux,
+                        h_in,
+                        tgt_key_padding_mask=padding_mask,
+                        memory_key_padding_mask=padding_mask,
+                        **attention_kwargs,
+                    )
+                    if self.separate_energy_force_transformers
+                    else h_global_energy
                 )
 
             ce = self.global_energy_charge_proj(feats["charge"])
             se = self.global_energy_spin_proj(feats["spin"])
 
             cse = ce.unsqueeze(-2) + se.unsqueeze(-2)  # (B, 1, C)
-
             h_global_energy = h_global_energy + cse
-            h_atomic_forces = h_atomic_forces + cse
 
             h_global_energy = self.global_energy_transformer(
                 self.global_energy_proj(h_global_energy),
                 padding_mask=padding_mask,
                 **attention_kwargs,
             )
-            h_atomic_forces = self.atomic_forces_transformer(
-                self.atomic_forces_proj(h_atomic_forces),
-                padding_mask=padding_mask,
-                **attention_kwargs,
-            )
+            if self.separate_energy_force_transformers:
+                h_atomic_forces = h_atomic_forces + cse
+                h_atomic_forces = self.atomic_forces_transformer(
+                    self.atomic_forces_proj(h_atomic_forces),
+                    padding_mask=padding_mask,
+                    **attention_kwargs,
+                )
+            else:
+                h_atomic_forces = h_global_energy
         else:
             h_global_energy = self.global_energy_proj(h_global_energy)
             h_atomic_forces = self.atomic_forces_proj(h_atomic_forces)
