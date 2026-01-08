@@ -193,6 +193,7 @@ batch_size_scale_factor: 0.5 # 0.5, 0.25, 0.125 -> 80M/sqrt(G)=23M, 160M/sqrt(G)
 hidden_size: 80 # 80, 100, 140 -> 80M/sqrt(G)=23M, 160M/sqrt(G)=46M, 300M/sqrt(G)=86M model sizes (where G=12 is the tetrahedral group size)
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
+num_aux_mlip_layers: ${model.architecture.num_aux_layers} # NOTE: by default, auxiliary energy and force prediction task layers are disabled
 aux_hidden_size: 80 # (fixed) hidden size for auxiliary task layers
 aux_mlip_hidden_size: ${model.architecture.aux_hidden_size} # (fixed) hidden size for auxiliary energy and force prediction tasks
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)

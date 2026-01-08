@@ -32,6 +32,7 @@ class TransformerModule(nn.Module):
         num_heads: Number of attention heads.
         num_layers: Number of transformer layers.
         num_aux_layers: Number of auxiliary transformer layers.
+        num_aux_mlip_layers: Number of auxiliary energy and force prediction transformer layers.
         aux_hidden_dim: Dimension of auxiliary transformer layers.
         aux_mlip_hidden_dim: Dimension of auxiliary energy and force prediction transformer layers.
         aux_layer: Layer at which to extract representations for auxiliary tasks.
@@ -63,6 +64,7 @@ class TransformerModule(nn.Module):
         num_heads: int,
         num_layers: int,
         num_aux_layers: int,
+        num_aux_mlip_layers: int,
         aux_hidden_dim: int,
         aux_mlip_hidden_dim: int,
         aux_layer: int,
@@ -103,6 +105,7 @@ class TransformerModule(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.num_aux_layers = num_aux_layers
+        self.num_aux_mlip_layers = num_aux_mlip_layers
         self.implementation = implementation
         self.context_length = context_length
         self.jvp_attn = jvp_attn
@@ -239,6 +242,15 @@ class TransformerModule(nn.Module):
         if self.num_aux_layers > 0:
             if self.cross_attention:
                 self.global_property_cross_attention = decoder_layer()
+
+            self.global_property_transformer = transformer_class(
+                dim=aux_hidden_dim,
+                num_heads=num_heads,
+                depth=num_aux_layers,
+            )
+
+        if self.num_aux_mlip_layers > 0:
+            if self.cross_attention:
                 self.global_energy_cross_attention = decoder_layer()
                 self.atomic_forces_cross_attention = decoder_layer()
 
@@ -257,20 +269,15 @@ class TransformerModule(nn.Module):
                 scale=1.0,
             )
 
-            self.global_property_transformer = transformer_class(
-                dim=aux_hidden_dim,
-                num_heads=num_heads,
-                depth=num_aux_layers,
-            )
             self.global_energy_transformer = transformer_class(
                 dim=aux_mlip_hidden_dim,
                 num_heads=num_heads,
-                depth=num_aux_layers,
+                depth=num_aux_mlip_layers,
             )
             self.atomic_forces_transformer = transformer_class(
                 dim=aux_mlip_hidden_dim,
                 num_heads=num_heads,
-                depth=num_aux_layers,
+                depth=num_aux_mlip_layers,
             )
 
         self.global_property_head = nn.Linear(aux_hidden_dim, num_properties, bias=True)
@@ -554,6 +561,17 @@ class TransformerModule(nn.Module):
                     memory_key_padding_mask=padding_mask,
                     **attention_kwargs,
                 )
+
+            h_global_property = self.global_property_transformer(
+                self.global_property_proj(h_global_property),
+                padding_mask=padding_mask,
+                **attention_kwargs,
+            )
+        else:
+            h_global_property = self.global_property_proj(h_global_property)
+
+        if self.num_aux_mlip_layers > 0:
+            if self.cross_attention:
                 h_global_energy = self.global_energy_cross_attention(
                     h_aux,
                     h_in,
@@ -577,11 +595,6 @@ class TransformerModule(nn.Module):
             h_global_energy = h_global_energy + cse
             h_atomic_forces = h_atomic_forces + cse
 
-            h_global_property = self.global_property_transformer(
-                self.global_property_proj(h_global_property),
-                padding_mask=padding_mask,
-                **attention_kwargs,
-            )
             h_global_energy = self.global_energy_transformer(
                 self.global_energy_proj(h_global_energy),
                 padding_mask=padding_mask,
@@ -593,7 +606,6 @@ class TransformerModule(nn.Module):
                 **attention_kwargs,
             )
         else:
-            h_global_property = self.global_property_proj(h_global_property)
             h_global_energy = self.global_energy_proj(h_global_energy)
             h_atomic_forces = self.atomic_forces_proj(h_atomic_forces)
 

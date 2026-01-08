@@ -62,6 +62,7 @@ class TransformerModulePlatonic(nn.Module):
         num_atom_types:       Number of atom types.
         num_layers:           Number of Platonic Transformer blocks in the trunk transformer
         num_aux_layers:       Number of Platonic Transformer blocks in the auxiliary transformer.
+        num_aux_mlip_layers:  Number of Platonic Transformer blocks in the auxiliary energy and force prediction transformer.
         aux_layer:            Layer at which to extract representations for auxiliary tasks.
         num_properties:       Number of global properties to predict.
         dataset_embedder:     The dataset embedder module.
@@ -103,6 +104,7 @@ class TransformerModulePlatonic(nn.Module):
         num_atom_types: int,
         num_layers: int,
         num_aux_layers: int,
+        num_aux_mlip_layers: int,
         aux_layer: int,
         num_properties: int,
         dataset_embedder: nn.Module,
@@ -143,6 +145,7 @@ class TransformerModulePlatonic(nn.Module):
         self.num_atom_types = num_atom_types
         self.num_layers = num_layers
         self.num_aux_layers = num_aux_layers
+        self.num_aux_mlip_layers = num_aux_mlip_layers
         self.aux_layer = aux_layer
         self.num_properties = num_properties
         self.context_length = context_length
@@ -287,6 +290,19 @@ class TransformerModulePlatonic(nn.Module):
         if self.num_aux_layers > 0:
             if self.use_cross_attn:
                 self.global_property_cross_attention = cross_attn_factory()
+
+            aux_transformer_kwargs = vars(
+                SimpleNamespace(
+                    c_model=c_aux,
+                    depth=num_aux_layers,
+                    repr_layer=None,
+                )
+            )
+            self.global_property_transformer = transformer_factory(**aux_transformer_kwargs)
+
+        # Optional energy and force prediction transformer heads
+        if self.num_aux_mlip_layers > 0:
+            if self.use_cross_attn:
                 self.global_energy_cross_attention = cross_attn_factory()
                 self.atomic_forces_cross_attention = cross_attn_factory()
 
@@ -305,21 +321,13 @@ class TransformerModulePlatonic(nn.Module):
                 scale=1.0,
             )
 
-            aux_transformer_kwargs = vars(
-                SimpleNamespace(
-                    c_model=c_aux,
-                    depth=num_aux_layers,
-                    repr_layer=None,
-                )
-            )
             aux_mlip_transformer_kwargs = vars(
                 SimpleNamespace(
                     c_model=c_aux_mlip,
-                    depth=num_aux_layers,
+                    depth=num_aux_mlip_layers,
                     repr_layer=None,
                 )
             )
-            self.global_property_transformer = transformer_factory(**aux_transformer_kwargs)
             self.global_energy_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
             self.atomic_forces_transformer = transformer_factory(**aux_mlip_transformer_kwargs)
 
@@ -718,6 +726,42 @@ class TransformerModulePlatonic(nn.Module):
                     )
                 )
                 h_global_property = self.global_property_cross_attention(**aux_cross_attn_kwargs)
+
+            aux_self_attn_kwargs = vars(
+                SimpleNamespace(
+                    coords_feat=coords,
+                    sequence_idxs=sequence_idxs,
+                    padding_mask_feat=padding_mask,
+                    attn_mask_self=None,
+                    # avg_num_nodes=avg_num_nodes,
+                )
+            )
+            h_global_property = self.global_property_transformer(
+                feat=self.global_property_proj(h_global_property),
+                **aux_self_attn_kwargs,
+            )  # (B, N, G*c_aux)
+
+        else:
+            h_global_property = self.global_property_proj(h_global_property)  # (B, N, G*c_aux)
+
+        if self.num_aux_mlip_layers > 0:
+
+            if self.use_cross_attn:
+                aux_cross_attn_kwargs = vars(
+                    SimpleNamespace(
+                        feat=h_aux,
+                        memory=h_in,
+                        coords_feat=coords,
+                        coords_mem=coords,
+                        sequence_idxs=sequence_idxs,
+                        padding_mask_feat=padding_mask,
+                        padding_mask_mem=padding_mask,
+                        attn_mask_self=None,
+                        attn_mask_cross=None,
+                        # avg_num_nodes_self=avg_num_nodes,
+                        # avg_num_nodes_cross=avg_num_nodes,
+                    )
+                )
                 h_global_energy = self.global_energy_cross_attention(**aux_cross_attn_kwargs)
                 h_atomic_forces = self.atomic_forces_cross_attention(**aux_cross_attn_kwargs)
 
@@ -739,10 +783,6 @@ class TransformerModulePlatonic(nn.Module):
                     # avg_num_nodes=avg_num_nodes,
                 )
             )
-            h_global_property = self.global_property_transformer(
-                feat=self.global_property_proj(h_global_property),
-                **aux_self_attn_kwargs,
-            )  # (B, N, G*c_aux)
             h_global_energy = self.global_energy_transformer(
                 feat=self.global_energy_proj(h_global_energy),
                 **aux_self_attn_kwargs,
@@ -753,7 +793,6 @@ class TransformerModulePlatonic(nn.Module):
             )  # (B, N, G*c_aux)
 
         else:
-            h_global_property = self.global_property_proj(h_global_property)  # (B, N, G*c_aux)
             h_global_energy = self.global_energy_proj(h_global_energy)  # (B, N, G*c_aux)
             h_atomic_forces = self.atomic_forces_proj(h_atomic_forces)  # (B, N, G*c_aux)
 

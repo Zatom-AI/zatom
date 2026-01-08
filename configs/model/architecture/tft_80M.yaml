@@ -137,6 +137,7 @@ batch_size_scale_factor: 2 # 2, 1, 0.5 -> 80M, 160M, 300M model sizes
 hidden_size: 512 # 512, 768, 1024 -> 80M, 160M, 300M model sizes
 num_layers: 16
 num_aux_layers: 0 # NOTE: by default, auxiliary task layers are disabled
+num_aux_mlip_layers: ${model.architecture.num_aux_layers} # NOTE: by default, auxiliary energy and force prediction task layers are disabled
 aux_hidden_size: 512 # (fixed) hidden size for auxiliary task layers
 aux_mlip_hidden_size: ${model.architecture.aux_hidden_size} # (fixed) hidden size for auxiliary energy and force prediction tasks
 aux_layer: 15 # NOTE: by default set to the last layer (zero-indexed)
