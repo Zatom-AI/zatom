@@ -256,10 +256,84 @@ class OMol25(Dataset):
         """Return the number of examples."""
         return self.dataset_length
 
+    def _get_energy_and_forces(self, atoms):
+        """Safely get energy and forces from atoms object, handling cases where calculator might not be attached.
+        
+        This is necessary because when loading atoms from AseDBDataset in DataLoader worker processes,
+        the calculator object might not be properly attached, even though the energy/forces data is stored
+        in the database. This method tries multiple fallback strategies to retrieve the data.
+        """
+        # Try to get energy - handle cases where calculator might not be attached
+        energy = None
+        try:
+            energy = atoms.get_potential_energy()
+        except RuntimeError as e:
+            if "no calculator" in str(e).lower() or "has no calculator" in str(e).lower():
+                # Try to get energy from calculator results if calc exists but isn't properly set
+                if atoms.calc is not None:
+                    if hasattr(atoms.calc, 'results') and 'energy' in atoms.calc.results:
+                        energy = atoms.calc.results['energy']
+                    elif hasattr(atoms.calc, 'get_potential_energy'):
+                        # Some calculators might have the method but not be properly initialized
+                        try:
+                            energy = atoms.calc.get_potential_energy(atoms)
+                        except Exception:
+                            pass
+                # Try to get from atoms.info
+                if energy is None and 'energy' in atoms.info:
+                    energy = atoms.info['energy']
+                # If we still don't have energy, log warning and return None to signal fallback needed
+                if energy is None:
+                    # This can happen when calculator is not properly attached in worker processes
+                    log.warning(
+                        f"Could not retrieve energy from atoms object. "
+                        f"Calculator attached: {atoms.calc is not None}, "
+                        f"Calculator results available: {hasattr(atoms.calc, 'results') if atoms.calc is not None else False}, "
+                        f"Info keys: {list(atoms.info.keys())}. "
+                        f"Returning None to trigger fallback to dummy values."
+                    )
+                    return None, None
+            else:
+                raise
+        
+        # Try to get forces - handle cases where calculator might not be attached
+        forces = None
+        try:
+            forces = atoms.get_forces()
+        except RuntimeError as e:
+            if "no calculator" in str(e).lower() or "has no calculator" in str(e).lower():
+                # Try to get forces from calculator results if calc exists but isn't properly set
+                if atoms.calc is not None:
+                    if hasattr(atoms.calc, 'results') and 'forces' in atoms.calc.results:
+                        forces = atoms.calc.results['forces']
+                    elif hasattr(atoms.calc, 'get_forces'):
+                        # Some calculators might have the method but not be properly initialized
+                        try:
+                            forces = atoms.calc.get_forces(atoms)
+                        except Exception:
+                            pass
+                # If we still don't have forces, return None to signal fallback needed
+                if forces is None:
+                    log.warning(
+                        f"Could not retrieve forces from atoms object. "
+                        f"Calculator attached: {atoms.calc is not None}, "
+                        f"Calculator results available: {hasattr(atoms.calc, 'results') if atoms.calc is not None else False}, "
+                        f"Info keys: {list(atoms.info.keys())}. "
+                        f"Returning None to trigger fallback to dummy values."
+                    )
+                    return None, None
+            else:
+                raise
+        
+        return energy, forces
+
     @typecheck
     def get(self, idx) -> Data:
         """Get a single example."""
         dataset = self._init_dataset()
+
+        # Get atoms from AseDBDataset - this handles the multi-file database properly
+        # and should attach calculator with energy/forces results
         atoms = dataset.get_atoms(idx)
 
         num_atoms = len(atoms)
@@ -268,16 +342,56 @@ class OMol25(Dataset):
         y = torch.zeros((num_atoms, 4), dtype=torch.float32)  # Dummy energy + forces
 
         if self.energy_coefficients is not None:
-            energy = np.array([atoms.get_potential_energy()], dtype=np.float32)
-            energy[0] = normalize_energy(atoms, energy[0], self.energy_coefficients)
+            # Try to get energy and forces
+            energy = None
+            forces = None
 
-            energy = torch.from_numpy(energy)
-            forces = torch.from_numpy(atoms.get_forces().astype(np.float32))
+            # Method 1: Get from calculator results if available
+            # The calculator should be attached by AseDBDataset with energy/forces in results
+            if atoms.calc is not None and hasattr(atoms.calc, 'results') and atoms.calc.results:
+                if 'energy' in atoms.calc.results:
+                    energy = atoms.calc.results['energy']
+                if 'forces' in atoms.calc.results:
+                    forces = atoms.calc.results['forces']
 
-            energy = (energy - self.shift) / self.scale
-            forces = forces / self.scale
+            # Method 2: Final fallback using _get_energy_and_forces helper
+            # This tries atoms.get_potential_energy() and other methods
+            if energy is None or forces is None:
+                energy_calc, forces_calc = self._get_energy_and_forces(atoms)
+                if energy is None:
+                    energy = energy_calc
+                if forces is None:
+                    forces = forces_calc
 
-            y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
+            # Only proceed if we have both energy and forces
+            if energy is not None and forces is not None:
+                energy = np.array([energy], dtype=np.float32)
+                energy[0] = normalize_energy(atoms, energy[0], self.energy_coefficients)
+
+                energy = torch.from_numpy(energy)
+                forces = torch.from_numpy(forces.astype(np.float32))
+
+                energy = (energy - self.shift) / self.scale
+                forces = forces / self.scale
+
+                y = torch.cat([energy.repeat(num_atoms, 1), forces], dim=-1)
+            else:
+                # CRITICAL: If energy_coefficients is set, we MUST have valid energy/forces for training
+                # Raising an error here prevents silently corrupting the model with dummy values
+                has_calc_results = (atoms.calc is not None and
+                                   hasattr(atoms.calc, 'results') and
+                                   atoms.calc.results is not None)
+                raise RuntimeError(
+                    f"Failed to retrieve energy/forces for sample at index {idx}. "
+                    f"energy_coefficients is set (training mode), but could not access data. "
+                    f"Diagnostics:\n"
+                    f"  - Atoms has calculator: {atoms.calc is not None}\n"
+                    f"  - Calculator has results: {has_calc_results}\n"
+                    f"  - Calc results keys: {list(atoms.calc.results.keys()) if has_calc_results else 'N/A'}\n"
+                    f"  - Retrieved energy: {energy is not None}\n"
+                    f"  - Retrieved forces: {forces is not None}\n"
+                    f"This usually indicates calculator results were not preserved in DataLoader workers."
+                )
 
         spin_graph = atoms.info.get("spin", atoms.info.get("multiplicity", 0))  # Int multiplicity
         charge_graph = atoms.info.get("charge", 0)
