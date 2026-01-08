@@ -19,7 +19,7 @@ df_loss = pd.DataFrame(
             7: 1750,
             8: 2000,
         },
-        "Zatom": {
+        "Zatom-1": {
             0: 19.64182,
             1: 1.75808,
             2: 1.1903,
@@ -30,7 +30,7 @@ df_loss = pd.DataFrame(
             7: 0.93031,
             8: 0.90646,
         },
-        "Zatom-L": {
+        "Zatom-1-L": {
             0: 10.66805,
             1: 1.56799,
             2: 1.24015,
@@ -41,7 +41,7 @@ df_loss = pd.DataFrame(
             7: 0.91278,
             8: 0.88432,
         },
-        "Zatom-XL": {
+        "Zatom-1-XL": {
             0: 2.10083,
             1: 1.90358,
             2: 1.34222,
@@ -67,7 +67,7 @@ df_crystal = pd.DataFrame(
             7: 1750,
             8: 2000,
         },
-        "Zatom": {
+        "Zatom-1": {
             0: 0.0,
             1: 0.81709,
             2: 0.85793,
@@ -78,7 +78,7 @@ df_crystal = pd.DataFrame(
             7: 0.89036,
             8: 0.89395,
         },
-        "Zatom-L": {
+        "Zatom-1-L": {
             0: 0.0,
             1: 0.82945,
             2: 0.85425,
@@ -89,7 +89,7 @@ df_crystal = pd.DataFrame(
             7: 0.89399,
             8: 0.89774,
         },
-        "Zatom-XL": {
+        "Zatom-1-XL": {
             0: 0.0,
             1: 0.78988,
             2: 0.84974,
@@ -115,7 +115,7 @@ df_molecule = pd.DataFrame(
             7: 1750,
             8: 2000,
         },
-        "Zatom": {
+        "Zatom-1": {
             0: 0.0,
             1: 0.61825,
             2: 0.87266,
@@ -126,7 +126,7 @@ df_molecule = pd.DataFrame(
             7: 0.94408,
             8: 0.94678,
         },
-        "Zatom-L": {
+        "Zatom-1-L": {
             0: 0.0,
             1: 0.76158,
             2: 0.87094,
@@ -137,7 +137,7 @@ df_molecule = pd.DataFrame(
             7: 0.94759,
             8: 0.9476,
         },
-        "Zatom-XL": {
+        "Zatom-1-XL": {
             0: 0.0,
             1: 0.55776,
             2: 0.82099,
@@ -155,9 +155,9 @@ df_molecule = pd.DataFrame(
 
 # Define model properties for consistency
 models = {
-    "Zatom": {"params": 80, "label": "Zatom (80M)", "color": "#1f77b4"},
-    "Zatom-L": {"params": 160, "label": "Zatom-L (160M)", "color": "#ff7f0e"},
-    "Zatom-XL": {"params": 300, "label": "Zatom-XL (300M)", "color": "#2ca02c"},
+    "Zatom-1": {"params": 80, "label": "Zatom-1 (80M)", "color": "#1f77b4", "marker": "o"},
+    "Zatom-1-L": {"params": 160, "label": "Zatom-1-L (160M)", "color": "#ff7f0e", "marker": "s"},
+    "Zatom-1-XL": {"params": 300, "label": "Zatom-1-XL (300M)", "color": "#2ca02c", "marker": "D"},
 }
 
 # Define plot configurations for each row
@@ -165,21 +165,21 @@ plot_configs = [
     {
         "title": "Train loss",
         "df": df_loss,
-        "y_label_left": "Train loss",
-        "y_label_right": "Ep. 2000: Train loss",
+        "y_label_left": "Train loss ↓",
+        "y_label_right": "Ep. 2000: Train loss ↓",
         "y_max": 3.0,
     },
     {
         "title": "Crystal validity",
         "df": df_crystal,
-        "y_label_left": "Crystal validity rate (%)",
-        "y_label_right": "Ep. 2000: Crystal validity rate (%)",
+        "y_label_left": "Crystal validity rate (%) ↑",
+        "y_label_right": "Ep. 2000: Crystal validity rate (%) ↑",
     },
     {
         "title": "Molecule validity",
         "df": df_molecule,
-        "y_label_left": "Molecule validity rate (%)",
-        "y_label_right": "Ep. 2000: Molecule validity rate (%)",
+        "y_label_left": "Molecule validity rate (%) ↑",
+        "y_label_right": "Ep. 2000: Molecule validity rate (%) ↑",
     },
 ]
 
@@ -208,8 +208,8 @@ for i, config in enumerate(plot_configs):
             config["df"][model_name],
             label=props["label"],
             color=props["color"],
-            marker=".",
-            markersize=6,
+            marker=props["marker"],
+            markersize=4,
             linestyle="-",
         )
         # Apply y-axis upper limit if provided in config (plotting functions don't accept y_max)
@@ -228,11 +228,13 @@ for i, config in enumerate(plot_configs):
     y_vals = [epoch_2000_data[config["title"]][model_name] for model_name in models]
     sizes = [props["params"] * 3 for props in models.values()]  # Scale bubble size
     colors = [props["color"] for props in models.values()]
+    markers = [props["marker"] for props in models.values()]
 
     # Scatter plot with scaled bubble sizes
-    ax_right.scatter(
-        x_vals, y_vals, s=sizes, c=colors, alpha=0.9, edgecolors="black", linewidth=0.5
-    )
+    for x, y, size, color, marker in zip(x_vals, y_vals, sizes, colors, markers):
+        ax_right.scatter(
+            x, y, s=size, c=color, marker=marker, alpha=0.9, edgecolors="black", linewidth=0.5
+        )
 
     # Calculate and plot trend line
     slope, intercept = np.polyfit(x_vals, y_vals, 1)

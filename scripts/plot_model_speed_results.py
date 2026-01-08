@@ -17,7 +17,7 @@ dataset_config = {
         "inset_y_lim": (-1, 21),
         "competitor_name": "FlowMM (12M)",
         "data": {
-            "zatom": np.array(
+            "zatom_1": np.array(
                 [
                     0.17984417,
                     0.39785317,
@@ -29,7 +29,7 @@ dataset_config = {
                     13.98595377,
                 ]
             ),
-            "zatom_l": np.array(
+            "zatom_1_l": np.array(
                 [
                     0.2797665,
                     0.63525633,
@@ -41,7 +41,7 @@ dataset_config = {
                     23.51053267,
                 ]
             ),
-            "zatom_xl": np.array(
+            "zatom_1_xl": np.array(
                 [
                     0.384134,
                     0.88740633,
@@ -65,7 +65,7 @@ dataset_config = {
         "inset_y_lim": (-2, 22),
         "competitor_name": "GeoLDM (5M)",
         "data": {
-            "zatom": np.array(
+            "zatom_1": np.array(
                 [
                     0.242883,
                     0.52798117,
@@ -77,7 +77,7 @@ dataset_config = {
                     19.53128467,
                 ]
             ),
-            "zatom_l": np.array(
+            "zatom_1_l": np.array(
                 [
                     0.36138233,
                     0.8467395,
@@ -89,7 +89,7 @@ dataset_config = {
                     32.09808756,
                 ]
             ),
-            "zatom_xl": np.array(
+            "zatom_1_xl": np.array(
                 [
                     0.51502567,
                     1.21208667,
@@ -113,7 +113,7 @@ dataset_config = {
         "inset_y_lim": (-5, 45),
         "competitor_name": "SemlaFlow (46M)",
         "data": {
-            "zatom": np.array(
+            "zatom_1": np.array(
                 [
                     1.36421967,
                     3.34336083,
@@ -125,7 +125,7 @@ dataset_config = {
                     132.07768022,
                 ]
             ),
-            "zatom_l": np.array(
+            "zatom_1_l": np.array(
                 [
                     2.1002645,
                     5.192131,
@@ -137,7 +137,7 @@ dataset_config = {
                     206.82904194,
                 ]
             ),
-            "zatom_xl": np.array(
+            "zatom_1_xl": np.array(
                 [
                     2.9900395,
                     7.442507,
@@ -171,9 +171,9 @@ data = config["data"]
 fig, ax = plt.subplots(figsize=(8, 6), dpi=120)
 
 colors = {
-    "zatom": "#525252",
-    "zatom_l": "#969696",
-    "zatom_xl": "#cccccc",
+    "zatom_1": "#525252",
+    "zatom_1_l": "#969696",
+    "zatom_1_xl": "#cccccc",
     "adit_s": "#1f497d",
     "adit_b": "#4f81bd",
     "adit_l": "#8cb4d9",
@@ -181,30 +181,30 @@ colors = {
 }
 
 # --- 4. Plot Main Data Series using Selected Config ---
-ax.plot(x_steps, data["zatom"], marker="o", color=colors["zatom"], label="Zatom (80M)")
+ax.plot(x_steps, data["zatom_1"], marker="o", color=colors["zatom_1"], label="Zatom-1 (80M)")
 ax.plot(
     x_steps,
-    data["zatom_l"],
-    marker="o",
-    color=colors["zatom_l"],
-    label="Zatom-L (160M)",
+    data["zatom_1_l"],
+    marker="s",
+    color=colors["zatom_1_l"],
+    label="Zatom-1-L (160M)",
 )
 ax.plot(
     x_steps,
-    data["zatom_xl"],
-    marker="o",
-    color=colors["zatom_xl"],
-    label="Zatom-XL (300M)",
+    data["zatom_1_xl"],
+    marker="D",
+    color=colors["zatom_1_xl"],
+    label="Zatom-1-XL (300M)",
 )
-ax.plot(x_steps, data["adit_s"], marker="o", color=colors["adit_s"], label="ADiT-S (80M)")
+ax.plot(x_steps, data["adit_s"], marker="^", color=colors["adit_s"], label="ADiT-S (80M)")
 ax.plot(
     x_steps,
     data["adit_b"],
-    marker="o",
+    marker="*",
     color=colors["adit_b"],
     label="ADiT-B (180M)",
 )
-ax.plot(x_steps, data["adit_l"], marker="o", color=colors["adit_l"], label="ADiT-L (500M)")
+ax.plot(x_steps, data["adit_l"], marker="v", color=colors["adit_l"], label="ADiT-L (500M)")
 ax.plot(
     x_steps,
     data["competitor"],
@@ -214,7 +214,7 @@ ax.plot(
 )
 
 # --- 5. Customize Main Plot Appearance ---
-y_label = f"Time to sample 10K {config['y_label_object']} (mins)"
+y_label = f"Time to sample 10K {config['y_label_object']} (mins) ↓"
 ax.set_xlabel("Number of integration steps", fontsize=14)
 ax.set_ylabel(y_label, fontsize=14)
 
@@ -229,12 +229,12 @@ ax.tick_params(axis="both", which="major", labelsize=12)
 axins = ax.inset_axes([0.08, 0.53, 0.35, 0.35])
 
 # Plot data on the inset axes
-axins.plot(x_steps, data["zatom"], marker="o", color=colors["zatom"])
-axins.plot(x_steps, data["zatom_l"], marker="o", color=colors["zatom_l"])
-axins.plot(x_steps, data["zatom_xl"], marker="o", color=colors["zatom_xl"])
-axins.plot(x_steps, data["adit_s"], marker="o", color=colors["adit_s"])
-axins.plot(x_steps, data["adit_b"], marker="o", color=colors["adit_b"])
-axins.plot(x_steps, data["adit_l"], marker="o", color=colors["adit_l"])
+axins.plot(x_steps, data["zatom_1"], marker="o", color=colors["zatom_1"])
+axins.plot(x_steps, data["zatom_1_l"], marker="s", color=colors["zatom_1_l"])
+axins.plot(x_steps, data["zatom_1_xl"], marker="D", color=colors["zatom_1_xl"])
+axins.plot(x_steps, data["adit_s"], marker="^", color=colors["adit_s"])
+axins.plot(x_steps, data["adit_b"], marker="*", color=colors["adit_b"])
+axins.plot(x_steps, data["adit_l"], marker="v", color=colors["adit_l"])
 axins.plot(x_steps, data["competitor"], marker="x", color=colors["competitor"])
 
 # Set the view for the inset from config
