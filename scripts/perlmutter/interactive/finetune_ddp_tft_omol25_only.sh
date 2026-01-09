@@ -34,8 +34,8 @@ mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="d0zkk789"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2026-01-06_09-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="8h5pnng6"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2026-01-08_16-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
 DEFAULT_ARCHITECTURE="tft_80M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,tfp}_80M`, `{tft,tfp}_160M`, `{tft,tfp}_300M`)
@@ -97,7 +97,9 @@ bash -c "
     experiment=$EXPERIMENT \
     model=$MODEL \
     model/architecture=$ARCHITECTURE \
+    model.architecture.num_aux_mlip_layers=8 \
     model.architecture.aux_mlip_hidden_size=1024 \
+    model.architecture.multimodal_model.separate_energy_force_transformers=false \
     model.augmentations.multiplicity=2 \
     model.optimizer.lr=3e-4 \
     name=$RUN_NAME \
