@@ -34,8 +34,8 @@ mkdir -p "$WANDB_ARTIFACT_DIR"
 
 # Define run details
 DEFAULT_DATASET="joint"                   # NOTE: Set the dataset to be used, must be one of (`joint`,)
-DEFAULT_RUN_ID="am7smqws"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
-DEFAULT_RUN_DATE="2026-01-10_17-30-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
+DEFAULT_RUN_ID="d8dva51a"                 # NOTE: Generate a unique ID for each run using `python scripts/generate_id.py`
+DEFAULT_RUN_DATE="2026-01-11_06-00-00"    # NOTE: Set this to the initial date and time of the run for unique identification (e.g., ${now:%Y-%m-%d}_${now:%H-%M-%S})
 DEFAULT_MODEL="zatom"                     # NOTE: Set the model to be used, must be one of (`zatom`,)
 DEFAULT_EXPERIMENT="finetune"             # NOTE: Set the experiment name to be used, must be one of (`train`, `finetune`, `eval`, `overfit`)
 DEFAULT_ARCHITECTURE="tft_80M"            # NOTE: Set the model architecture to be used, must be one of (`{tft,tfp}_80M`, `{tft,tfp}_160M`, `{tft,tfp}_300M`)
@@ -82,6 +82,7 @@ bash -c "
     srun --kill-on-bad-exit=1 shifter python zatom/train_fm.py \
     pretrained_ckpt_path=$PRETRAINED_CKPT_PATH \
     ckpt_path=$CKPT_PATH \
+    callbacks.auxiliary_task_finetuning.t_min=1.0 \
     callbacks.model_checkpoint.monitor=val_omol25/aux_global_energy_loss \
     data=$DATASET \
     data.datamodule.batch_size.train=64 \
@@ -97,9 +98,10 @@ bash -c "
     experiment=$EXPERIMENT \
     model=$MODEL \
     model/architecture=$ARCHITECTURE \
+    model.architecture.num_aux_mlip_layers=8 \
     model.architecture.aux_mlip_hidden_size=1024 \
     model.architecture.multimodal_model.mask_material_coords=false \
-    model.augmentations.multiplicity=2 \
+    model.augmentations.multiplicity=1 \
     model.optimizer.lr=3e-4 \
     name=$RUN_NAME \
     task_name=$TASK_NAME \
