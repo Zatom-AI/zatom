@@ -46,6 +46,7 @@ num_jobs=50
 slurm_qos=shared
 slurm_account=m5008
 slurm_partition=nersc
+slurm_additional_parameters='{"constraint": "gpu&hbm40g", "module": "gpu,nccl-plugin"}'
 
 # Consolidate
 eval_for_dft_pt=$(python "$PROJECT_DIR/forks/flowmm/scripts_model/evaluate.py" consolidate "$eval_for_dft_samples" --subdir "mp20_test_0" --path_eval_pt eval_for_dft.pt | tail -n 1)
@@ -58,6 +59,7 @@ python "$PROJECT_DIR/forks/flowmm/scripts_analysis/prerelax.py" \
     --num_jobs "$num_jobs" \
     --slurm_qos "$slurm_qos" \
     --slurm_account "$slurm_account" \
+    --slurm_additional_parameters "$slurm_additional_parameters" \
     --slurm_partition "$slurm_partition"
 
 # # DFT

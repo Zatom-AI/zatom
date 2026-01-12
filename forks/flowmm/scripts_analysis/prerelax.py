@@ -145,7 +145,7 @@ def main(args: Namespace) -> None:
         slurm_array_parallelism=args.num_jobs,
         timeout_min=args.timeout_min,
         nodes=1,
-        gpus_per_node=0,
+        gpus_per_node=1,
         slurm_ntasks_per_node=1,
         cpus_per_task=args.slurm_cpus_per_task,
         slurm_qos=args.slurm_qos,
