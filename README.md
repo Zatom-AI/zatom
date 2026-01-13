@@ -297,6 +297,8 @@ sun_json=sun.json
 python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$ehulls_corrected_json"
 ```
 
+> 💡 Note: See `scripts/perlmutter/regular/eval_dft_mp20.sh` for a full example of how to run materials evaluation with SLURM.
+
 ## For developers
 
 Set up `pre-commit` (one time only) for automatic code linting and formatting upon each `git commit`
