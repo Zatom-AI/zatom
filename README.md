@@ -1,6 +1,6 @@
 <div align="center">
 
-# Zatom
+# Zatom-1
 
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white"></a>
 <a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Lightning-792ee5?logo=pytorchlightning&logoColor=white"></a>
@@ -18,7 +18,7 @@
 
 ## Description
 
-Official repository of Zatom, a unified 3D molecule and material foundation model
+Official repository of Zatom-1, a unified 3D molecule and material foundation model
 
 ## Installation
 
@@ -152,7 +152,7 @@ Train model with chosen experiment configuration from [configs/experiment/](conf
 python zatom/train_fm.py experiment=experiment_name.yaml
 ```
 
-For example, reproduce Zatom's default model (pre)training run
+For example, reproduce Zatom-1's default model (pre)training run
 
 ```bash
 python zatom/train_fm.py experiment=train
@@ -164,21 +164,85 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within `.vscode/launch.json` for full examples of how to locally customize or debug model training. The scripts within `scripts/perlmutter/` additionally describe how to train models on a SLURM cluster.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within `.vscode/launch.json` for full examples of how to locally customize or debug model training. The scripts within `scripts/perlmutter/` additionally describe how to train or evaluate models on a SLURM cluster.
 
 ## Evaluation
 
-To generate Zatom's initial evaluation metrics for molecule and material generation
+### Generative tasks
+
+> 💡 Note: Generate a unique ID for each run using `python scripts/generate_id.py`.
+
+To generate Zatom-1's initial evaluation metrics for (QM9) molecule and (MP20) material generation
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_80M_QM9+MP20_dcz004rv seed=42 trainer=gpu
 ```
 
-To evaluate Zatom's molecule property predictions
+To generate Zatom-1-XL's initial evaluation metrics for (QM9) molecule and (MP20) material generation
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C] model.architecture.num_aux_layers=4 model.sampling.num_samples=1 model.sampling.batch_size=1 seed=42 trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_xl_joint_paper_weights.ckpt model/architecture=tft_300M model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_300M_QM9+MP20_kenribcl seed=42 trainer=gpu
 ```
+
+To generate Zatom-1's evaluation metrics for (QM9) molecule generation only
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_80M_QM9_myog4xe0 seed=42 trainer=gpu
+```
+
+To generate Zatom-1's initial evaluation metrics for (MP20) material generation only
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.datasets.qm9.proportion=0.0 model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_80M_MP20_5suq0fu0 seed=42 trainer=gpu
+```
+
+To generate Zatom-1's evaluation metrics for (GEOM-Drugs) molecule generation only
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_geom_paper_weights.ckpt data.datamodule.datasets.geom.proportion=1.0 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_80M_GEOM_l7f5ct7o seed=42 trainer=gpu
+```
+
+To generate Zatom-1's evaluation metrics for (QMOF150) material generation only
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_qmof_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qmof.proportion=1.0 model.sampling.num_samples=1000 model.sampling.batch_size=100 name=eval_tft_80M_QMOF_s6uzclqf seed=42 trainer=gpu
+```
+
+To plot Zatom-1's inference speed results for each dataset
+
+```bash
+python scripts/plot_model_speed_results.py --dataset QM9
+python scripts/plot_model_speed_results.py --dataset MP20
+python scripts/plot_model_speed_results.py --dataset GEOM
+```
+
+To plot Zatom-1's parameter scaling results
+
+```bash
+python scripts/plot_model_scaling_results.py
+```
+
+### Predictive tasks
+
+To evaluate Zatom-1's (QM9) molecule property predictions with QM9-only finetuning
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C] model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-prop-pred_7g4rg14y seed=42 trainer=gpu
+```
+
+To evaluate Zatom-1's (QM9) molecule and (Matbench) material property predictions with joint QM9-Matbench finetuning
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_mat_prop_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.matbench.proportion=1.0 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property=[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C] model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-Matbench-prop-pred_0c3kq4qw seed=42 trainer=gpu
+```
+
+To evaluate Zatom-1's (OMol25) molecule and (MPtrj) material energy and force predictions with joint OMol25-MPtrj finetuning
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_mlip_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.mptrj.proportion=1.0 data.datamodule.datasets.mptrj.global_energy=true data.datamodule.datasets.omol.proportion=1.0 data.datamodule.datasets.omol25.global_energy=true data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qm9.global_property=[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C] model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.architecture.multimodal_model.mask_material_coords=false model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_OMol25-MPtrj-mlip_jb0praq0 seed=42 trainer=gpu
+```
+
+### Materials evaluation
 
 > 💡 Note: Consider using [`Protein Viewer`](https://marketplace.visualstudio.com/items?itemName=ArianJamasb.protein-viewer) for VS Code to visualize molecules and using [`VESTA`](https://jp-minerals.org/vesta/en/) locally to visualize materials. Running [`PyMOL`](https://www.pymol.org/) locally may also be useful for aligning/comparing two molecules.
 
@@ -186,7 +250,7 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_joint_paper_weights.ckpt dat
 
 > 💡 Note: Doing density functional theory (DFT) with [VASP](https://www.vasp.at/) requires a VASP license to define the required environment variable `PATH_TO_YOUR_PSEUDOPOTENTIALS`. We do not provide guidance on running DFT. That being said, your DFT results should typically be [corrected using the settings from the Materials Project](https://docs.materialsproject.org/methodology/materials-methodology/thermodynamic-stability/thermodynamic-stability).
 
-To fully evaluate the generated materials
+To fully evaluate one's generated materials
 
 ```bash
 export PROJECT_ROOT=$(pwd)/forks/flowmm
