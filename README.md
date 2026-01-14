@@ -18,7 +18,7 @@
 
 ## Description
 
-Official repository of Zatom-1, a unified 3D molecule and material foundation model
+Official repository of Zatom-1, a multimodal flow foundation model for 3D molecules and materials
 
 ## Installation
 
