@@ -82,7 +82,7 @@ class TabularDataset(ABC):
 
 @dataclass
 class DiffCSP_MP20(TabularDataset):
-    root: Path = (Path(__file__).parents[2] / "remote/DiffCSP-official/data").resolve()
+    root: Path = (Path(__file__).parents[2] / "remote/diffcsp_official/data").resolve()
     train_unprocessed_path: Path = Path("mp_20/train.csv")
     val_unprocessed_path: Path = Path("mp_20/val.csv")
     test_unprocessed_path: Path = Path("mp_20/test.csv")

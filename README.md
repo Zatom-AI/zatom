@@ -147,13 +147,13 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/platom_1_joint_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_mp20_only_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_geom_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_qmof_pretraining_paper_weights.ckpt # TODO: Upload
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt # TODO: Upload
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
 
@@ -322,23 +322,39 @@ eval_for_dft_pt=$(python forks/flowmm/scripts_model/evaluate.py consolidate $eva
 # Pre-relax
 python forks/flowmm/scripts_analysis/prerelax.py "$eval_for_dft_pt" "$eval_for_dft_json" "$eval_log_dir" --num_jobs "$num_jobs" --slurm_partition "$slurm_partition"
 
-# DFT
+# DFT (ignore error if VASP license is not available)
 dft_dir="$eval_dir/dft"
 mkdir -p "$dft_dir"
 python forks/flowmm/scripts_analysis/dft_create_inputs.py "$eval_for_dft_json" "$dft_dir"
 
-# Energy above hull
+# Energy above hull (if VASP license is not available)
+# (Option 1: Using less accurate CHGNet prerelaxed energies)
+clean_outputs_dir="$eval_dir/clean_outputs"
 json_e_above_hull="$eval_dir/ehulls.json"
 python forks/flowmm/scripts_analysis/ehull.py "$eval_for_dft_json" "$json_e_above_hull"
 
-# Corrected energy above hull
+# Energy above hull (if VASP license is available)
+# (Option 2: Using more accurate DFT energies computed above using your VASP license, where `clean_outputs` contains trajectory files with name ######.traj with ###### corresponding to the index of the corresponding row in the `eval_for_dft_json` file)
+clean_outputs_dir="$eval_dir/clean_outputs"
+json_e_above_hull="$eval_dir/ehulls.json"
+python forks/flowmm/scripts_analysis/ehull.py "$eval_for_dft_json" "$json_e_above_hull" --clean_outputs_dir "${clean_outputs_dir}"
+
+# Corrected energy above hull (if VASP license is available)
 root_dft_clean_outputs="$eval_dir"
 ehulls_corrected_json="$eval_dir/ehulls_corrected.json"
 python forks/flowmm/scripts_analysis/ehull_correction.py "$eval_for_dft_json" "$ehulls_corrected_json" --root_dft_clean_outputs "$root_dft_clean_outputs"
 
-# S.U.N.
-sun_json=sun.json
+# S.U.N. and M.S.U.N (if VASP license is not available)
+sun_json="$eval_dir/sun.json"
+msun_json="$eval_dir/msun.json"
+python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$json_e_above_hull" --e_above_hull_column e_above_hull_per_atom_chgnet
+python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$json_e_above_hull" --e_above_hull_column e_above_hull_per_atom_chgnet --e_above_hull_maximum 0.1
+
+# S.U.N. and M.S.U.N (if VASP license is available)
+sun_json="$eval_dir/sun.json"
+msun_json="$eval_dir/msun.json"
 python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$ehulls_corrected_json"
+python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$ehulls_corrected_json" --e_above_hull_maximum 0.1
 ```
 
 > 💡 Note: See `scripts/perlmutter/regular/eval_dft_mp20.sh` for a full example of how to run materials evaluation with SLURM.
