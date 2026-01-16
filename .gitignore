@@ -148,6 +148,7 @@ dmypy.json
 configs/local/default.yaml
 /checkpoints/
 /data/
+/forks/flowmm/sun_count.json
 /forks/flowmm/remote/diffcsp_official/data/mp_20/*.json
 /logs/
 /tests/*.json
