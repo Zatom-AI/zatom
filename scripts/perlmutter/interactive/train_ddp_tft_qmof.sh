@@ -88,7 +88,7 @@ bash -c "
     data.datamodule.batch_size.test=128 \
     data.datamodule.datasets.mp20.proportion=0.0 \
     data.datamodule.datasets.qm9.proportion=0.0 \
-    data.datamodule.datasets.qmof.proportion=1.0 \
+    data.datamodule.datasets.qmof150.proportion=1.0 \
     date=$RUN_DATE \
     experiment=$EXPERIMENT \
     model=$MODEL \
