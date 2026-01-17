@@ -142,8 +142,8 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_pap
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mat_prop_paper_weights.ckpt # TODO: Upload
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_l_joint_pretraining_paper_weights.ckpt # TODO: Upload
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_pretraining_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_l_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_pretraining_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/platom_1_joint_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_mp20_only_pretraining_paper_weights.ckpt
@@ -158,7 +158,7 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
 ```
 
 ## Training
