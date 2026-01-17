@@ -89,10 +89,10 @@ python "$PROJECT_DIR/forks/flowmm/scripts_analysis/prerelax.py" \
 # sun_json="$eval_dir/sun.json"
 # msun_json="$eval_dir/msun.json"
 # python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$json_e_above_hull" --e_above_hull_column e_above_hull_per_atom_chgnet
-# python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$json_e_above_hull" --e_above_hull_column e_above_hull_per_atom_chgnet --e_above_hull_maximum 0.1
+# python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$json_e_above_hull" --json_sun_count msun_count.json --e_above_hull_column e_above_hull_per_atom_chgnet --e_above_hull_maximum 0.1
 
 # # S.U.N. and M.S.U.N (if VASP license is available)
 # sun_json="$eval_dir/sun.json"
 # msun_json="$eval_dir/msun.json"
 # python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$ehulls_corrected_json"
-# python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$ehulls_corrected_json" --e_above_hull_maximum 0.1
+# python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$ehulls_corrected_json" --json_sun_count msun_count.json --e_above_hull_maximum 0.1
