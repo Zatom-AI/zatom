@@ -81,9 +81,9 @@ bash -c "
     srun --kill-on-bad-exit=1 shifter python zatom/$TASK_NAME.py \
     ckpt_path=$CKPT_PATH \
     data=$DATASET \
-    data.datamodule.batch_size.train=128 \
-    data.datamodule.batch_size.val=128 \
-    data.datamodule.batch_size.test=128 \
+    data.datamodule.batch_size.train=32 \
+    data.datamodule.batch_size.val=32 \
+    data.datamodule.batch_size.test=32 \
     data.datamodule.datasets.qmof150.proportion=1.0 \
     date=$RUN_DATE \
     experiment=$EXPERIMENT \
@@ -94,6 +94,7 @@ bash -c "
     task_name=$TASK_NAME \
     trainer.num_nodes=$SLURM_JOB_NUM_NODES \
     trainer.devices=$SLURM_NTASKS_PER_NODE \
+    trainer.accumulate_grad_batches=4 \
     trainer.max_time='20:00:00:00'
 "
 
