@@ -9,10 +9,13 @@ from functools import partial
 from typing import Dict
 
 import numpy as np
+import pandas as pd
 import torch
+from mofchecker import MOFChecker
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.core.lattice import Lattice
 from pymatgen.core.structure import Structure
+from tqdm import tqdm
 
 import wandb
 from zatom.tools.ase_notebook import AseView
@@ -94,86 +97,80 @@ class MOFGenerationEvaluator:
                 [c.properties["valid"] for c in self.pred_mof_list], device=self.device
             ),
         }
+        valid_structs = [s for s in self.pred_mof_list if s.properties["valid"]]
 
-        # NOTE MOFChecker seems to cause segfaults when used in our slurm environment
-        # in an iterative manner, but works fine when used in a notebook iteratively.
+        # Compute MOF metrics
+        mofchecker_dict = []
+        for s in tqdm(valid_structs, desc="    MOFChecker"):
+            try:
+                mofchecker = MOFChecker(
+                    structure=s, symprec=None, angle_tolerance=None, primitive=False
+                )
+                desc = mofchecker.get_mof_descriptors()
+                all_checks = []
+                for k, v in desc.items():
+                    if isinstance(v, bool):
+                        if k == "has_3d_connected_graph":
+                            continue
+                        if k in ["has_carbon", "has_hydrogen", "has_metal", "is_porous"]:
+                            all_checks.append(int(v))
+                        else:
+                            all_checks.append(int(not v))
+                desc["all_checks"] = np.all(all_checks)
+            except Exception:  # SymmetryUndeterminedError or IndexError:
+                # import ipdb; ipdb.set_trace()
+                # all checks failed if PyMatGen leads to an error
+                desc = {
+                    "has_carbon": False,
+                    "has_hydrogen": False,
+                    "has_atomic_overlaps": True,
+                    "has_overcoordinated_c": True,
+                    "has_overcoordinated_n": True,
+                    "has_overcoordinated_h": True,
+                    "has_undercoordinated_c": True,
+                    "has_undercoordinated_n": True,
+                    "has_undercoordinated_rare_earth": True,
+                    "has_metal": False,
+                    "has_lone_molecule": True,
+                    "has_high_charges": True,
+                    # "is_porous",  # always nan for all QMOF CIF files
+                    "has_suspicicious_terminal_oxo": True,
+                    "has_undercoordinated_alkali_alkaline": True,
+                    "has_geometrically_exposed_metal": True,
+                    # 'has_3d_connected_graph',
+                    "all_checks": False,
+                }
+            mofchecker_dict.append(dict(desc))
 
-        # from mofchecker import MOFChecker
+        mofchecker_dict = (
+            pd.DataFrame(
+                mofchecker_dict,
+                columns=[
+                    "has_carbon",
+                    "has_hydrogen",
+                    "has_atomic_overlaps",
+                    "has_overcoordinated_c",
+                    "has_overcoordinated_n",
+                    "has_overcoordinated_h",
+                    "has_undercoordinated_c",
+                    "has_undercoordinated_n",
+                    "has_undercoordinated_rare_earth",
+                    "has_metal",
+                    "has_lone_molecule",
+                    "has_high_charges",
+                    # "is_porous",  # always nan for all QMOF CIF files
+                    "has_suspicicious_terminal_oxo",
+                    "has_undercoordinated_alkali_alkaline",
+                    "has_geometrically_exposed_metal",
+                    # 'has_3d_connected_graph',
+                    "all_checks",
+                ],
+            )
+            .mean()
+            .to_dict()
+        )
 
-        # mofchecker_dict = []
-        # for s in tqdm(valid_structs, desc="    MOFChecker"):
-        #     try:
-        #         mofchecker = MOFChecker(
-        #             structure=s,
-        #             symprec=None,
-        #             angle_tolerance=None,
-        #             primitive=False
-        #         )
-        #         desc = mofchecker.get_mof_descriptors()
-        #         all_checks = []
-        #         for k, v in desc.items():
-        #             if type(v) == bool:
-        #                 if k == "has_3d_connected_graph":
-        #                     continue
-        #                 if k in ["has_carbon", "has_hydrogen", "has_metal", "is_porous"]:
-        #                     all_checks.append(int(v))
-        #                 else:
-        #                     all_checks.append(int(not v))
-        #         desc["all_checks"] = np.all(all_checks)
-        #     except: # SymmetryUndeterminedError or IndexError:
-        #         # import ipdb; ipdb.set_trace()
-        #         # all checks failed if PyMatGen leads to an error
-        #         desc = {
-        #             "has_carbon": False,
-        #             "has_hydrogen": False,
-        #             "has_atomic_overlaps": True,
-        #             "has_overcoordinated_c": True,
-        #             "has_overcoordinated_n": True,
-        #             "has_overcoordinated_h": True,
-        #             "has_undercoordinated_c": True,
-        #             "has_undercoordinated_n": True,
-        #             "has_undercoordinated_rare_earth": True,
-        #             "has_metal": False,
-        #             "has_lone_molecule": True,
-        #             "has_high_charges": True,
-        #             # "is_porous",  # always nan for all QMOF CIF files
-        #             "has_suspicicious_terminal_oxo": True,
-        #             "has_undercoordinated_alkali_alkaline": True,
-        #             "has_geometrically_exposed_metal": True,
-        #             # 'has_3d_connected_graph',
-        #             "all_checks": False,
-        #         }
-        #     mofchecker_dict.append(dict(desc))
-
-        # mofchecker_dict = (
-        #     pd.DataFrame(
-        #         mofchecker_dict,
-        #         columns=[
-        #             "has_carbon",
-        #             "has_hydrogen",
-        #             "has_atomic_overlaps",
-        #             "has_overcoordinated_c",
-        #             "has_overcoordinated_n",
-        #             "has_overcoordinated_h",
-        #             "has_undercoordinated_c",
-        #             "has_undercoordinated_n",
-        #             "has_undercoordinated_rare_earth",
-        #             "has_metal",
-        #             "has_lone_molecule",
-        #             "has_high_charges",
-        #             # "is_porous",  # always nan for all QMOF CIF files
-        #             "has_suspicicious_terminal_oxo",
-        #             "has_undercoordinated_alkali_alkaline",
-        #             "has_geometrically_exposed_metal",
-        #             # 'has_3d_connected_graph',
-        #             "all_checks",
-        #         ],
-        #     )
-        #     .mean()
-        #     .to_dict()
-        # )
-
-        # metrics_dict = {**metrics_dict, **mofchecker_dict}
+        metrics_dict = {**metrics_dict, **mofchecker_dict}
 
         return metrics_dict
 
