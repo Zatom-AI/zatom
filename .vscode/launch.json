@@ -12,9 +12,10 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                // "logs/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/old-module-imports-model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt",
-                // "logs/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/old-module-imports-model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt",
-                // "logs/train_fm/runs/train_model-zatom_arch-tft_80M_MP20_2025-12-21_09-00-00/checkpoints/model-epoch@1399-step@8400-val_qm9_valid_rate@0.0000-val_mp20_valid_rate@0.8945.ckpt",
+                "logs/finetune_fm/runs/finetune_model-zatom_arch-tft_80M_qm9_matbench_2025-12-20_09-00-00/checkpoints/model-epoch@739-step@317460-val_qm9_property_loss@0.2761-val_omol25_energy_loss@0.0000.ckpt",
+                "logs/finetune_fm/runs/finetune_model-zatom_arch-tft_80M_omol25_2026-01-11_06-00-00/checkpoints/54-260000.ckpt",
+                "checkpoints/zatom_1_joint_paper_weights.ckpt",
+                "--merge_keys", "global_property",
                 // "--skip_key_merging",
             ]
         },
