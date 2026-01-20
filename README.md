@@ -350,7 +350,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 
 </details>
 
-#### DFT (*deprecated*)
+#### DFT (deprecated)
 
 <details>
 
