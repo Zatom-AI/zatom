@@ -147,7 +147,7 @@ One can download pretrained/finetuned Zatom-1 checkpoints as needed.
 mkdir checkpoints/
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mat_prop_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mat_prop_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_l_joint_pretraining_paper_weights.ckpt
