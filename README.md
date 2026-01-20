@@ -304,6 +304,14 @@ To fully evaluate one's generated materials, follow the instructions for [LeMat-
 uv run scripts/run_benchmarks.py --cifs logs/eval_fm/runs/eval_tft_80M_MP20_izr5qhhf_2025-12-16_20-00-00/mp20_test_0 --config comprehensive_multi_mlip_hull --name tft_80M_MP20_izr5qhhf
 ```
 
+One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBench.
+
+- [Results for MP20-only Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1 - TODO: Upload)
+- [Results for jointly trained Platom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_platom_1.zip) (Jointly trained Platom-1 - TODO: Upload)
+- [Results for jointly trained Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1 - TODO: Upload)
+- [Results for jointly trained Zatom-1-L](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L - TODO: Upload)
+- [Results for jointly trained Zatom-1-XL](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL - TODO: Upload)
+
 ### Materials evaluation (DFT, deprecated)
 
 > 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the directory `forks/flowmm/mp_02072023/` and then run `gunzip forks/flowmm/mp_02072023/2023-02-07-ppd-mp.pkl.gz`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
