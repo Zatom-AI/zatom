@@ -24,6 +24,8 @@ Official repository of Zatom-1, a multimodal flow foundation model for 3D molecu
 
 <details>
 
+<details>
+
 > 💡 Note: Make sure to create a `.env` file, for which you can reference `.env.example` as an example.
 
 ### Default
@@ -170,6 +172,8 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_
 
 </details>
 
+</details>
+
 ## Training
 
 <details>
@@ -212,6 +216,8 @@ python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.trai
 </details>
 
 ## Evaluation
+
+<details>
 
 ### Generative tasks
 
@@ -415,6 +421,8 @@ python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json
 ```
 
 > 💡 Note: See `scripts/perlmutter/regular/eval_dft_mp20.sh` for a full example of how to run materials evaluation with SLURM.
+
+</details>
 
 </details>
 
