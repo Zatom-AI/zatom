@@ -24,11 +24,11 @@ Official repository of Zatom-1, a multimodal flow foundation model for 3D molecu
 
 <details>
 
-<details>
-
 > 💡 Note: Make sure to create a `.env` file, for which you can reference `.env.example` as an example.
 
 ### Default
+
+<details>
 
 > 💡 Note: We recommend installing `zatom` in a clean Python environment, using `conda` or otherwise.
 
@@ -329,7 +329,7 @@ One can download 10,000 materials and molecules sampled with Zatom-1.
 
 ### Materials analysis
 
-#### LeMat-GenBench (**default**)
+#### LeMat-GenBench (default)
 
 <details>
 
@@ -350,7 +350,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 
 </details>
 
-#### DFT (**deprecated**)
+#### DFT (*deprecated*)
 
 <details>
 
