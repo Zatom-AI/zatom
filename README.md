@@ -329,6 +329,8 @@ One can download 10,000 materials and molecules sampled with Zatom-1.
 
 ### Materials analysis
 
+<details>
+
 #### LeMat-GenBench (default)
 
 <details>
@@ -421,6 +423,8 @@ python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json
 ```
 
 > 💡 Note: See [`scripts/perlmutter/regular/eval_dft_mp20.sh`](scripts/perlmutter/regular/eval_dft_mp20.sh) for a full example of how to run materials evaluation with SLURM.
+
+</details>
 
 </details>
 
