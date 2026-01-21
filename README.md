@@ -211,7 +211,7 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within `.vscode/launch.json` for full examples of how to locally customize or debug model training. The scripts within `scripts/perlmutter/` additionally describe how to train or evaluate models on a SLURM cluster.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within [`.vscode/launch.json`](.vscode/launch.json) for full examples of how to locally customize or debug model training. The scripts within [`scripts/perlmutter/`](scripts/perlmutter/) additionally describe how to train or evaluate models on a SLURM cluster.
 
 </details>
 
@@ -354,7 +354,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 
 <details>
 
-> 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the directory `forks/flowmm/mp_02072023/` and then run `gunzip forks/flowmm/mp_02072023/2023-02-07-ppd-mp.pkl.gz`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
+> 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the directory [`forks/flowmm/mp_02072023/`](forks/flowmm/mp_02072023/) and then run `gunzip forks/flowmm/mp_02072023/2023-02-07-ppd-mp.pkl.gz`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
 
 > 💡 Note: Doing density functional theory (DFT) with [VASP](https://www.vasp.at/) requires a VASP license to define the required environment variable `PATH_TO_YOUR_PSEUDOPOTENTIALS`. We do not provide guidance on running DFT. That being said, your DFT results should typically be [corrected using the settings from the Materials Project](https://docs.materialsproject.org/methodology/materials-methodology/thermodynamic-stability/thermodynamic-stability).
 
@@ -420,7 +420,7 @@ python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json"
 python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$ehulls_corrected_json" --json_sun_count msun_count.json --e_above_hull_maximum 0.1
 ```
 
-> 💡 Note: See `scripts/perlmutter/regular/eval_dft_mp20.sh` for a full example of how to run materials evaluation with SLURM.
+> 💡 Note: See [`scripts/perlmutter/regular/eval_dft_mp20.sh`](scripts/perlmutter/regular/eval_dft_mp20.sh) for a full example of how to run materials evaluation with SLURM.
 
 </details>
 
@@ -463,7 +463,7 @@ We thank all their contributors and maintainers!
 
 ## License
 
-This project is covered under the **MIT License**.
+This project is covered under the [**MIT License**](LICENSE).
 
 ## Copyright
 
