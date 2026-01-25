@@ -158,9 +158,9 @@ df_molecule = pd.DataFrame(
 
 # Define model properties for consistency
 models = {
-    "Zatom-1": {"params": 80, "label": "Zatom-1 (80M)", "color": "#1f77b4", "marker": "o"},
-    "Zatom-1-L": {"params": 160, "label": "Zatom-1-L (160M)", "color": "#ff7f0e", "marker": "s"},
-    "Zatom-1-XL": {"params": 300, "label": "Zatom-1-XL (300M)", "color": "#2ca02c", "marker": "D"},
+    "Zatom-1": {"params": 80, "label": "Zatom-1 (80M)", "color": "#009E73", "marker": "o"},
+    "Zatom-1-L": {"params": 160, "label": "Zatom-1-L (160M)", "color": "#E69F00", "marker": "s"},
+    "Zatom-1-XL": {"params": 300, "label": "Zatom-1-XL (300M)", "color": "#56B4E9", "marker": "D"},
 }
 
 # Define plot configurations for each row
@@ -187,7 +187,7 @@ plot_configs = [
 ]
 
 # Create the 3x2 subplot grid
-fig, axes = plt.subplots(3, 2, figsize=(12, 12), gridspec_kw={"width_ratios": [2.5, 1]})
+fig, axes = plt.subplots(3, 2, figsize=(8, 12), gridspec_kw={"width_ratios": [2, 1]})
 plt.style.use("default")  # Use a standard style
 
 # Get data at epoch 2000 for the correlation plots
@@ -220,11 +220,13 @@ for i, config in enumerate(plot_configs):
             ymin, _ = ax_left.get_ylim()
             ax_left.set_ylim(ymin, config["y_max"])
 
-    ax_left.axvline(x=2000, color="grey", linestyle="--", alpha=0.7)
+    # ax_left.axvline(x=2000, color="grey", linestyle="--", alpha=0.7)
+    ax_left.set_xscale("symlog", linthresh=250)
+    ax_left.set_xlim(0, 2100)
     ax_left.set_xlabel("Epoch")
     ax_left.set_ylabel(config["y_label_left"])
     ax_left.legend()
-    ax_left.grid(True, which="both", linestyle="--", linewidth=0.5)
+    # ax_left.grid(True, which="both", linestyle="--", linewidth=0.5)
 
     # --- RIGHT PLOT: Correlation at Epoch 2000 ---
     x_vals = np.log10([props["params"] for props in models.values()])
@@ -257,11 +259,11 @@ for i, config in enumerate(plot_configs):
         bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.5),
     )
 
-    ax_right.set_xlabel("log(Number of parameters in M)")
+    ax_right.set_xlabel("log10(Params in M)")
     ax_right.set_ylabel(config["y_label_right"])
     ax_right.yaxis.set_label_position("right")
     ax_right.yaxis.tick_right()
-    ax_right.grid(True, which="both", linestyle="--", linewidth=0.5)
+    # ax_right.grid(True, which="both", linestyle="--", linewidth=0.5)
 
 # Final adjustments and saving the figure
 plt.tight_layout(pad=2.0)

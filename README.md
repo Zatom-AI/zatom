@@ -164,7 +164,7 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
@@ -211,7 +211,7 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within `.vscode/launch.json` for full examples of how to locally customize or debug model training. The scripts within `scripts/perlmutter/` additionally describe how to train or evaluate models on a SLURM cluster.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within [`.vscode/launch.json`](.vscode/launch.json) for full examples of how to locally customize or debug model training. The scripts within [`scripts/perlmutter/`](scripts/perlmutter/) additionally describe how to train or evaluate models on a SLURM cluster.
 
 </details>
 
@@ -329,6 +329,8 @@ One can download 10,000 materials and molecules sampled with Zatom-1.
 
 ### Materials analysis
 
+<details>
+
 #### LeMat-GenBench (default)
 
 <details>
@@ -342,11 +344,11 @@ uv run scripts/run_benchmarks.py --cifs logs/eval_fm/runs/eval_tft_80M_MP20_izr5
 
 One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBench.
 
-- [Results for MP20-only Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1 - TODO: Upload)
-- [Results for jointly trained Platom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_platom_1.zip) (Jointly trained Platom-1 - TODO: Upload)
-- [Results for jointly trained Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1 - TODO: Upload)
-- [Results for jointly trained Zatom-1-L](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L - TODO: Upload)
-- [Results for jointly trained Zatom-1-XL](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL - TODO: Upload)
+- [Results for MP20-only Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1)
+- [Results for jointly trained Platom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_platom_1.zip) (Jointly trained Platom-1)
+- [Results for jointly trained Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1)
+- [Results for jointly trained Zatom-1-L](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
+- [Results for jointly trained Zatom-1-XL](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
 
 </details>
 
@@ -354,7 +356,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 
 <details>
 
-> 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the directory `forks/flowmm/mp_02072023/` and then run `gunzip forks/flowmm/mp_02072023/2023-02-07-ppd-mp.pkl.gz`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
+> 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the directory [`forks/flowmm/mp_02072023/`](forks/flowmm/mp_02072023/) and then run `gunzip forks/flowmm/mp_02072023/2023-02-07-ppd-mp.pkl.gz`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
 
 > 💡 Note: Doing density functional theory (DFT) with [VASP](https://www.vasp.at/) requires a VASP license to define the required environment variable `PATH_TO_YOUR_PSEUDOPOTENTIALS`. We do not provide guidance on running DFT. That being said, your DFT results should typically be [corrected using the settings from the Materials Project](https://docs.materialsproject.org/methodology/materials-methodology/thermodynamic-stability/thermodynamic-stability).
 
@@ -420,7 +422,9 @@ python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json"
 python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$ehulls_corrected_json" --json_sun_count msun_count.json --e_above_hull_maximum 0.1
 ```
 
-> 💡 Note: See `scripts/perlmutter/regular/eval_dft_mp20.sh` for a full example of how to run materials evaluation with SLURM.
+> 💡 Note: See [`scripts/perlmutter/regular/eval_dft_mp20.sh`](scripts/perlmutter/regular/eval_dft_mp20.sh) for a full example of how to run materials evaluation with SLURM.
+
+</details>
 
 </details>
 
@@ -463,7 +467,7 @@ We thank all their contributors and maintainers!
 
 ## License
 
-This project is covered under the **MIT License**.
+This project is covered under the [**MIT License**](LICENSE).
 
 ## Copyright
 
@@ -485,9 +489,11 @@ works, and perform publicly and display publicly, and to permit others to do so.
 If you use the code or data associated with this package or otherwise find this work useful, please cite:
 
 ```bibtex
-@article{zatom_1_2025,
+@article{zatom_1_2026,
     title={Zatom-1: A Multimodal Flow Foundation Model for 3D Molecules and Materials},
-    author={Et al.},
-    year=2025,
+    author={Alex Morehead* and Miruna Cretu* and Antonia Panescu* and Rishabh Anand* and Maurice Weiler* and Tynan Perez* and Samuel Blau and Steven Farrell and Wahid Bhimji and Anubhav Jain and Hrushikesh Sahasrabuddhe and Pietro Liò and Tommi Jaakkola and Rafael Gómez-Bombarelli and Rex Ying* and Ben Erichson* and Michael Mahoney*},
+    journal={arXiv},
+    year=2026,
+    note={* denotes equal contribution}
 }
 ```

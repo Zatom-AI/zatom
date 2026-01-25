@@ -227,32 +227,32 @@ ax.set_xlim(0, 1050)
 ax.set_xticks([10, 100, 250, 500, 750, 1000])
 ax.tick_params(axis="both", which="major", labelsize=12)
 
-# --- 6. Create and Configure the Inset Plot ---
-axins = ax.inset_axes([0.08, 0.53, 0.35, 0.35])
+# # --- 6. Create and Configure the Inset Plot ---
+# axins = ax.inset_axes([0.08, 0.53, 0.35, 0.35])
 
-# Plot data on the inset axes
-axins.plot(x_steps, data["zatom_1"], marker="o", color=colors["zatom_1"])
-axins.plot(x_steps, data["zatom_1_l"], marker="s", color=colors["zatom_1_l"])
-axins.plot(x_steps, data["zatom_1_xl"], marker="D", color=colors["zatom_1_xl"])
-axins.plot(x_steps, data["adit_s"], marker="^", color=colors["adit_s"])
-axins.plot(x_steps, data["adit_b"], marker="*", color=colors["adit_b"])
-axins.plot(x_steps, data["adit_l"], marker="v", color=colors["adit_l"])
-axins.plot(x_steps, data["competitor"], marker="x", color=colors["competitor"])
+# # Plot data on the inset axes
+# axins.plot(x_steps, data["zatom_1"], marker="o", color=colors["zatom_1"])
+# axins.plot(x_steps, data["zatom_1_l"], marker="s", color=colors["zatom_1_l"])
+# axins.plot(x_steps, data["zatom_1_xl"], marker="D", color=colors["zatom_1_xl"])
+# axins.plot(x_steps, data["adit_s"], marker="^", color=colors["adit_s"])
+# axins.plot(x_steps, data["adit_b"], marker="*", color=colors["adit_b"])
+# axins.plot(x_steps, data["adit_l"], marker="v", color=colors["adit_l"])
+# axins.plot(x_steps, data["competitor"], marker="x", color=colors["competitor"])
 
-# Set the view for the inset from config
-x1, x2 = 5, 105
-y1, y2 = config["inset_y_lim"]
-axins.set_xlim(x1, x2)
-axins.set_ylim(y1, y2)
+# # Set the view for the inset from config
+# x1, x2 = 5, 105
+# y1, y2 = config["inset_y_lim"]
+# axins.set_xlim(x1, x2)
+# axins.set_ylim(y1, y2)
 
-axins.set_xticks([10, 25, 50, 100])
-axins.tick_params(axis="both", which="major", labelsize=10)
+# axins.set_xticks([10, 25, 50, 100])
+# axins.tick_params(axis="both", which="major", labelsize=10)
 
-# --- 7. Draw Connection Lines for the Inset ---
-mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+# # --- 7. Draw Connection Lines for the Inset ---
+# mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
 
 # --- 8. Add Legend and Finalize ---
-ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0.0, fontsize=12)
+ax.legend(bbox_to_anchor=(0.01, 0.99), loc="upper left", borderaxespad=0.0, fontsize=12)
 fig.subplots_adjust(right=0.75)
 
 plt.savefig(
