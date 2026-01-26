@@ -44,11 +44,15 @@ def apply_name_fn_dict(
 
 def get_record(
     file: Path,
-) -> dict[str, any]:
-    record = {}
-    record.update(apply_name_fn_dict(file, NAME_FN_FOR_PATH))
-    traj = Trajectory(file)
-    record.update(apply_name_fn_dict(traj, NAME_FN_FOR_TRAJ))
+) -> dict[str, any] | None:
+    try:
+        record = {}
+        record.update(apply_name_fn_dict(file, NAME_FN_FOR_PATH))
+        traj = Trajectory(file)
+        record.update(apply_name_fn_dict(traj, NAME_FN_FOR_TRAJ))
+    except Exception as e:
+        print(f"Error processing file {file}: {e}")
+        return None
     return record
 
 
@@ -59,6 +63,7 @@ def get_dft_results(
     files: list[Path] = list(root.glob("*.traj"))
     # records = Parallel(n_jobs=n_jobs)(delayed(get_record)(file) for file in files)
     records = [get_record(file) for file in tqdm(files)]
+    records = [record for record in records if record is not None]
     df = pd.DataFrame.from_records(records)
     df["method"] = df["method"].map(
         {
