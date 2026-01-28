@@ -261,7 +261,7 @@ def array_dict_to_crystal(
             os.makedirs(save_dir_name, exist_ok=True)
             crys.structure.to(os.path.join(save_dir_name, f"crystal_{x['sample_idx']}.cif"))
     else:
-        # returns an absurd crystal
+        # Return an absurd crystal
         crys = Crystal(
             {
                 "frac_coords": np.zeros_like(x["frac_coords"]),
