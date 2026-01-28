@@ -173,9 +173,9 @@ data = config["data"]
 fig, ax = plt.subplots(figsize=(8, 6), dpi=120)
 
 colors = {
-    "zatom_1": "#525252",
-    "zatom_1_l": "#969696",
-    "zatom_1_xl": "#cccccc",
+    "zatom_1": "#a8db8b",
+    "zatom_1_l": "#5ba43b",
+    "zatom_1_xl": "#2d572c",
     "adit_s": "#1f497d",
     "adit_b": "#4f81bd",
     "adit_l": "#8cb4d9",
