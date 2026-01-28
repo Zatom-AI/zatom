@@ -7,6 +7,6 @@ structure = parser.get_structures()[0]  # Get the first structure from the CIF f
 
 # Step 2: Write to a new CIF file with symmetry information
 output_cif_path = "crystal_sym.cif"
-structure.to(filename=output_cif_path, symprec=0.01)
+structure.to(filename=output_cif_path, symprec=0.1)
 
 print(f"New CIF file with symmetry information written to: {output_cif_path}")
