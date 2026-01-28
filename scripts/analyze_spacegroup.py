@@ -1,12 +1,14 @@
+from pathlib import Path
+
 from pymatgen.io.cif import CifParser
 
-# Step 1: Load the CIF file
-cif_file_path = "crystal.cif"
-parser = CifParser(cif_file_path)
-structure = parser.get_structures()[0]  # Get the first structure from the CIF file
+cif_dir = Path("viz/")
 
-# Step 2: Write to a new CIF file with symmetry information
-output_cif_path = "crystal_sym.cif"
-structure.to(filename=output_cif_path, symprec=0.1)
+for file in cif_dir.iterdir():
+    # Step 1: Load the CIF file
+    parser = CifParser(file)
+    structure = parser.parse_structures()[0]  # Get the first structure from the CIF file
 
-print(f"New CIF file with symmetry information written to: {output_cif_path}")
+    # Step 2: Write to a new CIF file with symmetry information
+    output_cif_path = cif_dir / f"{file.stem}_sym.cif"
+    structure.to(filename=output_cif_path, symprec=0.1)
