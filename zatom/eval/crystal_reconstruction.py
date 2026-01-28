@@ -65,13 +65,20 @@ class CrystalReconstructionEvaluator:
         self.pred_crys_list = []
         self.gt_crys_list = []
 
-    def _arrays_to_crystals(self, save: bool = False, save_dir: str = "", n_jobs: int = -4):
+    def _arrays_to_crystals(
+        self,
+        save: bool = False,
+        save_dir: str = "",
+        n_jobs: int = -4,
+        symprec: float | None = None,
+    ):
         """Convert stored predictions and ground truths to Crystal objects for evaluation."""
         self.pred_crys_list = joblib_map(
             partial(
                 array_dict_to_crystal,
                 save=save,
                 save_dir_name=f"{save_dir}/pred",
+                symprec=symprec,
             ),
             self.pred_arrays_list,
             n_jobs=n_jobs,
@@ -84,6 +91,7 @@ class CrystalReconstructionEvaluator:
                 array_dict_to_crystal,
                 save=save,
                 save_dir_name=f"{save_dir}/gt",
+                symprec=symprec,
             ),
             self.gt_arrays_list,
             n_jobs=n_jobs,
@@ -118,7 +126,9 @@ class CrystalReconstructionEvaluator:
         ), "Number of predictions and ground truths must match."
 
         # Convert predictions and ground truths to Crystal objects
-        self._arrays_to_crystals(save, save_dir, n_jobs=n_jobs)
+        self._arrays_to_crystals(
+            save, save_dir, n_jobs=n_jobs, symprec=kwargs.get("symprec", None)
+        )
 
         # Check validity of predictions and ground truths
         validity = [
@@ -234,6 +244,7 @@ def array_dict_to_crystal(
     x: dict[str, np.ndarray],
     save: bool = False,
     save_dir_name: str = "",
+    symprec: float | None = None,
 ) -> Crystal:
     """Method to convert a dictionary of numpy arrays to a Crystal object which is compatible with
     StructureMatcher (used for evaluations). Previously called 'safe_crystal', as it return a
@@ -250,6 +261,7 @@ def array_dict_to_crystal(
             - 'sample_idx': Index of the sample in the dataset.
         save: Whether to save the crystal as a CIF file.
         save_dir_name: Directory to save the CIF file.
+        symprec: Symmetry precision for structure CIF generation.
 
     Returns:
         Crystal: Crystal object, optionally saved as a CIF file.
@@ -259,7 +271,9 @@ def array_dict_to_crystal(
         crys = Crystal(x)
         if crys.valid and save:
             os.makedirs(save_dir_name, exist_ok=True)
-            crys.structure.to(os.path.join(save_dir_name, f"crystal_{x['sample_idx']}.cif"))
+            crys.structure.to(
+                os.path.join(save_dir_name, f"crystal_{x['sample_idx']}.cif"), symprec=symprec
+            )
     else:
         # Return an absurd crystal
         crys = Crystal(
