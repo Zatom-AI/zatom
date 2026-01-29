@@ -174,7 +174,7 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_mp20_only
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_geom_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
