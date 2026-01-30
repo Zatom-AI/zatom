@@ -43,28 +43,18 @@ source ~/.bashrc  # or `source ~/.zshrc` - alternatively, one can restart their 
 
 With `conda` available, one can build a virtual environment for `zatom`.
 
+> 💡 Note: Make sure Git LFS is installed beforehand (https://git-lfs.com/).
+
+#### Linux
+
 ```bash
-# Clone project, making sure Git LFS is installed beforehand (https://git-lfs.com/)
+# Clone project
 git clone https://github.com/amorehead/zatom
 cd zatom
 
-# [OPTIONAL] Create Conda environment (for Linux)
+# [OPTIONAL] Create Conda environment
 conda create -n zatom -c conda-forge python=3.10 gcc=11.4.0 gxx=11.4.0 libstdcxx=14.1.0 libstdcxx-ng=14.1.0 libgcc=14.1.0 libgcc-ng=14.1.0 compilers=1.5.2
 conda activate zatom
-
-# [OPTIONAL] Alternatively, create Conda environment (for macOS)
-conda create -n zatom -c conda-forge python=3.10 clang=18 clangxx=18 libcxx=18 libcxx-devel=18 libgfortran5=15.1.0 lld=20.1.7 pybind11=3.0.0
-conda activate zatom
-
-# [OPTIONAL] Install `pyeqeq` (for macOS)
-export CC=clang
-export CXX=clang++
-export CPPFLAGS="-isystem $CONDA_PREFIX/include -isystem $CONDA_PREFIX/include/c++/v1"
-export CXXFLAGS="-std=c++17"
-export LDFLAGS="-fuse-ld=lld -L$CONDA_PREFIX/lib"
-export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
-pip install --no-build-isolation pyeqeq
-unset DYLD_LIBRARY_PATH
 
 # Install requirements
 pip install -e '.[cuda]'
@@ -72,8 +62,6 @@ pip install -e '.[cuda]'
 # [OPTIONAL] Install pre-commit hooks
 pre-commit install
 ```
-
-> 💡 Note: If you are installing on systems without access to CUDA GPUs (namely macOS or ROCm systems), remove `[cuda]` from the above commands. Be aware that the CPU-only version (e.g., without macOS's MPS GPU backend) will be significantly slower than the GPU version.
 
 > If run into GLIBC incompatibility issues on SLURM, most likely caused by `torch-scatter`, we recommend the following:
 >
@@ -86,6 +74,34 @@ pre-commit install
 > ```
 >
 > This installs the source tarball and compiles it locally, linking against your cluster's GLIBC.
+
+#### macOS
+
+```bash
+# Clone project
+git clone https://github.com/amorehead/zatom
+cd zatom
+
+# [OPTIONAL] Create Conda environment
+conda create -n zatom -c conda-forge python=3.10 clang=18 clangxx=18 libcxx=18 libcxx-devel=18 libgfortran5=15.1.0 lld=20.1.7 pybind11=3.0.0
+conda activate zatom
+
+# Install `pyeqeq`
+export CC=clang
+export CXX=clang++
+export CPPFLAGS="-isystem $CONDA_PREFIX/include -isystem $CONDA_PREFIX/include/c++/v1"
+export CXXFLAGS="-std=c++17"
+export LDFLAGS="-fuse-ld=lld -L$CONDA_PREFIX/lib"
+export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
+pip install --no-build-isolation pyeqeq
+unset DYLD_LIBRARY_PATH
+
+# Install requirements
+pip install -e .
+
+# [OPTIONAL] Install pre-commit hooks
+pre-commit install
+```
 
 ### `uv`
 
@@ -158,7 +174,7 @@ wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_mp20_only
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_geom_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt # TODO: Upload
+wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt
 
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
@@ -264,7 +280,7 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_geom_pretraining_pap
 To generate Zatom-1's evaluation metrics for (QMOF150) material generation only
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_qmof_only_pretraining_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qmof.proportion=1.0 model.sampling.num_samples=1000 model.sampling.batch_size=100 name=eval_tft_80M_QMOF_s6uzclqf seed=42 trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_qmof_only_pretraining_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qmof150.proportion=1.0 model.sampling.num_samples=1000 model.sampling.batch_size=100 name=eval_tft_80M_QMOF_s6uzclqf seed=42 trainer=gpu
 ```
 
 To plot Zatom-1's inference speed results for each dataset
@@ -292,19 +308,22 @@ python scripts/plot_model_scaling_results.py
 To evaluate Zatom-1's (QM9) molecule property predictions with QM9-only finetuning
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property="[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C]" model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-prop-pred_7g4rg14y seed=42 trainer=gpu
+# Use seeds 42, 43, and 44 and then run `scripts/group_analyze_csv_metrics.py` with `--keep_only_last_row` to reproduce paper statistics
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property="[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C]" logger=csv model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.architecture.atom_types_interpolant.path_t_min=0.98 model.architecture.pos_interpolant.path_t_min=0.98 model.architecture.frac_coords_interpolant.path_t_min=0.98 model.architecture.lengths_scaled_interpolant.path_t_min=0.98 model.architecture.angles_radians_interpolant.path_t_min=0.98 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-prop-pred_7g4rg14y seed=42 trainer=gpu
 ```
 
 To evaluate Zatom-1's zero-shot (Matbench) material property predictions with QM9-only finetuning
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.matbench.proportion=1.0 data.datamodule.datasets.matbench.global_property=matbench_mp_gap data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qm9.global_property="[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C]" model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-prop-pred_xyaqjgvx seed=42 trainer=gpu
+# Use seeds 42, 43, and 44 and then run `scripts/group_analyze_csv_metrics.py` with `--keep_only_last_row` to reproduce paper statistics
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt data.datamodule.batch_size.train=128 data.datamodule.batch_size.val=128 data.datamodule.batch_size.test=128 data.datamodule.datasets.matbench.proportion=1.0 data.datamodule.datasets.matbench.global_property=matbench_mp_gap data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qm9.global_property="[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C]" logger=csv model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.architecture.atom_types_interpolant.path_t_min=0.98 model.architecture.pos_interpolant.path_t_min=0.98 model.architecture.frac_coords_interpolant.path_t_min=0.98 model.architecture.lengths_scaled_interpolant.path_t_min=0.98 model.architecture.angles_radians_interpolant.path_t_min=0.98 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-prop-pred_xyaqjgvx seed=42 trainer=gpu
 ```
 
 To evaluate Zatom-1's (QM9) molecule and (Matbench) material property predictions with joint QM9-Matbench finetuning
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_mat_prop_paper_weights.ckpt data.datamodule.batch_size.train=32 data.datamodule.batch_size.val=32 data.datamodule.batch_size.test=32 data.datamodule.datasets.matbench.proportion=1.0 data.datamodule.datasets.matbench.global_property=matbench_mp_gap data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property="[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C]" model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-Matbench-prop-pred_0c3kq4qw seed=42 trainer=gpu
+# Use seeds 42, 43, and 44 and then run `scripts/group_analyze_csv_metrics.py` with `--keep_only_last_row` to reproduce paper statistics
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_mat_prop_paper_weights.ckpt data.datamodule.batch_size.train=32 data.datamodule.batch_size.val=32 data.datamodule.batch_size.test=32 data.datamodule.datasets.matbench.proportion=1.0 data.datamodule.datasets.matbench.global_property=matbench_mp_gap data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=1.0 data.datamodule.datasets.qm9.global_property="[mu,alpha,homo,lumo,gap,r2,zpve,U0,U,H,G,Cv,U0_atom,U_atom,H_atom,G_atom,A,B,C]" logger=csv model.architecture.num_aux_layers=4 model.architecture.num_aux_mlip_layers=8 model.architecture.aux_mlip_hidden_size=1024 model.architecture.atom_types_interpolant.path_t_min=0.98 model.architecture.pos_interpolant.path_t_min=0.98 model.architecture.frac_coords_interpolant.path_t_min=0.98 model.architecture.lengths_scaled_interpolant.path_t_min=0.98 model.architecture.angles_radians_interpolant.path_t_min=0.98 model.sampling.num_samples=1 model.sampling.batch_size=1 name=eval_tft_80M_QM9-Matbench-prop-pred_0c3kq4qw seed=42 trainer=gpu
 ```
 
 To evaluate Zatom-1's (OMol25) molecule and (MPtrj) material energy and force predictions with joint OMol25-MPtrj finetuning

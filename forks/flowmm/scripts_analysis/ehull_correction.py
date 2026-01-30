@@ -39,9 +39,9 @@ NAME_FN_FOR_TRAJ = {
 }
 
 
-def get_compat_params(dft_path):
-    incar_file = os.path.join(dft_path, "INCAR")
-    poscar_file = os.path.join(dft_path, "POSCAR")
+def get_compat_params(dft_dir):
+    incar_file = os.path.join(dft_dir, "INCAR")
+    poscar_file = os.path.join(dft_dir, "POSCAR")
     incar = Incar.from_file(incar_file)
     poscar = Poscar.from_file(poscar_file)
     param = {"hubbards": {}}
@@ -55,9 +55,9 @@ def get_compat_params(dft_path):
     return param
 
 
-def get_energy_correction(traj, dft_path):
+def get_energy_correction(traj, dft_dir):
     ase_atoms = traj[-1]
-    params = get_compat_params(dft_path)
+    params = get_compat_params(dft_dir)
     struct = AseAtomsAdaptor.get_structure(ase_atoms)
     cse_d = {
         "structure": struct,
@@ -82,21 +82,34 @@ def apply_name_fn_dict(
     return {prop: fn(obj) for prop, fn in name_fn.items()}
 
 
+def find_dft_subdirectory_by_id(base_dir: str, directory_id: str) -> str | None:
+    # NOTE: assumes that the directory_id is the exact name of the target directory
+    target_directory_name = directory_id
+    for root, dirs, files in os.walk(base_dir):
+        if target_directory_name in dirs:
+            return os.path.join(root, target_directory_name)
+    return None
+
+
 def get_record(
     file: Path,
-    dft_path: Path,
-) -> dict[str, any]:
-    record = {}
-    record.update(apply_name_fn_dict(file, NAME_FN_FOR_PATH))
-    traj = Trajectory(file)
-    record.update(apply_name_fn_dict(traj, NAME_FN_FOR_TRAJ))
-    _, file_id = os.path.split(file)
-    file_id = file_id.split(".")[0]
-    dft_files = os.path.join(dft_path, file_id)
-    cse, corrected_energy, pde = get_energy_correction(traj, dft_files)
-    record["corrected_energy"] = corrected_energy
-    record["computed_structure_entry"] = cse.as_dict()
-    record["phase_diagram_entry"] = pde.as_dict()
+    dft_dir: Path,
+) -> dict[str, any] | None:
+    try:
+        record = {}
+        record.update(apply_name_fn_dict(file, NAME_FN_FOR_PATH))
+        traj = Trajectory(file)
+        record.update(apply_name_fn_dict(traj, NAME_FN_FOR_TRAJ))
+        _, file_id = os.path.split(file)
+        file_id = file_id.split(".")[0]
+        dft_files = find_dft_subdirectory_by_id(dft_dir, file_id)
+        cse, corrected_energy, pde = get_energy_correction(traj, dft_files)
+        record["corrected_energy"] = corrected_energy
+        record["computed_structure_entry"] = cse.as_dict()
+        record["phase_diagram_entry"] = pde.as_dict()
+    except Exception as e:
+        print(f"Error processing file {file}: {e}")
+        return None
 
     return record
 
@@ -105,11 +118,12 @@ def get_dft_results(
     root: Path,
     # n_jobs: int = 1
 ) -> pd.DataFrame:
-    dft_path = os.path.join(root, "dft")
+    dft_dir = os.path.join(root, "dft")
     output_path = Path(os.path.join(root, "clean_outputs"))
     files: list[Path] = list(output_path.glob("*.traj"))
     # records = Parallel(n_jobs=n_jobs)(delayed(get_record)(file) for file in files)
-    records = [get_record(file, dft_path) for file in tqdm(files)]
+    records = [get_record(file, dft_dir) for file in tqdm(files)]
+    records = [record for record in records if record is not None]
     df = pd.DataFrame.from_records(records)
     df["method"] = df["method"].map(
         {

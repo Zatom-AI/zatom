@@ -14,19 +14,28 @@ def convert_all(parent_dir: str, output_dir: str):
     os.makedirs(output_dir, exist_ok=True)
 
     for subdir in os.listdir(parent_dir):
+        if "_bad" in subdir:
+            continue
         subdir_path = os.path.join(parent_dir, subdir)
         if os.path.isdir(subdir_path):
-            vasprun_path = os.path.join(subdir_path, "vasprun.xml")
-            if os.path.isfile(vasprun_path):
-                try:
-                    atoms = read(vasprun_path, index=":")
-                    output_traj = os.path.join(output_dir, f"{subdir}.traj")
-                    write(output_traj, atoms)
-                    print(f"[Index {converted_count}] Converted {vasprun_path} -> {output_traj}")
-                    converted_count += 1
-                except Exception as e:
-                    print(f"Failed to convert {vasprun_path}: {e}")
-                total_count += 1
+            for subsubdir in os.listdir(subdir_path):
+                if "_bad" in subsubdir:
+                    continue
+                subsubdir_path = os.path.join(subdir_path, subsubdir)
+                if os.path.isdir(subsubdir_path):
+                    vasprun_path = os.path.join(subsubdir_path, "vasprun.xml")
+                    if os.path.isfile(vasprun_path):
+                        try:
+                            atoms = read(vasprun_path, index=":")
+                            output_traj = os.path.join(output_dir, f"{subsubdir}.traj")
+                            write(output_traj, atoms)
+                            print(
+                                f"[Index {converted_count}] Converted {vasprun_path} -> {output_traj}"
+                            )
+                            converted_count += 1
+                        except Exception as e:
+                            print(f"Failed to convert {vasprun_path}: {e}")
+                        total_count += 1
 
     print(
         f"Conversion complete: {converted_count} out of {total_count} files converted successfully."

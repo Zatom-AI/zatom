@@ -68,7 +68,14 @@ class MoleculeGenerationEvaluator:
             total=len(self.pred_arrays_list),
         )
 
-    def get_metrics(self, save: bool = True, save_dir: str = "", n_jobs: int = -4, visualize: bool = True):
+    def get_metrics(
+        self,
+        save: bool = True,
+        save_dir: str = "",
+        n_jobs: int = -4,
+        visualize: bool = True,
+        **kwargs,
+    ):
         """Compute metrics for the generated molecules."""
         assert len(self.pred_arrays_list) > 0, "No predictions to evaluate."
         assert save, "Metric computation currently requires saving as pdb files."
