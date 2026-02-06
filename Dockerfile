@@ -46,5 +46,5 @@ WORKDIR /app/zatom
 ARG GIT_TAG=main
 RUN --mount=type=secret,id=github_token \
     GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
-    git clone https://$GITHUB_TOKEN@github.com/amorehead/zatom . --branch ${GIT_TAG} \
+    git clone https://$GITHUB_TOKEN@github.com/Zatom-AI/zatom . --branch ${GIT_TAG} \
     && python -m pip install .[cuda]
