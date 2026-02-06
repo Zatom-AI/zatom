@@ -103,6 +103,8 @@ pip install -e .
 pre-commit install
 ```
 
+> 💡 Note: Make sure to install `triton` via the [`triton-cpu`](https://github.com/triton-lang/triton-cpu?tab=readme-ov-file#install-from-source) fork if you want to use/debug Triton-based runtime optimizations on macOS. This fork requires you to run `git submodule sync` and `git submodule update --init --recursive -j 8` in its root directory before using `pip` to install it from source.
+
 ### `uv`
 
 You can also set up the environment via `uv`. You can find installation instructions [here](https://docs.astral.sh/uv/).
