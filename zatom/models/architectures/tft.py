@@ -64,6 +64,7 @@ class TFT(nn.Module):
         time_distribution: Distribution to sample time points from. Must be one of (`uniform`, `beta`, `histogram`).
         force_loss_choice: Choice of force loss to use. Must be one of (`mse`, `mae`, `huber`).
         time_alpha_factor: Alpha factor for beta time distribution.
+        gen_loss_weight: Weighting factor for generative losses.
         force_loss_weight: Weighting factor for force loss when performing auxiliary force prediction.
         test_so3_equivariance: Whether to test the model for SO(3) equivariance after each forward pass.
     """
@@ -90,6 +91,7 @@ class TFT(nn.Module):
         time_distribution: Literal["uniform", "beta", "histogram"] = "beta",
         force_loss_choice: Literal["mse", "mae", "huber"] = "mse",
         time_alpha_factor: float = 2.0,
+        gen_loss_weight: float = 1.0,
         force_loss_weight: float = 5.0,
         test_so3_equivariance: bool = False,
         **kwargs,
@@ -107,6 +109,7 @@ class TFT(nn.Module):
         self.interdist_loss = interdist_loss
         self.force_loss_choice = force_loss_choice
         self.time_alpha_factor = time_alpha_factor
+        self.gen_loss_weight = gen_loss_weight
         self.force_loss_weight = force_loss_weight
         self.test_so3_equivariance = test_so3_equivariance
 
@@ -555,24 +558,24 @@ class TFT(nn.Module):
             stats_dict = {}
 
         total_loss = (
-            atom_types_loss
-            + pos_loss
-            + frac_coords_loss
-            + lengths_scaled_loss
-            + angles_radians_loss
-            + dists_loss
+            atom_types_loss * self.gen_loss_weight
+            + pos_loss * self.gen_loss_weight
+            + frac_coords_loss * self.gen_loss_weight
+            + lengths_scaled_loss * self.gen_loss_weight
+            + angles_radians_loss * self.gen_loss_weight
+            + dists_loss * self.gen_loss_weight
         )
         loss_dict = {
             "loss": total_loss,
-            "atom_types_loss": atom_types_loss,
-            "pos_loss": pos_loss,
-            "frac_coords_loss": frac_coords_loss,
-            "lengths_scaled_loss": lengths_scaled_loss,
-            "angles_radians_loss": angles_radians_loss,
+            "atom_types_loss": atom_types_loss * self.gen_loss_weight,
+            "pos_loss": pos_loss * self.gen_loss_weight,
+            "frac_coords_loss": frac_coords_loss * self.gen_loss_weight,
+            "lengths_scaled_loss": lengths_scaled_loss * self.gen_loss_weight,
+            "angles_radians_loss": angles_radians_loss * self.gen_loss_weight,
         }
 
         if self.interdist_loss:
-            loss_dict["dists_loss"] = dists_loss
+            loss_dict["dists_loss"] = dists_loss * self.gen_loss_weight
 
         # Add auxiliary losses
         for aux_task in self.auxiliary_tasks:
