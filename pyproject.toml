@@ -105,6 +105,7 @@ dependencies = [
     "tensordict==0.10.0",
     "ase-db-backends==0.11.0",
     "ray[serve]>=2.52.1",
+    "pyarrow>=23.0.1",
     "fairchem-core @ git+https://github.com/facebookresearch/fairchem.git@a9287b37469a80f9286151d70ceb184f91dfad8e#subdirectory=packages/fairchem-core",
     "platonic_transformers @ git+https://github.com/amorehead/PlatonicTransformers.git@packaging",
 ]
