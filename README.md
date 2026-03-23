@@ -8,8 +8,6 @@
 
 <!-- <a href="https://github.com/ashleve/lightning-hydra-template"><img alt="Template" src="https://img.shields.io/badge/-Lightning--Hydra--Template-017F2F?style=flat&logo=github&labelColor=gray"></a><br> -->
 
-[![arXiv](http://img.shields.io/badge/Paper-arxiv.2602.22251-B31B1B.svg)](https://arxiv.org/abs/2602.22251)
-
 <!-- [![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/paper/2020) -->
 
 <img src="./overview.png">
@@ -49,7 +47,7 @@ With `conda` available, one can build a virtual environment for `zatom`.
 
 ```bash
 # Clone project
-git clone https://github.com/Zatom-AI/zatom
+git clone https://anonymous.4open.science/r/zatom-4F95
 cd zatom
 
 # [OPTIONAL] Create Conda environment
@@ -79,7 +77,7 @@ pre-commit install
 
 ```bash
 # Clone project
-git clone https://github.com/Zatom-AI/zatom
+git clone https://anonymous.4open.science/r/zatom-4F95
 cd zatom
 
 # [OPTIONAL] Create Conda environment
@@ -128,30 +126,11 @@ For sake of reproducibility, one can alternatively build a (CUDA-based) Docker i
 
 ```bash
 # Clone project, making sure Git LFS is installed beforehand (https://git-lfs.com/)
-git clone https://github.com/Zatom-AI/zatom
+git clone https://anonymous.4open.science/r/zatom-4F95
 cd zatom
 
-# Enable BuildKit to securely pass GitHub access token to Docker
-export DOCKER_BUILDKIT=1
-export GITHUB_TOKEN=your_token_value
-
 # E.g., to build image on local machine
-docker build --platform linux/amd64 --secret id=github_token,env=GITHUB_TOKEN --no-cache -t zatom:0.0.1 - < Dockerfile
-# Skip the following three steps if not using NERSC cluster
-docker login registry.nersc.gov
-docker tag zatom:0.0.1 registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
-docker push registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
-
-# E.g., alternatively, to build image on NERSC cluster
-podman-hpc build --platform linux/amd64 --secret id=github_token,env=GITHUB_TOKEN --no-cache -t zatom:0.0.1 - < Dockerfile
-podman-hpc migrate zatom:0.0.1
-podman-hpc login registry.nersc.gov
-podman-hpc tag zatom:0.0.1 registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
-podman-hpc push registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
-
-# If using NERSC cluster, prepare image with Shifter
-shifterimg login registry.nersc.gov
-shifterimg -v pull registry.nersc.gov/dasrepo/acmwhb/zatom:0.0.1
+docker build --platform linux/amd64 --no-cache -t zatom:0.0.1 - < Dockerfile
 ```
 
 > 💡 Note: The Docker image is ~30 GB in size. Make sure you have enough storage space beforehand to build it.
@@ -169,28 +148,30 @@ One can download pretrained/finetuned Zatom-1 checkpoints as needed.
 ```bash
 mkdir checkpoints/
 
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mat_prop_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mat_prop_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_l_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_l_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_xl_joint_pretraining_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/platom_1_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_mp20_only_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/platom_1_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_mp20_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qm9_only_pretraining_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_geom_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_geom_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qmof_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_omol25_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_omol25_only_mlip_pretraining_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18248567/files/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
 ```
 
 </details>
@@ -246,7 +227,7 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within [`.vscode/launch.json`](.vscode/launch.json) for full examples of how to locally customize or debug model training. The scripts within [`scripts/perlmutter/`](scripts/perlmutter/) additionally describe how to train or evaluate models on a SLURM cluster.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within [`.vscode/launch.json`](.vscode/launch.json) for full examples of how to locally customize or debug model training. The scripts within [`scripts/ANON/`](scripts/ANON/) additionally describe how to train or evaluate models on a SLURM cluster.
 
 </details>
 
@@ -359,9 +340,9 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt d
 
 One can download 10,000 materials and molecules sampled with Zatom-1.
 
-- [Materials as CIF files](https://zenodo.org/records/18248567/files/zatom_1_materials_mp20.zip) (MP20)
-- [Molecules as PDB files](https://zenodo.org/records/18248567/files/zatom_1_molecules_qm9.zip) (QM9)
-- [Molecules as PDB files](https://zenodo.org/records/18248567/files/zatom_1_molecules_geom.zip) (GEOM-Drugs)
+- [Materials as CIF files](https://ANONYMOUS.ORG/zatom_1_materials_mp20.zip) (MP20)
+- [Molecules as PDB files](https://ANONYMOUS.ORG/zatom_1_molecules_qm9.zip) (QM9)
+- [Molecules as PDB files](https://ANONYMOUS.ORG/zatom_1_molecules_geom.zip) (GEOM-Drugs)
 
 </details>
 
@@ -369,7 +350,7 @@ One can download 10,000 materials and molecules sampled with Zatom-1.
 
 <details>
 
-#### LeMat-GenBench (default)
+#### LeMat-GenBench
 
 <details>
 
@@ -382,85 +363,10 @@ uv run scripts/run_benchmarks.py --cifs logs/eval_fm/runs/eval_tft_80M_MP20_izr5
 
 One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBench.
 
-- [Results for MP20-only Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1)
-- [Results for jointly trained Platom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_platom_1.zip) (Jointly trained Platom-1)
-- [Results for jointly trained Zatom-1](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1)
-- [Results for jointly trained Zatom-1-L](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
-- [Results for jointly trained Zatom-1-XL](https://zenodo.org/records/18248567/files/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
-
-</details>
-
-#### DFT (deprecated)
-
-<details>
-
-> 💡 Note: If you want to compute energy above hull for materials, you must [download the convex hull from 2023-02-07](https://figshare.com/articles/dataset/Matbench_Discovery_v1_0_0/22715158?file=40344451). Extract the files to the directory [`forks/flowmm/mp_02072023/`](forks/flowmm/mp_02072023/) and then run `gunzip forks/flowmm/mp_02072023/2023-02-07-ppd-mp.pkl.gz`. We got this hull from [Matbench Discovery](https://matbench-discovery.materialsproject.org/).
-
-> 💡 Note: Doing density functional theory (DFT) with [VASP](https://www.vasp.at/) requires a VASP license to define the required environment variable `PATH_TO_YOUR_PSEUDOPOTENTIALS`. We do not provide guidance on running DFT. That being said, your DFT results should typically be [corrected using the settings from the Materials Project](https://docs.materialsproject.org/methodology/materials-methodology/thermodynamic-stability/thermodynamic-stability).
-
-To fully evaluate one's generated materials using DFT
-
-```bash
-export PROJECT_ROOT=$(pwd)/forks/flowmm
-export PMG_VASP_PSP_DIR=PATH_TO_YOUR_PSEUDOPOTENTIALS
-
-# Change as needed
-eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_80M_MP20_izr5qhhf_2025-12-16_20-00-00"
-# mp20_only_zatom_1_eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_80M_MP20-only_hxip8xly_2025-12-21_17-00-00"
-# jointly_trained_platom_1_eval_dir="$(pwd)/logs/eval_fm/runs/eval_tfp_80M_QM9+MP20_odrl69x1_2026-01-01_16-30-00"
-# jointly_trained_zatom_1_eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_80M_MP20_izr5qhhf_2025-12-16_20-00-00"
-# jointly_trained_zatom_1_l_eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_160M_QM9+MP20_zkiysa4a_2025-12-24_06-00-00"
-# jointly_trained_zatom_1_xl_eval_dir="$(pwd)/logs/eval_fm/runs/eval_tft_300M_QM9+MP20_i1upnjuo_2025-12-24_06-00-00"
-
-eval_for_dft_samples="$eval_dir/mp20_test_0"
-eval_for_dft_json="$eval_dir/mp20_test_0.json"
-eval_log_dir="$eval_dir/chgnet_log_dir"
-
-# Set other flags if you are using SLURM; if not using SLURM, do not pass `--slurm_partition`
-num_jobs=1
-slurm_partition=YOUR_SLURM_PARTITION
-
-# Consolidate
-eval_for_dft_pt=$(python forks/flowmm/scripts_model/evaluate.py consolidate $eval_for_dft_samples --subdir "mp20_test_0" --path_eval_pt eval_for_dft.pt | tail -n 1)
-
-# Pre-relax
-python forks/flowmm/scripts_analysis/prerelax.py "$eval_for_dft_pt" "$eval_for_dft_json" "$eval_log_dir" --num_jobs "$num_jobs" --slurm_partition "$slurm_partition"
-
-# DFT (ignore error if VASP license is not available)
-dft_dir="$eval_dir/dft"
-mkdir -p "$dft_dir"
-python forks/flowmm/scripts_analysis/dft_create_inputs.py "$eval_for_dft_json" "$dft_dir"
-
-# Energy above hull (if VASP license is not available)
-# (Option 1: Using less accurate CHGNet prerelaxed energies)
-json_e_above_hull="$eval_dir/ehulls.json"
-python forks/flowmm/scripts_analysis/ehull.py "$eval_for_dft_json" "$json_e_above_hull"
-
-# Energy above hull (if VASP license is available)
-# (Option 2: Using more accurate DFT energies computed above using your VASP license, where `clean_outputs` contains trajectory files with name ######.traj with ###### corresponding to the index of the corresponding row in the `eval_for_dft_json` file)
-clean_outputs_dir="$eval_dir/clean_outputs"
-json_e_above_hull="$eval_dir/ehulls.json"
-python forks/flowmm/scripts_analysis/ehull.py "$eval_for_dft_json" "$json_e_above_hull" --clean_outputs_dir "${clean_outputs_dir}"
-
-# Corrected energy above hull (if VASP license is available)
-root_dft_clean_outputs="$eval_dir"
-ehulls_corrected_json="$eval_dir/ehulls_corrected.json"
-python forks/flowmm/scripts_analysis/ehull_correction.py "$eval_for_dft_json" "$ehulls_corrected_json" --root_dft_clean_outputs "$root_dft_clean_outputs"
-
-# S.U.N. and M.S.U.N (if VASP license is not available)
-sun_json="$eval_dir/sun.json"
-msun_json="$eval_dir/msun.json"
-python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$json_e_above_hull" --e_above_hull_column e_above_hull_per_atom_chgnet
-python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$json_e_above_hull" --json_sun_count msun_count.json --e_above_hull_column e_above_hull_per_atom_chgnet --e_above_hull_maximum 0.1
-
-# S.U.N. and M.S.U.N (if VASP license is available)
-sun_json="$eval_dir/sun.json"
-msun_json="$eval_dir/msun.json"
-python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$sun_json" --ehulls "$ehulls_corrected_json"
-python forks/flowmm/scripts_analysis/novelty.py "$eval_for_dft_json" "$msun_json" --ehulls "$ehulls_corrected_json" --json_sun_count msun_count.json --e_above_hull_maximum 0.1
-```
-
-> 💡 Note: See [`scripts/perlmutter/regular/eval_dft_mp20.sh`](scripts/perlmutter/regular/eval_dft_mp20.sh) for a full example of how to run materials evaluation with SLURM.
+- [Results for MP20-only Zatom-1](https://ANONYMOUS.ORG/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1)
+- [Results for jointly trained Zatom-1](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1)
+- [Results for jointly trained Zatom-1-L](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
+- [Results for jointly trained Zatom-1-XL](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
 
 </details>
 
@@ -493,7 +399,6 @@ pre-commit run -a
 - [all-atom-diffusion-transformer](https://github.com/facebookresearch/all-atom-diffusion-transformer)
 - [flow_matching](https://github.com/facebookresearch/flow_matching)
 - [flowmm](https://github.com/facebookresearch/flowmm)
-- [jvp_flash_attention](https://github.com/amorehead/jvp_flash_attention)
 - [lemat-genbench](https://github.com/LeMaterial/lemat-genbench)
 - [lightning-hydra-template](https://github.com/ashleve/lightning-hydra-template)
 - [PlatonicTransformers](https://github.com/niazoys/PlatonicTransformers)
@@ -509,20 +414,7 @@ This project is covered under a modified [**BSD License**](LICENSE).
 
 ## Copyright
 
-Zatom Copyright (c) 2026, The Regents of the University of California,
-through Lawrence Berkeley National Laboratory (subject to receipt of
-any required approvals from the U.S. Dept. of Energy). All rights reserved.
-
-If you have questions about your rights to use or distribute this software,
-please contact Berkeley Lab's Intellectual Property Office at
-IPO@lbl.gov.
-
-**NOTICE.**  This Software was developed under funding from the U.S. Department
-of Energy and the U.S. Government consequently retains certain rights.  As
-such, the U.S. Government has been granted for itself and others acting on
-its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
-Software to reproduce, distribute copies to the public, prepare derivative 
-works, and perform publicly and display publicly, and to permit others to do so.
+Zatom Copyright (c) 2026.
 
 ## Citing this work
 
@@ -531,12 +423,7 @@ If you use the code or data associated with this package or otherwise find this 
 ```bibtex
 @article{zatom_1_2026,
     title={Zatom-1: A Multimodal Flow Foundation Model for 3D Molecules and Materials},
-    author={Alex Morehead* and Miruna Cretu* and Antonia Panescu* and Rishabh Anand* and Maurice Weiler* and Tynan Perez* and Samuel Blau and Steven Farrell and Wahid Bhimji and Anubhav Jain and Hrushikesh Sahasrabuddhe and Pietro Liò and Tommi Jaakkola and Rafael Gómez-Bombarelli and Rex Ying* and Ben Erichson* and Michael Mahoney*},
+    author={ANONYMOUS},
     year={2026},
-    eprint={2602.22251},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG},
-    url={https://arxiv.org/abs/2602.22251},
-    note={* denotes equal contribution}
 }
 ```

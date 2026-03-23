@@ -1,6 +1,5 @@
 name: eval_sweep_tft_300M_geom-speed_2025-12-27_15-00-00
 project: zatom
-entity: zatom
 program: zatom/eval_fm.py
 
 method: grid

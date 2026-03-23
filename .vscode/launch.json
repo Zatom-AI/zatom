@@ -343,39 +343,5 @@
                 // "trainer.overfit_batches=1"
             ]
         },
-        {
-            "name": "[FlowMM] evaluate (consolidate).py",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/forks/flowmm/scripts_model/evaluate.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PROJECT_ROOT": "${workspaceFolder}/forks/flowmm",
-            },
-            "args": [
-                "consolidate",
-                "${workspaceFolder}/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00/mp20_test_0",
-                "--subdir",
-                "mp20_test_0",
-                "--path_eval_pt",
-                "eval_for_dft.pt",
-            ]
-        },
-        {
-            "name": "[FlowMM] prerelax.py",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/forks/flowmm/scripts_analysis/prerelax.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "${workspaceFolder}/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00/mp20_test_0/eval_for_dft.pt",
-                "${workspaceFolder}/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00/mp20_test_0.json",
-                "${workspaceFolder}/logs/eval_fm/runs/eval_mft_80M_MP20_pbzagonf_2025-10-30_10-30-00/chgnet_log_dir",
-                "--num_jobs", "1",
-                // "--slurm_partition", "YOUR_SLURM_PARTITION",
-            ]
-        },
     ]
 }

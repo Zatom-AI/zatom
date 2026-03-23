@@ -3,7 +3,7 @@ name = "zatom"
 version = "0.0.1"
 description = "Official repository of Zatom, a multimodal flow foundation model for 3D molecules and materials"
 authors = [
-    { name = "Alex Morehead", email = "alex.morehead@gmail.edu" }
+    { name = "ANONYMOUS", email = "[EMAIL_ADDRESS]" }
 ]
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
@@ -108,12 +108,12 @@ dependencies = [
     "pyarrow>=23.0.1",
     "monty==2025.3.3",
     "fairchem-core @ git+https://github.com/facebookresearch/fairchem.git@a9287b37469a80f9286151d70ceb184f91dfad8e#subdirectory=packages/fairchem-core",
-    "platonic_transformers @ git+https://github.com/amorehead/PlatonicTransformers.git@packaging",
+    "platonic_transformers @ git+https://github.com/niazoys/PlatonicTransformers.git@4d4c29dd43b44b0982b91bc7e178189c9337121a",
 ]
 
 [project.urls]
-Homepage = "https://pypi.org/project/zatom/"
-Repository = "https://github.com/Zatom-AI/zatom"
+Homepage = "https://anonymous.4open.science/r/zatom-4F95"
+Repository = "https://anonymous.4open.science/r/zatom-4F95"
 
 [project.optional-dependencies]
 test = ["pytest", "requests"]

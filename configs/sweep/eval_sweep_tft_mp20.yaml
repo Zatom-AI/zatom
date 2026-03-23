@@ -1,6 +1,5 @@
 name: eval_sweep_tft_mp20_atom-types-and-steps_2026-01-03_06-30-00
 project: zatom
-entity: zatom
 program: zatom/eval_fm.py
 
 method: grid

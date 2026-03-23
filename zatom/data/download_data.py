@@ -40,7 +40,7 @@ _dataset_path = "data/"
 
 @typecheck
 def get_zatom_dataset(dataset_name: str, root: str = _dataset_path) -> str:
-    """Download a specific dataset from the Zatom-AI organization on Hugging Face.
+    """Download a specific dataset from an anonymous organization on Hugging Face.
 
     NOTE: This function can be added to the dataset loaders to automatically
     download the dataset if it is not found in the local path.
@@ -57,7 +57,7 @@ def get_zatom_dataset(dataset_name: str, root: str = _dataset_path) -> str:
         dataset_name in _avail_datasets
     ), f"Dataset {dataset_name} not found. Available datasets: {_avail_datasets}"
     dataset_path = hf_download_repo(
-        repo_id=f"Zatom-AI/{dataset_name}",
+        repo_id=f"ANON/{dataset_name}",
         local_root=root,  # Root directory to save the dataset
         name_by_subdir=True,  # Each dataset repo is saved in a subdirectory named after the dataset
         ignore_files=(
@@ -68,7 +68,7 @@ def get_zatom_dataset(dataset_name: str, root: str = _dataset_path) -> str:
 
 
 def download_all_datasets():
-    """Download all datasets from the Zatom-AI organization on Hugging Face."""
+    """Download all datasets from an anonymous organization on Hugging Face."""
     for dataset_name in _avail_datasets:
         print(f"Downloading {dataset_name} dataset...")
         data_path = get_zatom_dataset(dataset_name)
@@ -79,7 +79,7 @@ def download_all_datasets():
 def main():
     """Main function to parse command-line arguments and download the specified dataset(s)."""
     parser = argparse.ArgumentParser(
-        description="Download datasets from Zatom-AI organization on Hugging Face"
+        description="Download datasets from an anonymous organization on Hugging Face"
     )
     parser.add_argument(
         "--dataset",
