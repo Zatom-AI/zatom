@@ -154,8 +154,9 @@ wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mat_prop_paper_weights.
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_l_joint_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_xl_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_wd_joint_pretraining_paper_weights.ckpt
 
-wget -P checkpoints/ https://ANONYMOUS.ORG/platom_1_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/platom_1_qm9_only_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_mp20_only_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qm9_only_pretraining_paper_weights.ckpt
 
@@ -167,7 +168,9 @@ wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_omol25_only_mlip_pretraining_
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_k25_layer_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_k75_layer_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt
 
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
@@ -344,6 +347,12 @@ One can download 10,000 materials and molecules sampled with Zatom-1.
 - [Molecules as PDB files](https://ANONYMOUS.ORG/zatom_1_molecules_qm9.zip) (QM9)
 - [Molecules as PDB files](https://ANONYMOUS.ORG/zatom_1_molecules_geom.zip) (GEOM-Drugs)
 
+If desired, unzip `zatom_1_materials_mp20.zip` and `zatom_1_molecules_qm9.zip` and move `zatom_1_materials_mp20/` and `zatom_1_molecules_qm9/` under the new directory `data/gen_samples/`. One can then analyze Zatom-1's shared latent space for molecules and materials as follows.
+
+```bash
+python scripts/plot_embeddings.py
+```
+
 </details>
 
 ### Materials analysis
@@ -367,6 +376,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 - [Results for jointly trained Zatom-1](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1)
 - [Results for jointly trained Zatom-1-L](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
 - [Results for jointly trained Zatom-1-XL](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
+- [Results for jointly trained Zatom-1-WD](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_wd.zip) (Jointly trained Zatom-1-WD)
 
 </details>
 

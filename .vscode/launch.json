@@ -343,5 +343,23 @@
                 // "trainer.overfit_batches=1"
             ]
         },
+        {
+            "name": "[DEBUG] plot_embeddings.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/plot_embeddings.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                // "--normalization", "clip_std",
+            ],
+            "env": {
+                "TRITON_INTERPRET": "1",
+                // "TRITON_FRONT_END_DEBUGGING": "1",
+                // "TRITON_F32_DEFAULT": "ieee",
+                "DEBUG": "True",
+                "TYPECHECK": "True",
+            },
+        },
     ]
 }
