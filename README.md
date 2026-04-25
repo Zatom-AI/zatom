@@ -380,7 +380,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 - [Results for jointly trained Zatom-1-L](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
 - [Results for jointly trained Zatom-1-XL](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
 - [Results for jointly trained Zatom-1-WD](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_wd.zip) (Jointly trained Zatom-1-WD)
-- [Results for jointly trained Zatom-1-WD (Relaxed)](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_zatom_1_wd_relaxed.zip) (Jointly trained Zatom-1-WD (Relaxed))
+- [Results for jointly trained Zatom-1-WD (Relaxed)](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_wd_relaxed.zip) (Jointly trained Zatom-1-WD (Relaxed))
 
 </details>
 
