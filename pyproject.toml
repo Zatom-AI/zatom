@@ -113,8 +113,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://anonymous.4open.science/r/zatom-4F95"
-Repository = "https://anonymous.4open.science/r/zatom-4F95"
+Homepage = "https://ANONYMOUS.ORG/zatom"
+Repository = "https://ANONYMOUS.ORG/zatom"
 
 [project.optional-dependencies]
 test = ["pytest", "requests"]
