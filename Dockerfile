@@ -43,5 +43,5 @@ RUN conda install -y -c conda-forge python=3.10 gcc=11.4.0 gxx=11.4.0 libstdcxx=
 WORKDIR /app/zatom
 
 # Clone and install the package + requirements
-RUN git clone https://anonymous.4open.science/r/zatom-4F95 . \
+RUN git clone https://ANONYMOUS.ORG/zatom . \
     && python -m pip install .[cuda]
