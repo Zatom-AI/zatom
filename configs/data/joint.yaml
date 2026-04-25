@@ -59,7 +59,7 @@ datamodule:
       _target_: zatom.data.components.matbench_dataset.Matbench
       root: ${paths.data_dir}/matbench
       proportion: 0.0
-      global_property: matbench_mp_gap # NOTE: if provided, must be one of the properties listed in https://huggingface.co/datasets/Ty-Perez/matbench_properties#available-tasks-splits
+      global_property: matbench_mp_gap # NOTE: if provided, must be one of the properties listed in https://huggingface.co/datasets/ANONYMOUS/matbench_properties#available-tasks-splits
       # registry metadata
       id: 6
       type_label: 0 # periodic
