@@ -57,7 +57,7 @@ def get_zatom_dataset(dataset_name: str, root: str = _dataset_path) -> str:
         dataset_name in _avail_datasets
     ), f"Dataset {dataset_name} not found. Available datasets: {_avail_datasets}"
     dataset_path = hf_download_repo(
-        repo_id=f"ANON/{dataset_name}",
+        repo_id=f"ANONYMOUS/{dataset_name}",
         local_root=root,  # Root directory to save the dataset
         name_by_subdir=True,  # Each dataset repo is saved in a subdirectory named after the dataset
         ignore_files=(
