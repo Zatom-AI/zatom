@@ -7,7 +7,7 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
-license = "MIT"
+license = "BSD"
 keywords = [
     'artificial intelligence',
     'deep learning',
