@@ -47,7 +47,7 @@ With `conda` available, one can build a virtual environment for `zatom`.
 
 ```bash
 # Clone project
-git clone https://anonymous.4open.science/r/zatom-4F95
+git clone https://ANONYMOUS.ORG/zatom
 cd zatom
 
 # [OPTIONAL] Create Conda environment
@@ -77,7 +77,7 @@ pre-commit install
 
 ```bash
 # Clone project
-git clone https://anonymous.4open.science/r/zatom-4F95
+git clone https://ANONYMOUS.ORG/zatom
 cd zatom
 
 # [OPTIONAL] Create Conda environment
@@ -126,7 +126,7 @@ For sake of reproducibility, one can alternatively build a (CUDA-based) Docker i
 
 ```bash
 # Clone project, making sure Git LFS is installed beforehand (https://git-lfs.com/)
-git clone https://anonymous.4open.science/r/zatom-4F95
+git clone https://ANONYMOUS.ORG/zatom
 cd zatom
 
 # E.g., to build image on local machine
