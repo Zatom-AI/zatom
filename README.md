@@ -8,8 +8,6 @@
 
 <!-- <a href="https://github.com/ashleve/lightning-hydra-template"><img alt="Template" src="https://img.shields.io/badge/-Lightning--Hydra--Template-017F2F?style=flat&logo=github&labelColor=gray"></a><br> -->
 
-<!-- [![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/paper/2020) -->
-
 <img src="./overview.png">
 
 </div>
@@ -233,7 +231,7 @@ python zatom/train_fm.py experiment=train
 python zatom/train_fm.py trainer.max_epochs=2000 data.datamodule.batch_size.train=8
 ```
 
-> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within [`.vscode/launch.json`](.vscode/launch.json) for full examples of how to locally customize or debug model training. The scripts within [`scripts/ANON/`](scripts/ANON/) additionally describe how to train or evaluate models on a SLURM cluster.
+> 💡 Note: See the [VS Code](https://code.visualstudio.com/) runtime configs within [`.vscode/launch.json`](.vscode/launch.json) for full examples of how to locally customize or debug model training.
 
 </details>
 
