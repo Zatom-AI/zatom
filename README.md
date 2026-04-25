@@ -164,6 +164,7 @@ wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_geom_pretraining_paper_
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qmof_only_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_omol25_only_pretraining_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_omol25_only_mlip_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_omol25_pretrained_and_finetuned_mlip_paper_weights.ckpt
 
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
@@ -175,6 +176,8 @@ wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_xl_joint_mol_prop_pred_paper_
 
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
 wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
+
+wget -P checkpoints/ https://ANONYMOUS.ORG/zatom_1_joint_paper_weights_equal_mol_mat_training_set_ratio.ckpt
 ```
 
 </details>
@@ -377,6 +380,7 @@ One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBenc
 - [Results for jointly trained Zatom-1-L](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
 - [Results for jointly trained Zatom-1-XL](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
 - [Results for jointly trained Zatom-1-WD](https://ANONYMOUS.ORG/lemat_genbench_jointly_trained_zatom_1_wd.zip) (Jointly trained Zatom-1-WD)
+- [Results for jointly trained Zatom-1-WD (Relaxed)](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_zatom_1_wd_relaxed.zip) (Jointly trained Zatom-1-WD (Relaxed))
 
 </details>
 
