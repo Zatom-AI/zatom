@@ -1,4 +1,4 @@
-name: eval_sweep_tft_qm9_2025-12-29_16-30-00
+name: eval_sweep_tft_qm9_2026-03-29_16-30-00
 project: zatom
 program: zatom/eval_fm.py
 
@@ -10,7 +10,7 @@ metric: # Does not matter, as we are using sweep to run the experiment.
 
 parameters:
   ckpt_path:
-    value: "${paths.log_dir}/train_fm/runs/train_model-zatom_arch-tft_80M_joint_2025-12-15_20-00-00/checkpoints/model-epoch@1399-step@43400-val_qm9_valid_rate@0.9471-val_mp20_valid_rate@0.9003.ckpt"
+    value: "${paths.root_dir}/checkpoints/zatom_1_joint_pretraining_paper_weights.ckpt"
 
   data:
     values: [joint]
@@ -19,7 +19,7 @@ parameters:
     value: 0.0
 
   date:
-    value: "2025-12-29_16-30-00"
+    value: "2026-03-29_16-30-00"
 
   experiment:
     value: eval
