@@ -52,7 +52,7 @@ def get_matbench_data_path(task_name: str, local_root: Optional[Union[str, Path]
         Path to the downloaded Matbench dataset.
     """
     path = hf_download_file(
-        repo_id="Ty-Perez/matbench_properties",
+        repo_id="ANONYMOUS/matbench_properties",
         filename=f"{task_name}.tar.gz",
         local_root=local_root,
     )
