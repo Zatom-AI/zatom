@@ -9,7 +9,6 @@ from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 # --- 1. Master Configuration for All Datasets ---
 
-# NOTE: ADiT and competitor data points are estimated from Figure 2 and Table 3 of the ADiT paper.
 x_steps = np.array([10, 25, 50, 100, 250, 500, 750, 1000])
 
 dataset_config = {
