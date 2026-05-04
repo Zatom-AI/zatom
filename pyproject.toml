@@ -1,7 +1,7 @@
 [project]
 name = "zatom"
 version = "0.0.1"
-description = "Official repository of Zatom-1, a general-purpose model for 3D molecules and materials"
+description = "Anonymous code for Zatom-1, a general-purpose model for 3D molecules and materials"
 authors = [
     { name = "ANONYMOUS", email = "[EMAIL_ADDRESS]" }
 ]
