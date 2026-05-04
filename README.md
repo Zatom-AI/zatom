@@ -14,7 +14,7 @@
 
 ## Description
 
-Official repository of Zatom-1, a multimodal flow foundation model for 3D molecules and materials
+Official repository of Zatom-1, a general-purpose model for 3D molecules and materials
 
 ## Installation
 
@@ -434,7 +434,7 @@ If you use the code or data associated with this package or otherwise find this 
 
 ```bibtex
 @article{zatom_1_2026,
-    title={Zatom-1: A Multimodal Flow Foundation Model for 3D Molecules and Materials},
+    title={Zatom-1: Towards a Multimodal Foundation Model for 3D Molecules and Materials},
     author={ANONYMOUS},
     year={2026},
 }
