@@ -14,7 +14,7 @@
 
 ## Description
 
-Official repository of Zatom-1, a general-purpose model for 3D molecules and materials
+Anonymous code for Zatom-1, a general-purpose model for 3D molecules and materials
 
 ## Installation
 
@@ -404,29 +404,9 @@ pre-commit run -a
 
 </details>
 
-## Acknowledgements
-
-`zatom` builds upon the source code and data from the following projects:
-
-- [all-atom-diffusion-transformer](https://github.com/facebookresearch/all-atom-diffusion-transformer)
-- [flow_matching](https://github.com/facebookresearch/flow_matching)
-- [flowmm](https://github.com/facebookresearch/flowmm)
-- [lemat-genbench](https://github.com/LeMaterial/lemat-genbench)
-- [lightning-hydra-template](https://github.com/ashleve/lightning-hydra-template)
-- [PlatonicTransformers](https://github.com/niazoys/PlatonicTransformers)
-- [ProteinWorkshop](https://github.com/a-r-j/ProteinWorkshop)
-- [posebusters](https://github.com/maabuu/posebusters)
-- [tabasco](https://github.com/carlosinator/tabasco)
-
-We thank all their contributors and maintainers!
-
 ## License
 
 This project is covered under a modified [**BSD License**](LICENSE).
-
-## Copyright
-
-Zatom Copyright (c) 2026.
 
 ## Citing this work
 
