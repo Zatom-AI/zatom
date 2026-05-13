@@ -18,7 +18,7 @@
 
 ## Description
 
-Official repository of Zatom-1, a multimodal flow foundation model for 3D molecules and materials
+Official repository of Zatom-1, a general-purpose model for 3D molecules and materials
 
 ## Installation
 
@@ -169,33 +169,36 @@ One can download pretrained/finetuned Zatom-1 checkpoints as needed.
 ```bash
 mkdir checkpoints/
 
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_mat_prop_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_mat_prop_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_l_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_xl_joint_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_wd_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_l_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_xl_joint_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_wd_joint_pretraining_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/platom_1_qm9_only_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_mp20_only_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/platom_1_qm9_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_mp20_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_qm9_only_pretraining_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_geom_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_omol25_only_pretraining_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_omol25_only_mlip_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_geom_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_qmof_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_omol25_only_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_omol25_only_mlip_pretraining_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_omol25_pretrained_and_finetuned_mlip_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_k25_layer_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_k75_layer_mol_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_non_pretrained_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_qm9_only_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_k25_layer_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_mid_layer_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_k75_layer_mol_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_xl_joint_mol_prop_pred_paper_weights.ckpt
 
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
-wget -P checkpoints/ https://zenodo.org/records/18894015/files/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_mol_and_mat_prop_pred_paper_weights.ckpt
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_qm9_only_mol_and_mat_prop_pred_paper_weights.ckpt
+
+wget -P checkpoints/ https://zenodo.org/records/19766997/files/zatom_1_joint_paper_weights_equal_mol_mat_training_set_ratio.ckpt
 ```
 
 </details>
@@ -298,13 +301,19 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt d
 To generate Zatom-1's evaluation metrics for (GEOM-Drugs) molecule generation only
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_geom_pretraining_paper_weights.ckpt data.datamodule.datasets.geom.proportion=1.0 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_80M_GEOM_l7f5ct7o seed=42 trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_geom_pretraining_paper_weights.ckpt data.datamodule.datasets.geom.proportion=1e-4 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 model.sampling.num_samples=10000 model.sampling.batch_size=1000 name=eval_tft_80M_GEOM_l7f5ct7o seed=42 trainer=gpu
 ```
 
 To generate Zatom-1's evaluation metrics for (QMOF150) material generation only
 
 ```bash
-python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_qmof_only_pretraining_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qmof150.proportion=1.0 model.sampling.num_samples=1000 model.sampling.batch_size=100 name=eval_tft_80M_QMOF_s6uzclqf seed=42 trainer=gpu
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_qmof_only_pretraining_paper_weights.ckpt data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 data.datamodule.datasets.qmof150.proportion=1e-4 model.sampling.num_samples=1000 model.sampling.batch_size=100 name=eval_tft_80M_QMOF_s6uzclqf seed=42 trainer=gpu
+```
+
+To generate Zatom-1's evaluation metrics for (OMol25) molecule generation only
+
+```bash
+python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_omol25_only_pretraining_paper_weights.ckpt data.datamodule.datasets.omol25.proportion=1e-4 data.datamodule.datasets.mp20.proportion=0.0 data.datamodule.datasets.qm9.proportion=0.0 model.sampling.num_samples=1000 model.sampling.batch_size=100 name=eval_tft_80M_OMol25_im0ugrx5 seed=42 trainer=gpu
 ```
 
 > 💡 Note: If `eval_fm.py` is taking too long to initialize all its dataloader workers, pass `data.datamodule.num_workers.SPLIT=0`, where `SPLIT` is `train`, `val`, and `test`.
@@ -366,9 +375,9 @@ python zatom/eval_fm.py ckpt_path=checkpoints/zatom_1_joint_paper_weights.ckpt d
 
 One can download 10,000 materials and molecules sampled with Zatom-1.
 
-- [Materials as CIF files](https://zenodo.org/records/18894015/files/zatom_1_materials_mp20.zip) (MP20)
-- [Molecules as PDB files](https://zenodo.org/records/18894015/files/zatom_1_molecules_qm9.zip) (QM9)
-- [Molecules as PDB files](https://zenodo.org/records/18894015/files/zatom_1_molecules_geom.zip) (GEOM-Drugs)
+- [Materials as CIF files](https://zenodo.org/records/19766997/files/zatom_1_materials_mp20.zip) (MP20)
+- [Molecules as PDB files](https://zenodo.org/records/19766997/files/zatom_1_molecules_qm9.zip) (QM9)
+- [Molecules as PDB files](https://zenodo.org/records/19766997/files/zatom_1_molecules_geom.zip) (GEOM-Drugs)
 
 If desired, unzip `zatom_1_materials_mp20.zip` and `zatom_1_molecules_qm9.zip` and move `zatom_1_materials_mp20/` and `zatom_1_molecules_qm9/` under the new directory `data/gen_samples/`. One can then analyze Zatom-1's shared latent space for molecules and materials as follows.
 
@@ -395,12 +404,13 @@ uv run scripts/run_benchmarks.py --cifs logs/eval_fm/runs/eval_tft_80M_MP20_izr5
 
 One can also download Zatom-1's leaderboard-compatible results for LeMat-GenBench.
 
-- [Results for MP20-only Zatom-1](https://zenodo.org/records/18894015/files/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1)
-- [Results for jointly trained Platom-1](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_platom_1.zip) (Jointly trained Platom-1)
-- [Results for jointly trained Zatom-1](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1)
-- [Results for jointly trained Zatom-1-L](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
-- [Results for jointly trained Zatom-1-XL](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
-- [Results for jointly trained Zatom-1-WD](https://zenodo.org/records/18894015/files/lemat_genbench_jointly_trained_zatom_1_wd.zip) (Jointly trained Zatom-1-WD)
+- [Results for MP20-only Zatom-1](https://zenodo.org/records/19766997/files/lemat_genbench_mp20_only_zatom_1.zip) (MP20-only Zatom-1)
+- [Results for jointly trained Platom-1](https://zenodo.org/records/19766997/files/lemat_genbench_jointly_trained_platom_1.zip) (Jointly trained Platom-1)
+- [Results for jointly trained Zatom-1](https://zenodo.org/records/19766997/files/lemat_genbench_jointly_trained_zatom_1.zip) (Jointly trained Zatom-1)
+- [Results for jointly trained Zatom-1-L](https://zenodo.org/records/19766997/files/lemat_genbench_jointly_trained_zatom_1_l.zip) (Jointly trained Zatom-1-L)
+- [Results for jointly trained Zatom-1-XL](https://zenodo.org/records/19766997/files/lemat_genbench_jointly_trained_zatom_1_xl.zip) (Jointly trained Zatom-1-XL)
+- [Results for jointly trained Zatom-1-WD](https://zenodo.org/records/19766997/files/lemat_genbench_jointly_trained_zatom_1_wd.zip) (Jointly trained Zatom-1-WD)
+- [Results for jointly trained Zatom-1-WD (Relaxed)](https://zenodo.org/records/19766997/files/lemat_genbench_jointly_trained_zatom_1_wd_relaxed.zip) (Jointly trained Zatom-1-WD (Relaxed))
 
 </details>
 
@@ -531,11 +541,11 @@ If you have questions about your rights to use or distribute this software,
 please contact Berkeley Lab's Intellectual Property Office at
 IPO@lbl.gov.
 
-**NOTICE.**  This Software was developed under funding from the U.S. Department
-of Energy and the U.S. Government consequently retains certain rights.  As
+**NOTICE.** This Software was developed under funding from the U.S. Department
+of Energy and the U.S. Government consequently retains certain rights. As
 such, the U.S. Government has been granted for itself and others acting on
 its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
-Software to reproduce, distribute copies to the public, prepare derivative 
+Software to reproduce, distribute copies to the public, prepare derivative
 works, and perform publicly and display publicly, and to permit others to do so.
 
 ## Citing this work
@@ -544,8 +554,9 @@ If you use the code or data associated with this package or otherwise find this 
 
 ```bibtex
 @article{zatom_1_2026,
-    title={Zatom-1: A Multimodal Flow Foundation Model for 3D Molecules and Materials},
+    title={Zatom-1: Towards a Multimodal Foundation Model for 3D Molecules and Materials},
     author={Alex Morehead* and Miruna Cretu* and Antonia Panescu* and Rishabh Anand* and Maurice Weiler* and Tynan Perez* and Samuel Blau and Steven Farrell and Wahid Bhimji and Anubhav Jain and Hrushikesh Sahasrabuddhe and Pietro Liò and Tommi Jaakkola and Rafael Gómez-Bombarelli and Rex Ying* and Ben Erichson* and Michael Mahoney*},
+    journal={arXiv},
     year={2026},
     eprint={2602.22251},
     archivePrefix={arXiv},

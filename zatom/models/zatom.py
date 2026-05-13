@@ -43,7 +43,7 @@ TASK_NAMES = Literal["train_fm", "finetune_fm", "eval_fm", "overfit_fm", "debug_
 
 
 class Zatom(LightningModule):
-    """LightningModule for foundation modeling of 3D molecules and materials.
+    """LightningModule for general-purpose modeling of 3D molecules and materials.
 
     A `LightningModule` implements 6 key methods:
 

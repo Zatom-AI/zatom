@@ -167,27 +167,37 @@ models = {
 plot_configs = [
     {
         "title": "Train loss",
+        "filename": "model_scaling_train_loss.pdf",
+        "inset_bounds": [0.11, 0.17, 0.35, 0.35],
+        "corr_text_xy": [0.95, 0.95],
+        "corr_text_ha": "right",
+        "legend_loc": "upper right",
         "df": df_loss,
         "y_label_left": "Train loss ↓",
-        "y_label_right": "Ep. 2000: Train loss ↓",
         "y_max": 3.0,
     },
     {
         "title": "Crystal validity",
+        "filename": "model_scaling_crystal_validity.pdf",
+        "inset_bounds": [0.63, 0.16, 0.36, 0.36],
+        "corr_text_xy": [0.05, 0.95],
+        "corr_text_ha": "left",
+        "legend_loc": "lower left",
         "df": df_crystal,
         "y_label_left": "Crystal validity rate (%) ↑",
-        "y_label_right": "Ep. 2000: Crystal validity rate (%) ↑",
     },
     {
         "title": "Molecule validity",
+        "filename": "model_scaling_molecule_validity.pdf",
+        "inset_bounds": [0.63, 0.16, 0.36, 0.36],
+        "corr_text_xy": [0.05, 0.95],
+        "corr_text_ha": "left",
+        "legend_loc": "lower left",
         "df": df_molecule,
         "y_label_left": "Molecule validity rate (%) ↑",
-        "y_label_right": "Ep. 2000: Molecule validity rate (%) ↑",
     },
 ]
 
-# Create the 3x2 subplot grid
-fig, axes = plt.subplots(3, 2, figsize=(8, 12), gridspec_kw={"width_ratios": [2, 1]})
 plt.style.use("default")  # Use a standard style
 
 # Get data at epoch 2000 for the correlation plots
@@ -199,14 +209,53 @@ for config in plot_configs:
         model_name: row_2000[model_name].iloc[0] for model_name in models
     }
 
-# Loop through each row configuration to create the plots
-for i, config in enumerate(plot_configs):
-    ax_left = axes[i, 0]
-    ax_right = axes[i, 1]
+def add_model_size_inset(config, ax):
+    ax_inset = ax.inset_axes(config["inset_bounds"])
+    ax_inset.set_in_layout(False)
 
-    # --- LEFT PLOT: Metric vs. Epoch ---
+    x_vals = np.log10([props["params"] for props in models.values()])
+    y_vals = [epoch_2000_data[config["title"]][model_name] for model_name in models]
+    sizes = [props["params"] * 0.65 for props in models.values()]
+    colors = [props["color"] for props in models.values()]
+    markers = [props["marker"] for props in models.values()]
+
+    for x, y, size, color, marker in zip(x_vals, y_vals, sizes, colors, markers):
+        ax_inset.scatter(
+            x,
+            y,
+            s=size,
+            c=color,
+            marker=marker,
+            alpha=0.9,
+            edgecolors="black",
+            linewidth=0.5,
+        )
+
+    slope, intercept = np.polyfit(x_vals, y_vals, 1)
+    ax_inset.plot(x_vals, slope * np.array(x_vals) + intercept, color="darkgrey", zorder=0)
+
+    pearson_val, _ = pearsonr(x_vals, y_vals)
+    spearman_val, _ = spearmanr(x_vals, y_vals)
+    ax_inset.text(
+        *config["corr_text_xy"],
+        f"Pearson={pearson_val:.2f}\nSpearman={spearman_val:.2f}",
+        transform=ax_inset.transAxes,
+        fontsize=7,
+        horizontalalignment=config["corr_text_ha"],
+        verticalalignment="top",
+        bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.7, linewidth=0.5),
+    )
+
+    ax_inset.set_title("Ep. 2000 vs. size", fontsize=7, pad=2)
+    ax_inset.set_xlabel("log10(params in M)", fontsize=7, labelpad=1)
+    ax_inset.tick_params(axis="both", labelsize=7, length=2, pad=1)
+    ax_inset.margins(x=0.2, y=0.25)
+
+
+def plot_metric(config, ax, *, show_title=False):
+    # --- MAIN PLOT: Metric vs. Epoch ---
     for model_name, props in models.items():
-        ax_left.plot(
+        ax.plot(
             config["df"]["epoch"],
             config["df"][model_name],
             label=props["label"],
@@ -215,56 +264,46 @@ for i, config in enumerate(plot_configs):
             markersize=4,
             linestyle="-",
         )
-        # Apply y-axis upper limit if provided in config (plotting functions don't accept y_max)
-        if config.get("y_max", None) is not None:
-            ymin, _ = ax_left.get_ylim()
-            ax_left.set_ylim(ymin, config["y_max"])
 
-    # ax_left.axvline(x=2000, color="grey", linestyle="--", alpha=0.7)
-    ax_left.set_xscale("symlog", linthresh=250)
-    ax_left.set_xlim(0, 2100)
-    ax_left.set_xlabel("Epoch")
-    ax_left.set_ylabel(config["y_label_left"])
-    ax_left.legend()
-    # ax_left.grid(True, which="both", linestyle="--", linewidth=0.5)
+    # Apply y-axis upper limit if provided in config.
+    if config.get("y_max", None) is not None:
+        ymin, _ = ax.get_ylim()
+        ax.set_ylim(ymin, config["y_max"])
 
-    # --- RIGHT PLOT: Correlation at Epoch 2000 ---
-    x_vals = np.log10([props["params"] for props in models.values()])
-    y_vals = [epoch_2000_data[config["title"]][model_name] for model_name in models]
-    sizes = [props["params"] * 3 for props in models.values()]  # Scale bubble size
-    colors = [props["color"] for props in models.values()]
-    markers = [props["marker"] for props in models.values()]
+    # ax.axvline(x=2000, color="grey", linestyle="--", alpha=0.7)
+    ax.set_xscale("symlog", linthresh=250)
+    ax.set_xlim(0, 2100)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel(config["y_label_left"])
+    if show_title:
+        ax.set_title(config["title"])
+    ax.legend(loc=config["legend_loc"], fontsize=8)
+    # ax.grid(True, which="both", linestyle="--", linewidth=0.5)
+    add_model_size_inset(config, ax)
 
-    # Scatter plot with scaled bubble sizes
-    for x, y, size, color, marker in zip(x_vals, y_vals, sizes, colors, markers):
-        ax_right.scatter(
-            x, y, s=size, c=color, marker=marker, alpha=0.9, edgecolors="black", linewidth=0.5
-        )
+output_dir = os.path.dirname(__file__)
 
-    # Calculate and plot trend line
-    slope, intercept = np.polyfit(x_vals, y_vals, 1)
-    ax_right.plot(x_vals, slope * np.array(x_vals) + intercept, color="darkgrey", zorder=0)
+fig, axes = plt.subplots(3, 1, figsize=(6, 9))
+for config, ax in zip(plot_configs, axes):
+    plot_metric(config, ax, show_title=True)
 
-    # Calculate and display correlations
-    pearson_val, _ = pearsonr(x_vals, y_vals)
-    spearman_val, _ = spearmanr(x_vals, y_vals)
-    corr_text = f"Pearson: {pearson_val:.2f}\nSpearman: {spearman_val:.2f}"
-    ax_right.text(
-        0.05,
-        0.95,
-        corr_text,
-        transform=ax_right.transAxes,
-        fontsize=10,
-        verticalalignment="top",
-        bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.5),
+fig.subplots_adjust(left=0.14, right=0.97, bottom=0.07, top=0.95, hspace=0.55)
+fig.savefig(
+    os.path.join(output_dir, "model_scaling_results.pdf"),
+    dpi=300,
+    bbox_inches="tight",
+    pad_inches=0.05,
+)
+plt.close(fig)
+
+for config in plot_configs:
+    subplot_fig, ax = plt.subplots(figsize=(5.3, 3.3))
+    plot_metric(config, ax)
+    subplot_fig.subplots_adjust(left=0.17, right=0.97, bottom=0.17, top=0.96)
+    subplot_fig.savefig(
+        os.path.join(output_dir, config["filename"]),
+        dpi=300,
+        bbox_inches="tight",
+        pad_inches=0.05,
     )
-
-    ax_right.set_xlabel("log10(Params in M)")
-    ax_right.set_ylabel(config["y_label_right"])
-    ax_right.yaxis.set_label_position("right")
-    ax_right.yaxis.tick_right()
-    # ax_right.grid(True, which="both", linestyle="--", linewidth=0.5)
-
-# Final adjustments and saving the figure
-plt.tight_layout(pad=2.0)
-plt.savefig(os.path.join(os.path.dirname(__file__), "model_scaling_results.pdf"), dpi=300)
+    plt.close(subplot_fig)
