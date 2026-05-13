@@ -209,6 +209,7 @@ for config in plot_configs:
         model_name: row_2000[model_name].iloc[0] for model_name in models
     }
 
+
 def add_model_size_inset(config, ax):
     ax_inset = ax.inset_axes(config["inset_bounds"])
     ax_inset.set_in_layout(False)
@@ -280,6 +281,7 @@ def plot_metric(config, ax, *, show_title=False):
     ax.legend(loc=config["legend_loc"], fontsize=8)
     # ax.grid(True, which="both", linestyle="--", linewidth=0.5)
     add_model_size_inset(config, ax)
+
 
 output_dir = os.path.dirname(__file__)
 
